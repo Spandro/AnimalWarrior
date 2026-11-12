@@ -24,3 +24,10 @@ export const HERO_RADIUS = 0.5;
 export const SEPARATION_CELL = 2;
 /** Obergrenze gleichzeitiger Gegner. */
 export const MAX_ENEMIES = 300;
+
+/** Sekunden, nach denen ein verwirrter Gegner eine neue Zufallsrichtung würfelt. */
+export const CONFUSE_REROLL = 1;
+/** Anteil der Verlangsamung, der bei Bossen wirkt. */
+export const BOSS_SLOW_FACTOR = 0.5;
+/** Größte Teilstrecke beim Rückstoß (für die Hinderniskollision). */
+export const KNOCKBACK_SUBSTEP = 0.5;

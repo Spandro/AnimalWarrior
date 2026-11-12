@@ -14,7 +14,7 @@ export const CLASSES = {
       { stat: 'armor', flat: 2 },
     ],
     startAbility: 'schwerthieb',
-    abilityPool: [],
+    abilityPool: ['wirbelschlag', 'schildstoss', 'kriegsschrei', 'erdspalter'],
   },
   magier: {
     id: 'magier',
@@ -26,7 +26,7 @@ export const CLASSES = {
       { stat: 'cooldown', pct: -0.10 },
     ],
     startAbility: 'feuerball',
-    abilityPool: [],
+    abilityPool: ['frostring', 'kettenblitz', 'meteor', 'arkankugeln'],
   },
   dieb: {
     id: 'dieb',
@@ -38,6 +38,6 @@ export const CLASSES = {
       { stat: 'critDamage', flat: 0.25 },
     ],
     startAbility: 'wurfdolche',
-    abilityPool: [],
+    abilityPool: ['giftflaeche', 'schattenklon', 'klingenfaecher', 'rauchbombe'],
   },
 };

@@ -4,3 +4,4 @@ import './combat.test.js';
 import './spatial.test.js';
 import './terrain.test.js';
 import './world.test.js';
+import './abilities.test.js';

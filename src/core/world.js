@@ -3,36 +3,117 @@ import { computeStats } from './stats.js';
 import { resolveHit } from './combat.js';
 import { createGrid } from './spatial.js';
 import { obstaclesNear } from './terrain.js';
+import { stepAbilities } from './abilities.js';
 import { CLASSES } from '../data/classes.js';
-import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, HERO_RADIUS, SEPARATION_CELL, MAX_ENEMIES } from '../data/enemies.js';
+import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, HERO_RADIUS, SEPARATION_CELL, MAX_ENEMIES,
+  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP } from '../data/enemies.js';
 
 /**
  * @typedef {import('./stats.js').Stats} Stats
  * @typedef {import('../data/animals.js').Modifier} Modifier
  * @typedef {{ id: string, level: number, cooldownLeft: number }} HeroAbility
- * @typedef {{ modifiers: Modifier[], timeLeft: number }} Buff
+ * @typedef {{ modifiers: Modifier[], timeLeft: number, abilityId?: string }} Buff
  * @typedef {{ x: number, z: number, facing: {x:number,z:number}, hp: number, stats: Stats, modifiers: Modifier[],
  *   abilities: HeroAbility[], buffs: Buff[], radius: number, invulnerableUntil: number, animalId: string, classId: string }} Hero
  * @typedef {{ id: number, type: string, x: number, z: number, hp: number, maxHp: number, radius: number, speed: number,
- *   damage: number, elite: boolean, boss: boolean, flying: boolean, behavior: string, slowUntil: number, confusedUntil: number,
- *   contactReadyAt: number, ai: object }} Enemy
+ *   damage: number, elite: boolean, boss: boolean, flying: boolean, behavior: string, slowUntil: number, slowFactor: number,
+ *   confusedUntil: number, stunnedUntil: number, contactReadyAt: number, hitReadyAt: Record<string, number>, ai: object,
+ *   wander?: { x: number, z: number, rerollAt: number } }} Enemy
  * @typedef {{ kind: 'xp'|'gold'|'potion'|'chest', x: number, z: number, value: number }} Pickup
  * @typedef {{ level: number, xp: number, kills: number, gold: number, bonuses: object, damageByAbility: Record<string, number>, revivesLeft: number }} Run
  * @typedef {{ time: number, seed: number, rng: import('./rng.js').Rng, hero: Hero, enemies: Enemy[], projectiles: object[],
  *   zones: object[], orbitals: object[], summons: object[], pickups: Pickup[], events: object[], run: Run, nextId: number }} World
  */
 
-/** Bewegungsfunktionen je behavior; unbekannte fallen auf chase zurück. Weitere kommen in Aufgabe 7. */
+/**
+ * Bewegungsfunktionen je behavior; unbekannte fallen auf chase zurück. Weitere kommen in Aufgabe 7.
+ * Sie nutzen enemyTarget und enemySpeed, damit Klon und Verlangsamung wirken.
+ */
 const BEHAVIORS = {
   chase(world, enemy, dt) {
-    const dx = world.hero.x - enemy.x, dz = world.hero.z - enemy.z;
+    const target = enemyTarget(world, enemy);
+    const dx = target.x - enemy.x, dz = target.z - enemy.z;
     const d = Math.hypot(dx, dz);
     if (d < 1e-9) return;
-    const step = enemy.speed * dt;
+    const step = Math.min(d, enemySpeed(world, enemy) * dt);
     enemy.x += (dx / d) * step;
     enemy.z += (dz / d) * step;
   },
 };
+
+/**
+ * Ziel, das ein Gegner ansteuert: die nächste Beschwörung, in deren Lockradius er steht, sonst der Held.
+ * @param {World} world
+ * @param {Enemy} enemy
+ * @returns {{ x: number, z: number }}
+ */
+export function enemyTarget(world, enemy) {
+  let best = world.hero, bestD2 = Infinity;
+  for (const s of world.summons) {
+    const dx = s.x - enemy.x, dz = s.z - enemy.z;
+    const d2 = dx * dx + dz * dz;
+    if (d2 <= s.lureRadius * s.lureRadius && d2 < bestD2) { best = s; bestD2 = d2; }
+  }
+  return best;
+}
+
+/**
+ * Aktuelles Tempo eines Gegners unter Verlangsamung.
+ * @param {World} world
+ * @param {Enemy} enemy
+ */
+export function enemySpeed(world, enemy) {
+  return world.time < enemy.slowUntil ? enemy.speed * (1 - enemy.slowFactor) : enemy.speed;
+}
+
+/**
+ * Setzt Zustände auf einen Gegner. Bosse sind immun gegen Betäubung und Verwirrung, Verlangsamung wirkt halb.
+ * Längere bzw. stärkere Wirkungen werden nicht durch schwächere überschrieben.
+ * @param {World} world
+ * @param {Enemy} enemy
+ * @param {{ slow?: number, slowDuration?: number, stun?: number, confuse?: number }} status
+ */
+export function applyStatus(world, enemy, { slow = 0, slowDuration = 0, stun = 0, confuse = 0 }) {
+  const t = world.time;
+  if (slow > 0 && slowDuration > 0) {
+    const factor = enemy.boss ? slow * BOSS_SLOW_FACTOR : slow;
+    if (t >= enemy.slowUntil || factor >= enemy.slowFactor) enemy.slowFactor = factor;
+    enemy.slowUntil = Math.max(enemy.slowUntil, t + slowDuration);
+  }
+  if (enemy.boss) return;
+  if (stun > 0) enemy.stunnedUntil = Math.max(enemy.stunnedUntil, t + stun);
+  if (confuse > 0) enemy.confusedUntil = Math.max(enemy.confusedUntil, t + confuse);
+}
+
+/**
+ * Stößt einen Gegner direkt vom Helden weg; Bodengegner bleiben an Hindernissen hängen. Bosse sind immun.
+ * @param {World} world
+ * @param {Enemy} enemy
+ * @param {number} distance
+ */
+export function knockback(world, enemy, distance) {
+  if (enemy.boss || distance <= 0) return;
+  let dx = enemy.x - world.hero.x, dz = enemy.z - world.hero.z;
+  const d = Math.hypot(dx, dz);
+  if (d < 1e-9) { dx = world.hero.facing.x; dz = world.hero.facing.z; } else { dx /= d; dz /= d; }
+  const steps = Math.max(1, Math.ceil(distance / KNOCKBACK_SUBSTEP));
+  for (let i = 0; i < steps; i++) {
+    enemy.x += dx * distance / steps;
+    enemy.z += dz * distance / steps;
+    if (!enemy.flying) pushOutOfObstacles(world, enemy);
+  }
+}
+
+/** Verwirrter Gegner: läuft in eine zufällige Richtung, die etwa einmal pro Sekunde neu gewürfelt wird. */
+function wander(world, enemy, dt) {
+  if (!enemy.wander || world.time >= enemy.wander.rerollAt) {
+    const a = world.rng.range(0, Math.PI * 2);
+    enemy.wander = { x: Math.cos(a), z: Math.sin(a), rerollAt: world.time + CONFUSE_REROLL };
+  }
+  const step = enemySpeed(world, enemy) * dt;
+  enemy.x += enemy.wander.x * step;
+  enemy.z += enemy.wander.z * step;
+}
 
 /**
  * @param {{ seed: number, animalId: string, classId: string, modifiers?: Modifier[] }} opts
@@ -89,7 +170,7 @@ export function spawnEnemy(world, type, x, z, { elite = false, hpMul = 1, dmgMul
     radius: def.radius * (elite ? ELITE.scale : 1),
     speed: def.speed, damage: def.damage * dmgMul,
     elite, boss: def.behavior === 'boss', flying: !!def.flying, behavior: def.behavior,
-    slowUntil: 0, confusedUntil: 0, contactReadyAt: 0, ai: {},
+    slowUntil: 0, slowFactor: 0, confusedUntil: 0, stunnedUntil: 0, contactReadyAt: 0, hitReadyAt: {}, ai: {},
   };
   world.enemies.push(enemy);
   return enemy;
@@ -216,15 +297,21 @@ export function stepWorld(world, dt, input) {
   // Regeneration
   if (hero.stats.hpRegen > 0) hero.hp = Math.min(hero.stats.maxHp, hero.hp + hero.stats.hpRegen * dt);
 
+  // Fähigkeiten auslösen, Geschosse, Zonen, Umläufe und Beschwörungen bewegen
+  stepAbilities(world, dt);
+
   // Gegner bewegen
   for (const e of world.enemies) {
-    (BEHAVIORS[e.behavior] || BEHAVIORS.chase)(world, e, dt);
+    if (world.time < e.stunnedUntil) continue;
+    if (world.time < e.confusedUntil) wander(world, e, dt);
+    else (BEHAVIORS[e.behavior] || BEHAVIORS.chase)(world, e, dt);
   }
   separateEnemies(world);
   for (const e of world.enemies) if (!e.flying) pushOutOfObstacles(world, e);
 
   // Berührungsschaden
   for (const e of world.enemies) {
+    if (world.time < e.stunnedUntil) continue;
     const dx = e.x - hero.x, dz = e.z - hero.z;
     const min = e.radius + hero.radius;
     if (dx * dx + dz * dz < min * min && world.time >= e.contactReadyAt) {

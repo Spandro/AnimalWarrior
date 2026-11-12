@@ -13,7 +13,12 @@ function run(world, seconds, dt, input) {
   const steps = Math.round(seconds / dt);
   for (let i = 0; i < steps; i++) stepWorld(world, dt, input);
 }
-const newWorld = (extra = {}) => createWorld({ seed: clearSeed(), animalId: 'ente', classId: 'dieb', ...extra });
+/** Welt ohne Heldenfähigkeiten, damit automatisch geworfene Dolche die Bewegungstests nicht stören. */
+function newWorld(extra = {}) {
+  const w = createWorld({ seed: clearSeed(), animalId: 'ente', classId: 'dieb', ...extra });
+  w.hero.abilities = [];
+  return w;
+}
 
 test('world: createWorld liefert Held mit Startfähigkeit und vollem Leben', () => {
   const w = createWorld({ seed: 1, animalId: 'hase', classId: 'magier' });
