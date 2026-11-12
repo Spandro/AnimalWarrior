@@ -2,6 +2,7 @@ import { createWorld, stepWorld, spawnEnemy, spawnShadow, cappedEnemyCount, knoc
 import { pendingLevelUps, rollCards, applyCard, openChest } from '../core/progression.js';
 import { obstaclesNear } from '../core/terrain.js';
 import { ENEMIES, ELITE } from '../data/enemies.js';
+import { MAX_LEVEL } from '../data/bonuses.js';
 import { SHADOW, SHADOW_LINES, shadowMaxHp } from '../data/shadow.js';
 import {
   RUN_DURATION, MAX_ENEMIES, unlockMinute, weights, MAX_FORMULA_MINUTE, spawnPerSecond, hpMul, dmgMul,
@@ -27,8 +28,11 @@ import {
  * @typedef {'playing'|'levelup'|'paused'|'won'|'lost'} RunState
  * @typedef {{ acc: number, backlog: number, strongPending: number, nextEliteAt: number, bossIndex: number,
  *   finalBoss: import('../core/world.js').Enemy|null, shadowIndex: number }} SpawnState
+ * @typedef {import('../data/achievements.js').RunFacts} RunFacts
  * @typedef {{ world: World, state: RunState, cards: Card[]|null, view: { halfW: number, halfH: number },
- *   timeScale: number, events: object[], spawn: SpawnState }} Run
+ *   timeScale: number, events: object[], spawn: SpawnState, facts: RunFacts, streakFrom: number }} Run
+ *   `facts`: Zahlen für die Erfolge, in `stepRun` aus den Ereignissen jedes Teilschritts fortgeschrieben (nur einfache
+ *   Werte, keine Verweise in die Welt); `streakFrom`: Spielzeit der letzten Tötung (oder 0).
  */
 
 /**
@@ -41,7 +45,49 @@ export function createSurvivorRun({ seed, animalId, classId, modifiers = [], rev
   return {
     world, state: 'playing', cards: null, view: { ...DEFAULT_VIEW }, timeScale, events: [],
     spawn: { acc: 0, backlog: 0, strongPending: 0, nextEliteAt: ELITE_INTERVAL, bossIndex: 0, finalBoss: null, shadowIndex: 0 },
+    facts: {
+      ended: false, won: false, time: 0, level: 1, kills: 0, killsByType: {}, dodges: 0, goldEarned: 0, bossesKilled: 0,
+      shadowsRouted: 0, revived: 0, hpFractionAtEnd: 1, longestNoKillStreak: 0, maxedAbilities: 0, animalId, classId,
+    },
+    streakFrom: 0,
   };
+}
+
+/**
+ * Schreibt die Zahlen für die Erfolge fort: zählt die Ereignisse eines Teilschritts und frischt Zeit, Level,
+ * Gold und Fähigkeitsstufen auf. Die Serie ohne Tötung läuft nur mit der Spielzeit, also nie in Pause oder Kartenwahl.
+ * Bären gibt es nur als Bosse; jede Bärentötung zählt deshalb als besiegter Boss.
+ * @param {Run} run
+ * @param {object[]} events
+ */
+export function recordFacts(run, events) {
+  const f = run.facts, world = run.world;
+  let killed = false;
+  for (const e of events) {
+    if (e.type === 'kill') {
+      killed = true;
+      f.killsByType[e.enemyType] = (f.killsByType[e.enemyType] || 0) + 1;
+      if (e.enemyType === 'baer') f.bossesKilled++;
+    } else if (e.type === 'dodge') f.dodges++;
+    else if (e.type === 'shadowFlee') f.shadowsRouted++;
+    else if (e.type === 'revive') f.revived++;
+  }
+  f.kills = world.run.kills;
+  f.time = world.time;
+  f.level = world.run.level;
+  f.goldEarned = world.run.gold;
+  f.maxedAbilities = world.hero.abilities.filter((a) => a.level >= MAX_LEVEL).length;
+  f.longestNoKillStreak = Math.max(f.longestNoKillStreak, world.time - run.streakFrom);
+  if (killed) run.streakFrom = world.time;
+}
+
+/**
+ * Kopie der Zahlen für die Erfolge (ohne Verweise auf den Durchgang).
+ * @param {Run} run
+ * @returns {RunFacts}
+ */
+export function getFacts(run) {
+  return { ...run.facts, killsByType: { ...run.facts.killsByType } };
 }
 
 /**
@@ -75,6 +121,7 @@ function subStep(run, dt, input) {
     run.cards = rollCards(world, 3);
     world.events.push({ type: 'levelup', level: world.run.level + 1 });
   }
+  recordFacts(run, world.events);
   run.events.push(...world.events);
 }
 
@@ -217,6 +264,15 @@ function endRun(run, state, eventType) {
   run.state = state;
   run.cards = null;
   run.world.events.push({ type: eventType });
+  finishFacts(run);
+}
+
+/** Hält das Ende in den Zahlen fest: beendet, gewonnen oder nicht, Lebensanteil des Helden. */
+function finishFacts(run) {
+  const hero = run.world.hero;
+  run.facts.ended = true;
+  run.facts.won = run.state === 'won';
+  run.facts.hpFractionAtEnd = Math.min(1, Math.max(0, hero.hp / hero.stats.maxHp));
 }
 
 /**
@@ -242,6 +298,8 @@ export function abandonRun(run) {
   run.state = 'lost';
   run.cards = null;
   run.events = [{ type: 'death' }];
+  recordFacts(run, []);
+  finishFacts(run);
 }
 
 /**

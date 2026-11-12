@@ -1,15 +1,20 @@
 import { ANIMALS } from '../data/animals.js';
 import { CLASSES } from '../data/classes.js';
 import { META } from '../data/meta.js';
+import { ENEMIES } from '../data/enemies.js';
+import { ACHIEVEMENTS } from '../data/achievements.js';
 
 /**
  * @typedef {{ bestTime: number, wins: number, runs: number }} SurvivorRecord
  * @typedef {{ id: string, name: string, animal: string, class: string, createdAt: number, survivor: SurvivorRecord }} Hero
  * @typedef {{ volume: number, quality: 'high' | 'low' }} Settings
- * @typedef {{ version: number, heroes: Hero[], gold: number, metaUpgrades: Record<string, number>, settings: Settings }} Save
+ * @typedef {import('../data/achievements.js').LifetimeStats} LifetimeStats
+ * @typedef {{ version: number, heroes: Hero[], gold: number, metaUpgrades: Record<string, number>, settings: Settings,
+ *   achievements: Record<string, number>, stats: LifetimeStats }} Save
+ *   `achievements`: Erfolgs-Id → Zeitpunkt der Freischaltung (ms); `stats`: lebenslange Zähler für alle Helden.
  */
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 export const STORAGE_KEY = 'animalwarrior.save';
 export const BACKUP_KEY = 'animalwarrior.save.corrupt';
 export const MAX_HEROES = 6;
@@ -23,11 +28,29 @@ export function defaultSave() {
     gold: 0,
     metaUpgrades: {},
     settings: { volume: 70, quality: 'high' },
+    achievements: {},
+    stats: { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0 },
   };
 }
 
-/** Migrationsschritte: Version n → n + 1. Aktuell gibt es nur Version 1. */
-const MIGRATIONS = {};
+const countOf = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
+
+/**
+ * Migrationsschritte: Version n → n + 1; sie ändern ihre Eingabe nicht.
+ * 1 → 2: Erfolge und lebenslange Zähler; Durchgänge und Siege stammen aus den Helden, der Rest beginnt bei null.
+ */
+const MIGRATIONS = {
+  1: (data) => {
+    const heroes = Array.isArray(data.heroes) ? data.heroes : [];
+    const total = (key) => heroes.reduce((sum, h) => sum + countOf(h?.survivor?.[key]), 0);
+    return {
+      ...data,
+      version: 2,
+      achievements: {},
+      stats: { kills: {}, runs: total('runs'), wins: total('wins'), winsByAnimal: {}, shadowsRouted: 0 },
+    };
+  },
+};
 
 /**
  * Hebt Daten schrittweise auf die aktuelle Version. Wirft bei unbrauchbarer Version.
@@ -86,5 +109,22 @@ export function validate(data) {
   if (!isObject(st)) return fail('Einstellungen fehlen');
   if (!Number.isInteger(st.volume) || st.volume < 0 || st.volume > 100) return fail('Ungültige Lautstärke');
   if (st.quality !== 'high' && st.quality !== 'low') return fail('Ungültige Qualität');
+  if (!isObject(data.achievements)) return fail('Erfolge fehlen');
+  for (const [id, at] of Object.entries(data.achievements)) {
+    if (!ACHIEVEMENTS.some((a) => a.id === id)) return fail('Unbekannter Erfolg');
+    if (!isNonNegNumber(at)) return fail('Ungültiger Freischaltzeitpunkt');
+  }
+  const stats = data.stats;
+  if (!isObject(stats)) return fail('Statistik fehlt');
+  for (const key of ['runs', 'wins', 'shadowsRouted']) {
+    if (!Number.isInteger(stats[key]) || stats[key] < 0) return fail('Ungültiger Zähler');
+  }
+  for (const [field, known] of [['kills', ENEMIES], ['winsByAnimal', ANIMALS]]) {
+    if (!isObject(stats[field])) return fail('Statistik fehlt');
+    for (const [key, n] of Object.entries(stats[field])) {
+      if (!Object.hasOwn(known, key)) return fail('Unbekannter Eintrag in der Statistik');
+      if (!Number.isInteger(n) || n < 0) return fail('Ungültiger Zähler');
+    }
+  }
   return { ok: true };
 }

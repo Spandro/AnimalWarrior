@@ -85,6 +85,7 @@ export function renderMain(c, props, app) {
     el('nav', { class: 'menu-list', 'aria-label': 'Hauptmenü' },
       el('button', { class: 'btn btn-primary btn-large', type: 'button', onclick: () => app.screens.show('heroes') }, 'Spielen'),
       el('button', { class: 'btn', type: 'button', onclick: () => app.screens.show('metaShop') }, 'Dauerboni'),
+      el('button', { class: 'btn', type: 'button', onclick: () => app.screens.show('achievements') }, 'Erfolge'),
       el('button', { class: 'btn', type: 'button', onclick: () => app.screens.show('settings') }, 'Einstellungen'),
       el('div', { class: 'menu-row' },
         el('button', { class: 'btn', type: 'button', onclick: () => exportSave(app) }, 'Spielstand exportieren'),

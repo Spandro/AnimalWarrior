@@ -31,7 +31,7 @@ const arpeggio = (wave, notes, step, dur, gain) =>
   notes.map((f, i) => ({ kind: 'tone', wave, freq: [f, f], dur, gain, delay: i * step }));
 
 /**
- * Klang je Ereignistyp (`run.events`); `click` ist für Menüknöpfe.
+ * Klang je Ereignistyp (`run.events`); `click` ist für Menüknöpfe, `achievement` für freigeschaltete Erfolge (kein Ereignis, wird direkt gespielt).
  * @type {Record<string, Voice[]>}
  */
 export const SFX = {
@@ -77,6 +77,11 @@ export const SFX = {
   shadowVanish: [
     { kind: 'noise', filter: 'bandpass', freq: [1400, 250], dur: 0.7, gain: 0.22, attack: 0.05 },
     { kind: 'tone', wave: 'sine', freq: [330, 110], dur: 0.7, gain: 0.12, attack: 0.05 },
+  ],
+  // Erfolg freigeschaltet: kleine helle Fanfare, nicht so lang wie der Sieg.
+  achievement: [
+    ...arpeggio('triangle', [784, 988, 1175, 1568], 0.08, 0.3, 0.26),
+    { kind: 'noise', filter: 'highpass', freq: [7000, 4000], dur: 0.25, gain: 0.08, delay: 0.24 },
   ],
   click: [
     { kind: 'tone', wave: 'triangle', freq: [660, 440], dur: 0.05, gain: 0.18 },

@@ -5,7 +5,8 @@ import { createTerrainView } from './render/terrain.js';
 import { createEnemyView } from './render/enemies.js';
 import { createHeroView } from './render/hero.js';
 import { createEffects } from './render/effects.js';
-import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary, abandonRun } from './modes/survivor.js';
+import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary, getFacts, abandonRun } from './modes/survivor.js';
+import { evaluateAchievements, liveStats } from './core/achievements.js';
 import { spawnEnemy, damageEnemy } from './core/world.js';
 import { xpToNext } from './core/progression.js';
 import { createRng } from './core/rng.js';
@@ -34,17 +35,20 @@ const FPS_WINDOW = 5;
  *   animalId: string, classId: string, seed: number, quality?: 'high'|'low', timeScale?: number,
  *   modifiers?: import('./data/animals.js').Modifier[], revive?: boolean, sfx?: { handle(events: object[]): void },
  *   debug?: boolean, stress?: boolean, autopick?: boolean, sprites?: import('./render/sprites.js').SpriteSheets,
- *   onEnd?: (summary: Summary) => void }} options
+ *   achievements?: { getSave: () => import('./save/schema.js').Save, notify: (id: string) => void },
+ *   onEnd?: (summary: Summary, extra: { facts: import('./data/achievements.js').RunFacts, earlyIds: string[] }) => void }} options
  *   `view` ist der gemeinsame Renderer der App (sonst wird einer für `canvas` angelegt). `sprites` sind die
  *   geladenen Bildbögen (`loadSpriteSheets`); fehlen sie oder sind sie nicht `ok`, erscheinen die 3D-Figuren.
  *   Nur mit `debug`: `stress` füllt die Welt mit Ratten, `autopick` wählt Karten selbst, Taste K besiegt
  *   alle Gegner, L gibt ein Level. `onEnd` kommt einmal nach Sieg, Tod oder Aufgeben. `sfx` bekommt dieselben
  *   Ereignisse wie die Effekte und spielt die Klänge dazu.
+ *   `achievements` (nur mit Spielstand): `getSave` liefert den aktuellen Stand, `notify(id)` meldet einen mitten im
+ *   Durchgang erfüllten Erfolg; `onEnd` bekommt dazu die Zahlen des Durchgangs und diese Ids (`earlyIds`).
  * @returns {{ stop(): void, setQuality(q: 'high'|'low'): void }}
  */
 export function startGame({
   canvas, uiLayer, view, animalId, classId, seed, quality = 'high', timeScale = 1, modifiers = [], revive = false,
-  debug = false, stress = false, autopick = false, sprites, sfx, onEnd,
+  debug = false, stress = false, autopick = false, sprites, sfx, achievements, onEnd,
 }) {
   if (!view) view = createRenderer(canvas, { quality });
   else view.setQuality(quality);
@@ -159,7 +163,27 @@ export function startGame({
     if (ended) return;
     ended = true;
     keys.clear();
-    endTimer = setTimeout(() => onEnd?.(getSummary(run)), delay);
+    endTimer = setTimeout(() => onEnd?.(getSummary(run), { facts: getFacts(run), earlyIds: [...early] }), delay);
+  }
+
+  /**
+   * Erfolge mitten im Durchgang: einmal je Spielsekunde mit den laufenden Zahlen; neu erfüllte Ids werden sofort
+   * gemeldet und für das Ende gemerkt (gespeichert und mit Gold belohnt wird erst dort).
+   */
+  const early = new Set();
+  let achievementSecond = -1;
+  function checkAchievements() {
+    if (!achievements || ended || run.state === 'won' || run.state === 'lost') return;
+    const second = Math.floor(world.time);
+    if (second === achievementSecond) return;
+    achievementSecond = second;
+    const save = achievements.getSave();
+    const f = getFacts(run);
+    const ctx = { run: f, stats: liveStats(save.stats, f), save: { ...save, gold: save.gold + Math.floor(f.goldEarned) } };
+    for (const id of evaluateAchievements(ctx, new Set([...Object.keys(save.achievements), ...early]))) {
+      early.add(id);
+      achievements.notify(id);
+    }
   }
 
   let acc = 0, last = NaN, rafId = 0;
@@ -182,6 +206,7 @@ export function startGame({
     }
     // Pause, Kartenwahl und Ende: Welt steht, kein Nachholen danach.
     if (run.state !== 'playing') acc = 0;
+    checkAchievements();
 
     if (run.state === 'levelup' && !levelUp.open) {
       if (autopick) chooseCard(run, 0);

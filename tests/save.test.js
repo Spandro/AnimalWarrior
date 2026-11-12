@@ -206,12 +206,107 @@ test('save: validate prüft Stufen, Einstellungen und Namen', () => {
   assertEqual(validate({ ...s, heroes: [h] }).ok, false);
 });
 
-test('save: migrate lässt Version 1 unverändert und wirft sonst', () => {
+test('save: migrate lässt die aktuelle Version unverändert und wirft sonst', () => {
   const s = defaultSave();
   assertEqual(migrate(s), s);
-  assertEqual(SAVE_VERSION, 1);
+  assertEqual(SAVE_VERSION, 2);
   assertThrows(() => migrate({ version: 99 }));
+  assertThrows(() => migrate({ version: 0 }));
   assertThrows(() => migrate(null));
+});
+
+const v1Hero = (n, animal, runs, wins) => ({
+  id: `h${n}`, name: `H${n}`, animal, class: 'krieger', createdAt: 1, survivor: { bestTime: 120, wins, runs },
+});
+const v1Save = () => ({
+  version: 1, gold: 340, metaUpgrades: { leben: 2 }, settings: { volume: 40, quality: 'low' },
+  heroes: [v1Hero(1, 'hase', 5, 1), v1Hero(2, 'ente', 7, 2)],
+});
+
+test('save: migrate hebt Version 1 auf 2 mit leeren Erfolgen und Zählern aus den Helden', () => {
+  const old = v1Save();
+  const copy = JSON.parse(JSON.stringify(old));
+  const s = migrate(old);
+  assertEqual(old, copy, 'Eingabe bleibt unverändert');
+  assertEqual(s.version, 2);
+  assertEqual(s.achievements, {});
+  assertEqual(s.stats, { kills: {}, runs: 12, wins: 3, winsByAnimal: {}, shadowsRouted: 0 });
+  assertEqual(s.gold, 340);
+  assertEqual(s.heroes, old.heroes);
+  assertEqual(s.metaUpgrades, { leben: 2 });
+  assertEqual(s.settings, { volume: 40, quality: 'low' });
+  assertTrue(validate(s).ok);
+});
+
+test('save: migrate einer Version 1 ohne Helden ergibt Nullzähler', () => {
+  const s = migrate({ version: 1, gold: 0, metaUpgrades: {}, settings: { volume: 70, quality: 'high' }, heroes: [] });
+  assertEqual(s.stats, { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0 });
+  assertTrue(validate(s).ok);
+});
+
+test('save: Spielstand der Version 1 im Speicher wird beim Laden migriert und dann als Version 2 gespeichert', () => {
+  const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify(v1Save()) });
+  const store = createStore(storage);
+  const r = store.load();
+  assertEqual(r.status, 'ok');
+  assertEqual(r.data.version, 2);
+  assertEqual(r.data.heroes.length, 2);
+  assertEqual(r.data.gold, 340);
+  store.update((s) => { s.gold += 1; });
+  assertEqual(JSON.parse(storage.getItem(STORAGE_KEY)).version, 2);
+  assertEqual(JSON.parse(storage.getItem(STORAGE_KEY)).gold, 341);
+});
+
+test('save: importJson nimmt den Export einer älteren Version 1 an und migriert ihn', () => {
+  const store = createStore(memoryStorage());
+  const r = store.importJson(JSON.stringify(v1Save(), null, 2));
+  assertTrue(r.ok, r.error);
+  assertEqual(r.data.version, 2);
+  assertEqual(store.load().data.stats.runs, 12);
+  assertEqual(store.load().data.heroes.length, 2);
+});
+
+test('save: Version 2 mit Erfolgen und Statistik übersteht Speichern, Export und Import', () => {
+  const store = createStore(memoryStorage());
+  store.update((s) => {
+    s.gold = 80;
+    s.achievements = { 'erste-schritte': 1700000000000, pazifist: 1700000005000 };
+    s.stats = { kills: { ratte: 12, baer: 1 }, runs: 3, wins: 1, winsByAnimal: { hase: 1 }, shadowsRouted: 2 };
+  });
+  const loaded = store.load();
+  assertEqual(loaded.status, 'ok');
+  assertEqual(loaded.data.achievements, { 'erste-schritte': 1700000000000, pazifist: 1700000005000 });
+  const other = createStore(memoryStorage());
+  assertTrue(other.importJson(store.exportJson()).ok);
+  assertEqual(other.load().data, loaded.data);
+});
+
+test('save: defaultSave enthält Erfolge und Nullstatistik', () => {
+  const s = defaultSave();
+  assertEqual(s.version, 2);
+  assertEqual(s.achievements, {});
+  assertEqual(s.stats, { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0 });
+});
+
+test('save: validate lehnt unbekannte Erfolge, negative oder gebrochene Zähler und falsche Formen ab', () => {
+  const s = defaultSave();
+  const withStats = (o) => ({ ...s, stats: { ...s.stats, ...o } });
+  assertTrue(validate({ ...s, achievements: { pazifist: 5 } }).ok);
+  assertEqual(validate({ ...s, achievements: { gibtEsNicht: 5 } }).ok, false);
+  assertEqual(validate({ ...s, achievements: { pazifist: 'gestern' } }).ok, false);
+  assertEqual(validate({ ...s, achievements: { pazifist: -1 } }).ok, false);
+  assertEqual(validate({ ...s, achievements: [] }).ok, false);
+  assertEqual(validate({ ...s, achievements: undefined }).ok, false);
+  assertEqual(validate({ ...s, stats: undefined }).ok, false);
+  assertEqual(validate(withStats({ runs: -1 })).ok, false);
+  assertEqual(validate(withStats({ wins: 1.5 })).ok, false);
+  assertEqual(validate(withStats({ shadowsRouted: -2 })).ok, false);
+  assertEqual(validate(withStats({ kills: { ratte: -1 } })).ok, false);
+  assertEqual(validate(withStats({ kills: { drache: 1 } })).ok, false);
+  assertEqual(validate(withStats({ kills: { ratte: 2.5 } })).ok, false);
+  assertEqual(validate(withStats({ winsByAnimal: { hase: -1 } })).ok, false);
+  assertEqual(validate(withStats({ winsByAnimal: { drache: 1 } })).ok, false);
+  assertTrue(validate(withStats({ kills: { ratte: 4 }, winsByAnimal: { ente: 2 } })).ok);
 });
 
 test('save: normalizeHeroName', () => {

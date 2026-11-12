@@ -473,3 +473,55 @@ fieldset.setting { box-sizing: border-box; }
 .option-body { display: flex; flex-direction: column; min-width: 0; }
 .option-title { font-weight: 700; }
 .option-text { font-size: 0.9rem; overflow-wrap: break-word; }
+
+/* ---------------------------------------------------------------- Erfolge */
+
+/* Einblendung: im Spiel unten (oben liegen die Leisten, in der Mitte der Held), sonst oben unter der Meldungsleiste. */
+.toasts {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 15;
+  top: calc(var(--notice-h, 0px) + 12px);
+  width: min(420px, calc(100% - 24px)); pointer-events: none;
+  display: flex; flex-direction: column; align-items: stretch;
+}
+body[data-screen="game"] .toasts { top: auto; bottom: 64px; }
+.toast {
+  box-sizing: border-box; padding: 10px 14px; border-radius: 12px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: baseline;
+  background: linear-gradient(180deg, rgba(58, 48, 22, 0.96), rgba(36, 30, 14, 0.96));
+  border: 2px solid var(--accent-hi); color: var(--text);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55), 0 0 0 3px rgba(236, 192, 97, 0.18);
+  overflow-wrap: anywhere;
+  animation: toast-in 0.25s ease-out;
+  transition: opacity 0.3s, transform 0.3s;
+}
+.toast-out { opacity: 0; transform: translateY(6px); }
+.toast-kicker { grid-column: 1 / -1; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-hi); }
+.toast-title { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; }
+.toast-gold { color: var(--accent-hi); font-weight: 700; white-space: nowrap; }
+.toast-line { grid-column: 1 / -1; font-size: 0.95rem; font-style: italic; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
+.achievement-list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 12px;
+}
+.achievement {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 12px 14px;
+  border-radius: 12px; border: 2px solid var(--line-soft); background: rgba(0, 0, 0, 0.18);
+  overflow-wrap: anywhere;
+}
+.achievement-done {
+  border-color: var(--accent-hi);
+  background: linear-gradient(180deg, rgba(74, 62, 30, 0.7), rgba(39, 51, 31, 0.8));
+  box-shadow: 0 0 0 2px rgba(236, 192, 97, 0.2), 0 4px 14px rgba(0, 0, 0, 0.28);
+}
+.achievement-title { font-family: var(--serif); font-size: 1.2rem; font-weight: 600; }
+.achievement-done .achievement-title::before { content: '★ '; color: var(--accent-hi); }
+.achievement-locked .achievement-title { color: var(--muted); }
+.achievement-condition { color: var(--muted); font-size: 0.92rem; }
+.achievement-line { font-style: italic; }
+.achievement-locked .achievement-line { color: var(--muted); letter-spacing: 0.2em; }
+.achievement-meta { margin-top: auto; padding-top: 4px; display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 0.85rem; }
+.achievement-gold { color: var(--accent-hi); font-weight: 700; }
+.achievement-date { color: var(--muted); }

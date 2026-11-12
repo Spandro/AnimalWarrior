@@ -14,3 +14,4 @@ import './cardText.test.js';
 import './sprites.test.js';
 import './sfx.test.js';
 import './shadow.test.js';
+import './achievements.test.js';

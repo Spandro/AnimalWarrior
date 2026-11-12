@@ -7,6 +7,9 @@ import { isWebGLAvailable, createRenderer } from './render/renderer.js';
 import { loadSpriteSheets } from './render/sprites.js';
 import { startGame } from './game.js';
 import { createStore, addHero, deleteHero, recordRun, STORAGE_KEY } from './save/store.js';
+import { applyRunToStats, evaluateAchievements, unlock } from './core/achievements.js';
+import { ACHIEVEMENTS } from './data/achievements.js';
+import { createToasts } from './ui/achievements.js';
 import { metaModifiers, hasRevive } from './save/meta.js';
 import { createScreens, createNoticeBar } from './ui/screens.js';
 import { createSfx } from './audio/sfx.js';
@@ -95,7 +98,17 @@ function startApp() {
     /** Merkmal des zuletzt angeforderten Durchgangs, solange er auf die Figuren wartet. */
     pendingRun: null,
     showNotice,
+    /** Einblendungen für Erfolge; im Body, damit sie im Spiel und auf dem Ergebnisbildschirm erscheinen. */
+    toasts: createToasts(document.body),
     screens: null,
+
+    /** Blendet einen Erfolg ein und spielt den Ton dazu. */
+    announceAchievement(id) {
+      const def = ACHIEVEMENTS.find((a) => a.id === id);
+      if (!def) return;
+      app.toasts.show({ title: def.title, line: def.line, gold: def.gold });
+      app.sfx.play('achievement');
+    },
 
     /**
      * Ändert den Spielstand und speichert. Klappt das Speichern nicht, gilt die Änderung nur
@@ -162,7 +175,8 @@ function startApp() {
           canvas, uiLayer, view: app.view, animalId: hero.animal, classId: hero.class,
           seed: Date.now(), quality: app.quality, timeScale, debug, autopick, sprites, sfx: app.sfx,
           modifiers: metaModifiers(app.save), revive: hasRevive(app.save),
-          onEnd: (summary) => app.finishRun(heroId, summary),
+          achievements: { getSave: () => app.save, notify: (id) => app.announceAchievement(id) },
+          onEnd: (summary, extra) => app.finishRun(heroId, summary, extra),
         });
       });
     },
@@ -170,14 +184,37 @@ function startApp() {
     /**
      * Nach Sieg, Tod oder Aufgeben: Durchgang verbuchen (Gold, Statistik, beste Zeit) und Ergebnis zeigen.
      * @param {string} heroId
-     * @param {ReturnType<typeof import('./modes/survivor.js').getSummary>} summary
+     * @param {{ facts: import('./data/achievements.js').RunFacts, earlyIds: string[] }} [extra]
+     *   Zahlen des Durchgangs und Erfolge, die schon während des Durchgangs eingeblendet wurden.
+     *
+     * Erfolge: Alles in einem `update` – Durchgang verbuchen, lebenslange Zähler fortschreiben, Erfolge freischalten
+     * (die schon eingeblendeten und die, die erst jetzt erfüllt sind) samt Gold. Neue Einblendungen erscheinen auf
+     * dem Ergebnisbildschirm.
      */
-    finishRun(heroId, summary) {
+    finishRun(heroId, summary, extra) {
       app.endRunSilently();
       const before = app.save.heroes.find((h) => h.id === heroId)?.survivor.bestTime ?? 0;
-      if (app.save.heroes.some((h) => h.id === heroId)) app.update((save) => recordRun(save, heroId, summary));
+      const facts = extra?.facts;
+      const earlyIds = extra?.earlyIds ?? [];
+      let lateIds = [];
+      if (facts) {
+        // Zähler und Gold so, wie sie nach dem Verbuchen sind, ohne den gespeicherten Stand zu ändern.
+        const stats = applyRunToStats(structuredClone(app.save.stats), facts);
+        const save = { ...app.save, gold: app.save.gold + Math.floor(summary.gold) };
+        const known = new Set([...Object.keys(app.save.achievements), ...earlyIds]);
+        lateIds = evaluateAchievements({ run: facts, stats, save }, known);
+      }
+      const ids = [...earlyIds, ...lateIds];
+      if (app.save.heroes.some((h) => h.id === heroId)) {
+        app.update((save) => {
+          recordRun(save, heroId, summary);
+          if (facts) applyRunToStats(save.stats, facts);
+          unlock(save, ids, Date.now());
+        });
+      }
       const after = app.save.heroes.find((h) => h.id === heroId)?.survivor.bestTime ?? 0;
       app.screens.show('result', { heroId, summary, newBest: after > before });
+      for (const id of lateIds) app.announceAchievement(id);
     },
 
     endRunSilently() {
@@ -205,7 +242,7 @@ function startApp() {
     if (status !== 'ok' && status !== 'empty') return;
     app.save = data;
     const screen = app.screens.current();
-    if (screen === 'main' || screen === 'heroes' || screen === 'mode' || screen === 'metaShop') {
+    if (screen === 'main' || screen === 'heroes' || screen === 'mode' || screen === 'metaShop' || screen === 'achievements') {
       app.screens.show(screen, app.screens.props());
     }
   });

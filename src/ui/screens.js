@@ -5,9 +5,10 @@ import { renderMetaShop } from './metaShop.js';
 import { renderSettings } from './settings.js';
 import { renderCreateAnimal, renderCreateClass, renderCreateName } from './heroCreate.js';
 import { renderResult } from './result.js';
+import { renderAchievements } from './achievements.js';
 
 /**
- * @typedef {'main'|'heroes'|'createAnimal'|'createClass'|'createName'|'mode'|'game'|'result'|'metaShop'|'settings'} ScreenName
+ * @typedef {'main'|'heroes'|'createAnimal'|'createClass'|'createName'|'mode'|'game'|'result'|'metaShop'|'settings'|'achievements'} ScreenName
  * @typedef {(container: HTMLElement, props: Record<string, any>, app: any) => (void | (() => void))} ScreenBuilder
  *   baut den Bildschirm in `container`; die optionale Rückgabe räumt beim Verlassen auf.
  */
@@ -25,6 +26,7 @@ const BUILDERS = {
   result: renderResult,
   metaShop: renderMetaShop,
   settings: renderSettings,
+  achievements: renderAchievements,
 };
 
 /**
