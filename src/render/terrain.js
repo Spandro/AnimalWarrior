@@ -14,6 +14,19 @@ const GRASS_DRY = new THREE.Color(0x8a8a55);
 const GRASS_DARK = new THREE.Color(0x46573a);
 const SOIL = new THREE.Color(0x76694f);
 
+/** Kronenstufen als [Radius, Höhe der Basis, Kegelhöhe] in Vielfachen von s = Stammradius / 0.75. */
+const CANOPY_TIERS = [[2.6, 1.3, 2.4], [2.0, 2.5, 2.2], [1.4, 3.6, 2.0], [0.8, 4.6, 1.6]];
+/** Deckkraft ausgeblendeter Kronen. */
+const CANOPY_FADED_OPACITY = 0.28;
+/**
+ * Ausblendbereich um den Helden in Vielfachen von s: bis FADE_FRONT vor ihm (Richtung Kamera, +z),
+ * FADE_BEHIND hinter ihm und FADE_SIDE seitlich. Die Krone (Radius 2.6 s, Höhe 6.2 s) verdeckt bei
+ * 55° Kameraneigung den Boden bis etwa 6.2 s / tan 55° ≈ 4.3 s hinter ihrem Fuß.
+ */
+const FADE_FRONT = 6.5;
+const FADE_BEHIND = 1.5;
+const FADE_SIDE = 2.8;
+
 /** Deterministischer Hash eines Gitterpunkts nach [0,1). */
 function hash2(seed, x, z) {
   let h = Math.imul(seed | 0, 0x27d4eb2d) ^ Math.imul(x | 0, 0x85ebca6b) ^ Math.imul(z | 0, 0xc2b2ae35);
@@ -116,10 +129,21 @@ export function createTerrainView(scene, seed) {
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3b2c, roughness: 0.95 });
   const needleMats = [0x2f4a2e, 0x38522f, 0x2a4433, 0x415a34]
     .map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, flatShading: true }));
+  // Durchscheinende Gegenstücke der Kronen: Bäume zwischen Kamera und Held werden damit gezeichnet.
+  const fadedMats = needleMats.map((m) => {
+    const f = m.clone();
+    f.transparent = true;
+    f.opacity = CANOPY_FADED_OPACITY;
+    f.depthWrite = false;
+    return f;
+  });
   const rockMats = [0x7c7a72, 0x6d6b64, 0x88847a, 0x75726a]
     .map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, flatShading: true }));
 
-  /** @type {Map<string, { group: THREE.Group, groundGeo: THREE.BufferGeometry }>} */
+  /**
+   * @typedef {{ x: number, z: number, s: number, cones: THREE.Mesh[], matIndex: number, faded: boolean }} TreeRecord
+   * @type {Map<string, { group: THREE.Group, groundGeo: THREE.BufferGeometry, trees: TreeRecord[] }>}
+   */
   const tiles = new Map();
   let lastCx = NaN, lastCz = NaN;
 
@@ -147,6 +171,7 @@ export function createTerrainView(scene, seed) {
     return mesh;
   }
 
+  /** @returns {{ group: THREE.Group, record: TreeRecord }} */
   function tree(o, h) {
     const g = new THREE.Group();
     g.position.set(o.x, 0, o.z);
@@ -155,17 +180,35 @@ export function createTerrainView(scene, seed) {
     const trunk = new THREE.Mesh(trunkGeo, trunkMat);
     trunk.scale.set(o.radius, 2.6 * s, o.radius);
     g.add(trunk);
-    const mat = needleMats[Math.floor(h * 97) % needleMats.length];
-    const tiers = [[2.6, 1.3, 2.4], [2.0, 2.5, 2.2], [1.4, 3.6, 2.0], [0.8, 4.6, 1.6]];
-    for (const [r, y, ch] of tiers) {
-      const cone = new THREE.Mesh(coneGeo, mat);
+    const matIndex = Math.floor(h * 97) % needleMats.length;
+    const cones = [];
+    for (const [r, y, ch] of CANOPY_TIERS) {
+      const cone = new THREE.Mesh(coneGeo, needleMats[matIndex]);
       cone.position.y = y * s;
       cone.scale.set(r * s, ch * s, r * s);
       cone.rotation.y = h * 7 + y;
       g.add(cone);
+      cones.push(cone);
     }
     g.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
-    return g;
+    return { group: g, record: { x: o.x, z: o.z, s, cones, matIndex, faded: false } };
+  }
+
+  /**
+   * Blendet Kronen aus, die zwischen Kamera und Held stehen. Die Kamera steht in +z-Richtung vom Helden
+   * (siehe renderer.js), verdeckende Bäume liegen also knapp neben oder vor dem Helden in +z.
+   */
+  function fadeCanopies(x, z) {
+    for (const tile of tiles.values()) {
+      for (const t of tile.trees) {
+        const dz = t.z - z, dx = Math.abs(t.x - x);
+        const hide = dz > -FADE_BEHIND * t.s && dz < FADE_FRONT * t.s && dx < FADE_SIDE * t.s;
+        if (hide === t.faded) continue;
+        t.faded = hide;
+        const m = (hide ? fadedMats : needleMats)[t.matIndex];
+        for (const c of t.cones) c.material = m;
+      }
+    }
   }
 
   function rock(o, h) {
@@ -184,14 +227,21 @@ export function createTerrainView(scene, seed) {
     group.add(ground);
     const half = TERRAIN_CELL / 2;
     const near = obstaclesNear(seed, (cx + 0.5) * TERRAIN_CELL, (cz + 0.5) * TERRAIN_CELL, half * Math.SQRT2);
+    const trees = [];
     for (const o of near) {
       // Nur Hindernisse, deren Mittelpunkt in dieser Zelle liegt; Nachbarn baut deren Zelle.
       if (Math.floor(o.x / TERRAIN_CELL) !== cx || Math.floor(o.z / TERRAIN_CELL) !== cz) continue;
       const h = hash2(seed, Math.round(o.x * 100), Math.round(o.z * 100));
-      group.add(o.kind === 'tree' ? tree(o, h) : rock(o, h));
+      if (o.kind === 'tree') {
+        const t = tree(o, h);
+        group.add(t.group);
+        trees.push(t.record);
+      } else {
+        group.add(rock(o, h));
+      }
     }
     root.add(group);
-    return { group, groundGeo: ground.geometry };
+    return { group, groundGeo: ground.geometry, trees };
   }
 
   function removeTile(key) {
@@ -201,21 +251,26 @@ export function createTerrainView(scene, seed) {
     tiles.delete(key);
   }
 
-  /** Baut Zellen im Umkreis von VIEW_CELLS um (x,z) und entfernt weiter entfernte. */
+  /**
+   * Baut Zellen im Umkreis von VIEW_CELLS um (x,z), entfernt weiter entfernte und blendet
+   * Baumkronen zwischen Kamera und (x,z) aus. Jedes Bild mit der Heldenposition aufrufen.
+   */
   function update(x, z) {
     const cx = Math.floor(x / TERRAIN_CELL), cz = Math.floor(z / TERRAIN_CELL);
-    if (cx === lastCx && cz === lastCz) return;
-    lastCx = cx; lastCz = cz;
-    for (const key of [...tiles.keys()]) {
-      const [kx, kz] = key.split(',').map(Number);
-      if (Math.abs(kx - cx) > VIEW_CELLS || Math.abs(kz - cz) > VIEW_CELLS) removeTile(key);
-    }
-    for (let ix = cx - VIEW_CELLS; ix <= cx + VIEW_CELLS; ix++) {
-      for (let iz = cz - VIEW_CELLS; iz <= cz + VIEW_CELLS; iz++) {
-        const key = ix + ',' + iz;
-        if (!tiles.has(key)) tiles.set(key, buildTile(ix, iz));
+    if (cx !== lastCx || cz !== lastCz) {
+      lastCx = cx; lastCz = cz;
+      for (const key of [...tiles.keys()]) {
+        const [kx, kz] = key.split(',').map(Number);
+        if (Math.abs(kx - cx) > VIEW_CELLS || Math.abs(kz - cz) > VIEW_CELLS) removeTile(key);
+      }
+      for (let ix = cx - VIEW_CELLS; ix <= cx + VIEW_CELLS; ix++) {
+        for (let iz = cz - VIEW_CELLS; iz <= cz + VIEW_CELLS; iz++) {
+          const key = ix + ',' + iz;
+          if (!tiles.has(key)) tiles.set(key, buildTile(ix, iz));
+        }
       }
     }
+    fadeCanopies(x, z);
   }
 
   function dispose() {
@@ -228,6 +283,7 @@ export function createTerrainView(scene, seed) {
     for (const g of rockGeos) g.dispose();
     trunkMat.dispose();
     for (const m of needleMats) m.dispose();
+    for (const m of fadedMats) m.dispose();
     for (const m of rockMats) m.dispose();
   }
 

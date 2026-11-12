@@ -402,8 +402,9 @@ export function animateCharacter(group, { speed = 0, time = 0, attackT } = {}) {
   parts.legL.rotation.x = swing;
   parts.legR.rotation.x = -swing;
 
-  let armR = rest.armForward - swing * 0.7 + breathe * 0.03;
-  const armL = rest.armForward + swing * 0.7 - breathe * 0.03;
+  // Arme schwingen gegengleich zu den Beinen: der linke Arm mit dem rechten Bein und umgekehrt.
+  let armR = rest.armForward + swing * 0.7 + breathe * 0.03;
+  const armL = rest.armForward - swing * 0.7 - breathe * 0.03;
   let twist = 0;
   if (attackT !== undefined && attackT > 0 && attackT < 1) {
     // Ausholen über den Kopf, Hieb nach vorn unten, zurück in die Ruhehaltung.

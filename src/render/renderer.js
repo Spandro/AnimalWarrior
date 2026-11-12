@@ -3,7 +3,7 @@ import * as THREE from '../../vendor/three.module.min.js';
 /** Kameraneigung über dem Boden (Höhenwinkel) in Grad. */
 const CAMERA_TILT_DEG = 55;
 /** Abstand der Kamera zum Zielpunkt in Weltmetern. */
-const CAMERA_DISTANCE = 22;
+const CAMERA_DISTANCE = 15;
 const CAMERA_FOV = 45;
 /** Nebel- und Hintergrundfarbe, abgestimmt auf die mittlere Bodenfarbe. */
 const FOG_COLOR = 0x7b8566;
