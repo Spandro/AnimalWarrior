@@ -1,6 +1,6 @@
 import { test, assertEqual, assertTrue } from './runner.js';
 import { obstaclesInCell, obstaclesNear } from '../src/core/terrain.js';
-import { TERRAIN_CELL, MAX_OBSTACLES_PER_CELL } from '../src/data/terrain.js';
+import { TERRAIN_CELL, MAX_OBSTACLES_PER_CELL, START_CLEAR_RADIUS } from '../src/data/terrain.js';
 
 test('terrain: gleiche Eingabe liefert gleiche Hindernisse', () => {
   assertEqual(obstaclesInCell(42, 3, -2), obstaclesInCell(42, 3, -2));
@@ -38,4 +38,12 @@ test('terrain: obstaclesNear liefert nur Hindernisse im Bereich und alle davon',
     for (const o of obstaclesInCell(seed, cx, cz)) if (Math.hypot(o.x - x, o.z - z) <= range + o.radius) expected++;
   }
   assertEqual(near.length, expected);
+});
+
+test('terrain: kein Hindernis ragt in den Startradius um den Ursprung', () => {
+  for (const seed of [1, 2, 3, 7, 42, 99, 1234, 98765]) {
+    for (const o of obstaclesNear(seed, 0, 0, START_CLEAR_RADIUS + 5)) {
+      assertTrue(Math.hypot(o.x, o.z) - o.radius >= START_CLEAR_RADIUS);
+    }
+  }
 });

@@ -77,12 +77,12 @@ export function recomputeHeroStats(world) {
  * @param {number} x
  * @param {number} z
  * @param {{ elite?: boolean, hpMul?: number, dmgMul?: number }} [opts]
- * @returns {Enemy|null} null, wenn das Gegnerlimit erreicht ist
+ * @returns {Enemy|null} Elite und Bosse sind vom Limit von 300 Gegnern ausgenommen; reguläre Gegner liefern bei erreichtem Limit null
  */
 export function spawnEnemy(world, type, x, z, { elite = false, hpMul = 1, dmgMul = 1 } = {}) {
   const def = ENEMIES[type];
   if (!def) throw new Error(`Unbekannter Gegner: ${type}`);
-  if (world.enemies.length >= MAX_ENEMIES) return null;
+  if (!elite && def.behavior !== 'boss' && world.enemies.length >= MAX_ENEMIES) return null;
   const maxHp = def.hp * hpMul * (elite ? ELITE.hpMul : 1);
   const enemy = {
     id: world.nextId++, type, x, z, hp: maxHp, maxHp,

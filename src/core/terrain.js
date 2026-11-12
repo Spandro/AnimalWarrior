@@ -1,5 +1,5 @@
 import { createRng } from './rng.js';
-import { TERRAIN_CELL, MAX_OBSTACLES_PER_CELL, TREE_RADIUS, ROCK_RADIUS, TREE_SHARE } from '../data/terrain.js';
+import { TERRAIN_CELL, MAX_OBSTACLES_PER_CELL, TREE_RADIUS, ROCK_RADIUS, TREE_SHARE, START_CLEAR_RADIUS } from '../data/terrain.js';
 
 /** @typedef {{ x: number, z: number, radius: number, kind: 'tree'|'rock' }} Obstacle */
 
@@ -44,7 +44,7 @@ function generateCell(seed, cx, cz) {
       kind: tree ? 'tree' : 'rock',
     });
   }
-  return out;
+  return out.filter((o) => Math.hypot(o.x, o.z) - o.radius >= START_CLEAR_RADIUS);
 }
 
 /**

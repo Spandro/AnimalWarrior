@@ -232,3 +232,12 @@ test('world: Gegnerlimit von 300 wird eingehalten', () => {
   for (let i = 0; i < 305; i++) spawnEnemy(w, 'ratte', 30 + i, 0);
   assertEqual(w.enemies.length, 300);
 });
+
+test('world: Boss und Elite ignorieren das Gegnerlimit, reguläre Gegner nicht', () => {
+  const w = newWorld();
+  for (let i = 0; i < 300; i++) spawnEnemy(w, 'ratte', 30 + i, 0);
+  assertEqual(spawnEnemy(w, 'ratte', 0, 40), null);
+  assertTrue(spawnEnemy(w, 'baer', 0, 40).boss);
+  assertTrue(spawnEnemy(w, 'wolf', 0, 40, { elite: true }).elite);
+  assertEqual(w.enemies.length, 302);
+});
