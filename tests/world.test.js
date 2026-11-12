@@ -1,0 +1,234 @@
+import { test, assertEqual, assertClose, assertTrue } from './runner.js';
+import { createWorld, stepWorld, spawnEnemy, damageEnemy, damageHero, recomputeHeroStats } from '../src/core/world.js';
+import { obstaclesInCell, obstaclesNear } from '../src/core/terrain.js';
+import { DROPS, ELITE, ENEMIES } from '../src/data/enemies.js';
+
+const NONE = { moveX: 0, moveZ: 0 };
+/** Seed, dessen Gelände um den Startpunkt frei ist (damit Laufstrecken nicht durch Hindernisse gestört werden). */
+function clearSeed() {
+  for (let s = 1; s < 1000; s++) if (obstaclesNear(s, 3, 3, 8).length === 0) return s;
+  throw new Error('kein freier Seed');
+}
+function run(world, seconds, dt, input) {
+  const steps = Math.round(seconds / dt);
+  for (let i = 0; i < steps; i++) stepWorld(world, dt, input);
+}
+const newWorld = (extra = {}) => createWorld({ seed: clearSeed(), animalId: 'ente', classId: 'dieb', ...extra });
+
+test('world: createWorld liefert Held mit Startfähigkeit und vollem Leben', () => {
+  const w = createWorld({ seed: 1, animalId: 'hase', classId: 'magier' });
+  assertEqual(w.hero.abilities, [{ id: 'feuerball', level: 1, cooldownLeft: 0 }]);
+  assertEqual(w.hero.hp, w.hero.stats.maxHp);
+  assertEqual(w.run, { level: 1, xp: 0, kills: 0, gold: 0, bonuses: {}, damageByAbility: {}, revivesLeft: 0 });
+  assertEqual(w.enemies, []);
+});
+
+test('world: nach 1 s nach rechts ist hero.x ungefähr moveSpeed', () => {
+  const w = newWorld();
+  run(w, 1, 0.1, { moveX: 1, moveZ: 0 });
+  assertClose(w.hero.x, w.hero.stats.moveSpeed, 1e-6);
+  assertEqual(w.hero.facing, { x: 1, z: 0 });
+});
+
+test('world: diagonale Eingabe legt dieselbe Strecke zurück', () => {
+  const w = newWorld();
+  run(w, 1, 0.1, { moveX: 1, moveZ: 1 });
+  assertClose(Math.hypot(w.hero.x, w.hero.z), w.hero.stats.moveSpeed, 1e-6);
+});
+
+test('world: ohne Eingabe bleibt facing erhalten', () => {
+  const w = newWorld();
+  stepWorld(w, 0.1, { moveX: 0, moveZ: -1 });
+  stepWorld(w, 0.1, NONE);
+  assertEqual(w.hero.facing, { x: 0, z: -1 });
+});
+
+test('world: Held bleibt außerhalb eines Hindernisses', () => {
+  let seed = 1, obstacle;
+  for (; seed < 200; seed++) { obstacle = obstaclesInCell(seed, 1, 0)[0]; if (obstacle) break; }
+  const w = createWorld({ seed, animalId: 'ente', classId: 'dieb' });
+  w.hero.x = obstacle.x - 3; w.hero.z = obstacle.z;
+  for (let i = 0; i < 60; i++) {
+    stepWorld(w, 0.05, { moveX: 1, moveZ: 0 });
+    assertTrue(Math.hypot(w.hero.x - obstacle.x, w.hero.z - obstacle.z) >= obstacle.radius + w.hero.radius - 1e-6);
+  }
+});
+
+test('world: Ratte nähert sich dem Helden', () => {
+  const w = newWorld();
+  const rat = spawnEnemy(w, 'ratte', 10, 0);
+  run(w, 1, 0.1, NONE);
+  assertClose(rat.x, 10 - ENEMIES.ratte.speed, 1e-6);
+});
+
+test('world: spawnEnemy setzt Werte, Elite ist stärker und größer', () => {
+  const w = newWorld();
+  const e = spawnEnemy(w, 'wolf', 5, 5, { elite: true, hpMul: 2, dmgMul: 1.5 });
+  assertEqual(e.maxHp, 45 * 2 * ELITE.hpMul);
+  assertEqual(e.hp, e.maxHp);
+  assertClose(e.damage, 12 * 1.5);
+  assertClose(e.radius, 0.5 * ELITE.scale);
+  assertTrue(e.elite && !e.boss);
+  assertTrue(spawnEnemy(w, 'baer', 0, 0).boss);
+  assertTrue(spawnEnemy(w, 'ratte', 0, 0).id !== e.id);
+});
+
+test('world: Berührung schadet höchstens einmal je 0,5 s', () => {
+  const w = newWorld({ animalId: 'waschbaer' }); // keine Regeneration
+  spawnEnemy(w, 'ratte', 0, 0);
+  const hp0 = w.hero.hp;
+  let hits = 0;
+  for (let i = 0; i < 4; i++) { stepWorld(w, 0.25, NONE); hits += w.events.filter((e) => e.type === 'heroHit').length; }
+  assertEqual(hits, 2);
+  assertEqual(w.hero.hp, hp0 - 2 * ENEMIES.ratte.damage);
+});
+
+test('world: Unverwundbarkeit verhindert Heldenschaden', () => {
+  const w = newWorld();
+  w.hero.invulnerableUntil = 5;
+  const hp0 = w.hero.hp;
+  damageHero(w, 10);
+  assertEqual(w.hero.hp, hp0);
+  w.time = 5;
+  damageHero(w, 10);
+  assertEqual(w.hero.hp, hp0 - 10);
+});
+
+test('world: Ausweichen meldet dodge ohne Schaden', () => {
+  const w = newWorld();
+  w.hero.stats = { ...w.hero.stats, dodge: 1 };
+  const hp0 = w.hero.hp;
+  damageHero(w, 10);
+  assertEqual(w.hero.hp, hp0);
+  assertEqual(w.events, [{ type: 'dodge' }]);
+});
+
+const noDrops = () => ({ chance: () => false, int: () => 1 });
+
+test('world: tödlicher Treffer zählt kills, legt xp ab und meldet kill', () => {
+  const w = newWorld();
+  w.rng = noDrops();
+  const rat = spawnEnemy(w, 'ratte', 7, 8);
+  damageEnemy(w, rat, { amount: 10, crit: false }, 'schwerthieb');
+  assertEqual(w.run.kills, 1);
+  assertEqual(w.enemies, []);
+  assertEqual(w.pickups, [{ kind: 'xp', x: 7, z: 8, value: ENEMIES.ratte.xp }]);
+  assertEqual(w.run.damageByAbility, { schwerthieb: 10 });
+  assertEqual(w.events, [
+    { type: 'hit', x: 7, z: 8, amount: 10, crit: false },
+    { type: 'kill', enemyType: 'ratte', x: 7, z: 8 },
+  ]);
+});
+
+test('world: nicht tödlicher Treffer lässt Gegner leben', () => {
+  const w = newWorld();
+  const wolf = spawnEnemy(w, 'wolf', 3, 3);
+  damageEnemy(w, wolf, { amount: 5, crit: true }, 'feuerball');
+  assertEqual(w.enemies.length, 1);
+  assertEqual(wolf.hp, 40);
+  assertEqual(w.run.kills, 0);
+});
+
+test('world: Gold- und Trankdrops folgen den Wahrscheinlichkeiten', () => {
+  const w = newWorld();
+  w.rng = { chance: () => true, int: () => 2 };
+  damageEnemy(w, spawnEnemy(w, 'ratte', 0, 0), { amount: 99, crit: false }, 'x');
+  assertEqual(w.pickups.map((p) => p.kind), ['xp', 'gold', 'potion']);
+  assertEqual(w.pickups[1].value, 2);
+  assertEqual(w.pickups[2].value, DROPS.potionHeal);
+});
+
+test('world: getöteter Elite legt chest ab und mehr xp', () => {
+  const w = newWorld();
+  w.rng = noDrops();
+  damageEnemy(w, spawnEnemy(w, 'ratte', 1, 1, { elite: true }), { amount: 9999, crit: false }, 'x');
+  assertEqual(w.pickups.map((p) => p.kind), ['xp', 'chest']);
+  assertEqual(w.pickups[0].value, ENEMIES.ratte.xp * ELITE.xpMul);
+  assertEqual(w.pickups[1].value, DROPS.chestGold);
+});
+
+test('world: xp-Aufsammeln erhöht run.xp um value × xpGain', () => {
+  const w = newWorld({ modifiers: [{ stat: 'xpGain', pct: 0.5 }] });
+  w.pickups.push({ kind: 'xp', x: 1, z: 0, value: 4 }, { kind: 'xp', x: 50, z: 0, value: 4 });
+  stepWorld(w, 0.1, NONE);
+  assertClose(w.run.xp, 4 * 1.5);
+  assertEqual(w.pickups.length, 1); // das ferne bleibt liegen
+  assertEqual(w.events, [{ type: 'pickup', kind: 'xp', value: 4 }]);
+});
+
+test('world: Gold-Aufsammeln erhöht run.gold um value × goldGain', () => {
+  const w = createWorld({ seed: clearSeed(), animalId: 'waschbaer', classId: 'dieb' });
+  w.pickups.push({ kind: 'gold', x: 1, z: 0, value: 2 });
+  stepWorld(w, 0.1, NONE);
+  assertClose(w.run.gold, 2 * 1.2);
+});
+
+test('world: Trank heilt 20 % und nie über maxHp', () => {
+  const w = newWorld();
+  const max = w.hero.stats.maxHp;
+  w.hero.hp = 10;
+  w.pickups.push({ kind: 'potion', x: 0, z: 0, value: DROPS.potionHeal });
+  stepWorld(w, 0.01, NONE);
+  assertClose(w.hero.hp, 10 + max * 0.2, 0.05);
+  w.hero.hp = max - 1;
+  w.pickups.push({ kind: 'potion', x: 0, z: 0, value: DROPS.potionHeal });
+  stepWorld(w, 0.01, NONE);
+  assertTrue(w.hero.hp <= max);
+  assertClose(w.hero.hp, max, 0.05);
+});
+
+test('world: Truhe wird eingesammelt und gemeldet, ohne Belohnung', () => {
+  const w = newWorld();
+  w.pickups.push({ kind: 'chest', x: 0, z: 0, value: 25 });
+  stepWorld(w, 0.1, NONE);
+  assertEqual(w.pickups, []);
+  assertEqual(w.run.gold, 0);
+  assertEqual(w.events, [{ type: 'pickup', kind: 'chest', value: 25 }]);
+});
+
+test('world: Ente regeneriert 1 Leben pro Sekunde, nie über maxHp', () => {
+  const w = newWorld();
+  w.hero.hp = 100;
+  run(w, 1, 0.5, NONE);
+  assertClose(w.hero.hp, 101, 1e-6);
+  w.hero.hp = w.hero.stats.maxHp - 0.2;
+  run(w, 1, 0.5, NONE);
+  assertEqual(w.hero.hp, w.hero.stats.maxHp);
+});
+
+test('world: Stärkung läuft ab und Werte werden neu berechnet', () => {
+  const w = newWorld();
+  const base = w.hero.stats.moveSpeed;
+  w.hero.buffs.push({ modifiers: [{ stat: 'moveSpeed', pct: 1 }], timeLeft: 0.3 });
+  recomputeHeroStats(w);
+  assertClose(w.hero.stats.moveSpeed, base / 1.1 * 2.1); // dieb: +10 %, Stärkung: +100 % (additiv)
+  stepWorld(w, 0.1, NONE);
+  assertEqual(w.hero.buffs.length, 1);
+  stepWorld(w, 0.3, NONE);
+  assertEqual(w.hero.buffs.length, 0);
+  assertClose(w.hero.stats.moveSpeed, base);
+});
+
+test('world: recomputeHeroStats addiert maxHp-Zuwachs zu hp', () => {
+  const w = newWorld();
+  const max = w.hero.stats.maxHp;
+  w.hero.hp = 50;
+  w.hero.modifiers.push({ stat: 'maxHp', flat: 30 });
+  recomputeHeroStats(w);
+  assertEqual(w.hero.stats.maxHp, max + 30);
+  assertEqual(w.hero.hp, 80);
+});
+
+test('world: Gegner überlappen sich nicht dauerhaft', () => {
+  const w = newWorld();
+  const a = spawnEnemy(w, 'ratte', 20, 0);
+  const b = spawnEnemy(w, 'ratte', 20, 0);
+  stepWorld(w, 0.01, NONE);
+  assertTrue(Math.hypot(a.x - b.x, a.z - b.z) >= a.radius + b.radius - 1e-6);
+});
+
+test('world: Gegnerlimit von 300 wird eingehalten', () => {
+  const w = newWorld();
+  for (let i = 0; i < 305; i++) spawnEnemy(w, 'ratte', 30 + i, 0);
+  assertEqual(w.enemies.length, 300);
+});
