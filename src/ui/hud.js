@@ -1,4 +1,5 @@
-// Anzeige im Spiel: Leben, Erfahrung mit Level, Timer, Gold, besiegte Gegner, Fähigkeiten, Lebensbalken des Bosses.
+// Anzeige im Spiel: Leben, Erfahrung mit Level, Timer, Gold, besiegte Gegner, Fähigkeiten, Lebensbalken des Bosses
+// und des Schattens (mit Restzeit) sowie die Sprüche des Schattens.
 // Die Elemente entstehen einmal; je Bild ändern sich nur Text und Stil, und nur, wenn sich der Wert geändert hat.
 import { el, formatNumber } from './dom.js';
 import { displayTime } from '../modes/survivor.js';
@@ -8,6 +9,9 @@ import { ABILITY_COLOR } from '../render/effects.js';
 
 const MAX_ABILITIES = 5;
 const BOSS_NAME = 'Bär';
+const SHADOW_NAME = 'Dein Schatten';
+/** So lange steht ein Spruch des Schattens da (Weltsekunden). */
+const TAUNT_SECONDS = 3;
 
 /** Sekunden als mm:ss, auch für 0. */
 const clock = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -61,7 +65,8 @@ function textCell(node) {
 
 /**
  * @param {HTMLElement} uiLayer
- * @returns {{ update(run: import('../modes/survivor.js').Run): void, dispose(): void }}
+ * @returns {{ handle(events: object[], world: import('../core/world.js').World): void,
+ *   update(run: import('../modes/survivor.js').Run): void, dispose(): void }}
  */
 export function createHud(uiLayer) {
   const hp = bar('hud-hp', 'Leben');
@@ -73,6 +78,12 @@ export function createHud(uiLayer) {
   const bossName = el('span', { class: 'hud-boss-name', text: BOSS_NAME });
   const bossBar = bar('hud-boss-bar', 'Leben des Bosses');
   const boss = el('div', { class: 'hud-boss', hidden: true }, bossName, bossBar.root);
+  const shadowTime = el('span', { class: 'hud-shadow-time' });
+  const shadowBar = bar('hud-shadow-bar', 'Leben deines Schattens');
+  const shadowBox = el('div', { class: 'hud-boss hud-shadow', hidden: true },
+    el('div', { class: 'hud-shadow-head' }, el('span', { class: 'hud-boss-name', text: SHADOW_NAME }), shadowTime),
+    shadowBar.root);
+  const taunt = el('div', { class: 'hud-taunt', hidden: true });
 
   const slots = [];
   const abilityRow = el('ul', { class: 'hud-abilities', 'aria-label': 'Fähigkeiten' });
@@ -93,7 +104,7 @@ export function createHud(uiLayer) {
       el('div', { class: 'hud-counters' },
         el('span', { class: 'hud-gold', title: 'Gold' }, el('span', { class: 'hud-icon', 'aria-hidden': 'true', text: '●' }), goldNode),
         el('span', { class: 'hud-kills', title: 'Besiegte Gegner' }, el('span', { class: 'hud-icon', 'aria-hidden': 'true', text: '✕' }), killsNode))),
-    boss,
+    el('div', { class: 'hud-bosses' }, boss, shadowBox, taunt),
     abilityRow);
   uiLayer.append(root);
 
@@ -101,9 +112,23 @@ export function createHud(uiLayer) {
   const setTimer = textCell(timerNode);
   const setGold = textCell(goldNode);
   const setKills = textCell(killsNode);
-  let bossShown = false;
+  const setShadowTime = textCell(shadowTime);
+  let bossShown = false, shadowShown = false, tauntUntil = -Infinity;
 
   return {
+    /**
+     * Sprüche des Schattens aus den Ereignissen eines Logikschritts (Text nur über textContent).
+     * @param {object[]} events run.events
+     * @param {import('../core/world.js').World} world
+     */
+    handle(events, world) {
+      for (const e of events) {
+        if (!e.type.startsWith('shadow') || !e.line) continue;
+        taunt.textContent = `„${e.line}“`;
+        taunt.hidden = false;
+        tauntUntil = world.time + TAUNT_SECONDS;
+      }
+    },
     update(run) {
       const { hero, run: r, enemies } = run.world;
       const maxHp = hero.stats.maxHp;
@@ -132,10 +157,19 @@ export function createHud(uiLayer) {
         s.li.setAttribute('aria-label', `${name}, Stufe ${lv}`);
       }
 
-      let b = null;
-      for (const e of enemies) if (e.boss) { b = e; break; }
+      let b = null, sh = null;
+      for (const e of enemies) {
+        if (e.shadow) sh = e;
+        else if (e.boss && !e.untargetable && !b) b = e;
+      }
       if (!!b !== bossShown) { boss.hidden = !b; bossShown = !!b; }
       if (b) bossBar.set(b.hp / b.maxHp, `${Math.max(0, Math.ceil(b.hp))} / ${Math.round(b.maxHp)}`, Math.round(b.maxHp));
+      if (!!sh !== shadowShown) { shadowBox.hidden = !sh; shadowShown = !!sh; }
+      if (sh) {
+        shadowBar.set(sh.hp / sh.maxHp, `${Math.ceil(sh.hp)} / ${Math.round(sh.maxHp)}`, Math.round(sh.maxHp));
+        setShadowTime(sh.fleeing ? 'flieht!' : `noch ${Math.max(0, Math.ceil(sh.expiresAt - run.world.time))} s`);
+      }
+      if (!taunt.hidden && run.world.time >= tauntUntil) taunt.hidden = true;
     },
     dispose() { root.remove(); },
   };

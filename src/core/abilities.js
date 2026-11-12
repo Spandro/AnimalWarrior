@@ -1,6 +1,6 @@
 import { resolveHit } from './combat.js';
 import { createGrid } from './spatial.js';
-import { damageEnemy, applyStatus, knockback, recomputeHeroStats } from './world.js';
+import { damageEnemy, applyStatus, knockback, recomputeHeroStats, isTargetable } from './world.js';
 import { ABILITIES, AREA_KEYS, PROJECTILE_SUBSTEP, ABILITY_GRID_CELL } from '../data/abilities.js';
 
 /**
@@ -86,13 +86,13 @@ export function stepAbilities(world, dt) {
 /** @returns {Ctx} */
 function createContext(world) {
   const grid = createGrid(ABILITY_GRID_CELL);
-  for (const e of world.enemies) grid.insert(e);
+  for (const e of world.enemies) if (isTargetable(e)) grid.insert(e);
   return { world, grid };
 }
 
-/** Lebende Gegner, deren Kreis den Kreis (x, z, r) berührt. */
+/** Erfassbare Gegner (lebend, nicht unantastbar), deren Kreis den Kreis (x, z, r) berührt. */
 function enemiesInCircle(ctx, x, z, r) {
-  return ctx.grid.queryCircle(x, z, r).filter((e) => e.hp > 0);
+  return ctx.grid.queryCircle(x, z, r).filter(isTargetable);
 }
 
 /** Nächster lebender Gegner zum Punkt innerhalb von range, ohne die in exclude. */
@@ -119,7 +119,7 @@ function densestEnemy(ctx, range, radius) {
 
 /** Schaden des Helden auf einen Gegner. */
 function strike(world, enemy, baseDamage, abilityId) {
-  if (!(baseDamage > 0) || enemy.hp <= 0) return;
+  if (!(baseDamage > 0) || !isTargetable(enemy)) return;
   const s = world.hero.stats;
   const hit = resolveHit(world.rng,
     { baseDamage, damage: s.damage, critChance: s.critChance, critDamage: s.critDamage },
@@ -130,7 +130,7 @@ function strike(world, enemy, baseDamage, abilityId) {
 /** Schaden, dann (falls er überlebt) Zustände und Rückstoß aus den Parametern. */
 function strikeWithEffects(world, enemy, p, abilityId) {
   strike(world, enemy, p.damage, abilityId);
-  if (enemy.hp <= 0) return;
+  if (!isTargetable(enemy)) return;
   applyStatus(world, enemy, p);
   if (p.knockback) knockback(world, enemy, p.knockback);
 }

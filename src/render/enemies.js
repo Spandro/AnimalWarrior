@@ -1,10 +1,12 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { ENEMIES } from '../data/enemies.js';
 import { ABILITIES } from '../data/abilities.js';
-import { ENEMY_SPRITES, CROW_FLIGHT_HEIGHT, BILLBOARD } from '../data/sprites.js';
+import { ENEMY_SPRITES, HERO_SPRITES, CROW_FLIGHT_HEIGHT, BILLBOARD } from '../data/sprites.js';
+import { SHADOW } from '../data/shadow.js';
 import {
   billboardOrientation, spriteGeometry, spriteWidth, spriteMaterial, shadowMaterial, composeSprite, spriteMotion,
 } from './sprites.js';
+import { buildCharacter, animateCharacter } from './character.js';
 
 /**
  * Darstellung aller Weltobjekte außer Held und Gelände: Gegner, Heldengeschosse, Gegnergeschosse,
@@ -217,6 +219,9 @@ const TINT = {
   slow: new THREE.Color(0.72, 0.95, 1.5),
 };
 
+/** Dein Schatten: Farbe (multipliziert das Heldenbild), Deckkraft, Ein- und Ausblenden (Weltsekunden). */
+const SHADOW_LOOK = { color: 0x3a2264, opacity: 0.75, fadeIn: 0.6, fadeOut: 0.5, aura: 0x2a0f52 };
+
 // ---------------------------------------------------------------- Instanzvorrat
 
 /**
@@ -330,6 +335,36 @@ export function createEnemyView(scene, { sprites, camera } = {}) {
   // Warmer Lichthof unter Elite-Gegnern: die Instanzfarbe allein hellt dunkle Felle (Krähe) kaum auf.
   const eliteHalo = createPool(root, discGeo, decalMat(0xffa040, 0.3, true), 64);
 
+  // Dein Schatten: eine eigene Tafel mit dem Bild des Helden (bzw. seine 3D-Figur), dunkel violett und
+  // durchscheinend, mit violettem Schein am Boden. Entsteht beim ersten Erscheinen.
+  const shadowAura = createPool(root, discGeo, decalMat(SHADOW_LOOK.aura, 0.35), 2);
+  /** @type {{ object: THREE.Object3D, material: THREE.Material, def?: import('../data/sprites.js').SpriteDef, width?: number }|null} */
+  let shadowFigure = null;
+  function ensureShadowFigure(hero) {
+    if (shadowFigure) return shadowFigure;
+    if (painted) {
+      const def = HERO_SPRITES[`${hero.animalId}-${hero.classId}`];
+      const material = mat(new THREE.MeshBasicMaterial({
+        map: sprites.textures[def.sheet], color: SHADOW_LOOK.color, transparent: true, opacity: SHADOW_LOOK.opacity,
+        alphaTest: BILLBOARD.alphaTest, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
+      }));
+      const object = new THREE.Mesh(geo(spriteGeometry(def, sprites.sizes[def.sheet])), material);
+      object.matrixAutoUpdate = false;
+      object.frustumCulled = false;
+      shadowFigure = { object, material, def, width: spriteWidth(def) };
+    } else {
+      const material = mat(new THREE.MeshStandardMaterial({
+        color: 0x1c1430, emissive: 0x3a1f66, emissiveIntensity: 0.8, roughness: 0.9, transparent: true, opacity: SHADOW_LOOK.opacity,
+      }));
+      const object = buildCharacter(hero.animalId, hero.classId);
+      object.traverse((o) => { if (o.isMesh) { o.material = material; o.castShadow = false; o.receiveShadow = false; } });
+      shadowFigure = { object, material };
+    }
+    shadowFigure.object.visible = false;
+    root.add(shadowFigure.object);
+    return shadowFigure;
+  }
+
   // Geschosse
   const ballGeo = geo(new THREE.SphereGeometry(1, 12, 8));
   const fireCore = createPool(root, ballGeo, glowMat(0xffc070), 64);
@@ -345,6 +380,8 @@ export function createEnemyView(scene, { sprites, camera } = {}) {
   const daggerTrail = createPool(root, ballGeo, glowMat(0xcfe0ff, 0.35, true), 128);
   const spitCore = createPool(root, ballGeo, glowMat(0xa6d84a), 64);
   const spitHalo = createPool(root, ballGeo, glowMat(0x5f9a18, 0.45, true), 64);
+  const shadowShotCore = createPool(root, ballGeo, glowMat(0x2a1640), 32);
+  const shadowShotHalo = createPool(root, ballGeo, glowMat(0x6a2cff, 0.4, true), 32);
 
   // Umlaufkugeln
   const orbCore = createPool(root, ballGeo, glowMat(0xe2d4ff), 16);
@@ -380,7 +417,8 @@ export function createEnemyView(scene, { sprites, camera } = {}) {
   ])), pickupMat, 8, { castShadow: true });
 
   const allPools = [
-    ...Object.values(enemyPools), ...enemyExtras, blobs, eliteHalo, fireCore, fireHalo, daggers, daggerTrail, spitCore, spitHalo,
+    ...Object.values(enemyPools), ...enemyExtras, blobs, eliteHalo, shadowAura, fireCore, fireHalo, daggers, daggerTrail,
+    spitCore, spitHalo, shadowShotCore, shadowShotHalo,
     orbCore, orbHalo, poisonDisc, poisonRing, burnDisc, burnRing, targetRing, targetFill, otherDisc, meteorRock,
     xpPool, goldPool, potionPool, chestPool,
   ];
@@ -436,12 +474,48 @@ export function createEnemyView(scene, { sprites, camera } = {}) {
     gaitNext.clear();
   }
 
+  /**
+   * Zeichnet den Schatten: blendet nach dem Erscheinen ein, vor dem Ablauf und während der ganzen Flucht aus;
+   * während der Vorwarnung seines Hiebs der Ausfall nach vorn wie beim Helden.
+   */
+  function drawShadow(world, e, alpha, t) {
+    const fig = ensureShadowFigure(world.hero);
+    const p = tracker.pos(e.id, e.x, e.z, alpha);
+    const clamp01 = (v) => Math.max(0, Math.min(1, v));
+    const fadeIn = clamp01((t - (e.expiresAt - SHADOW.duration)) / SHADOW_LOOK.fadeIn);
+    const fadeOut = e.fleeing
+      ? clamp01((e.fleeUntil - t) / SHADOW.fleeDuration)
+      : clamp01((e.expiresAt - t) / SHADOW_LOOK.fadeOut);
+    const fade = Math.min(fadeIn, fadeOut);
+    fig.material.opacity = SHADOW_LOOK.opacity * fade;
+    fig.object.visible = fade > 0.01;
+    const a = e.ai.attack;
+    const attackT = e.ai.phase === 'swipe' && a ? clamp01(1 - (e.ai.until - t) / a.delay) * 0.5 : undefined;
+    const ph = e.id * 1.7;
+    if (painted) {
+      const g = gait.get(e.id);
+      const motion = spriteMotion(fig.def.motion, { speed: g?.speed ?? 0, time: t + ph, attackT });
+      composeSprite(fig.object.matrix, orient, p.x, 0, p.z, fig.width, fig.def.heightM, g?.face ?? 1, motion, fig.def.footOffset);
+      fig.object.matrixWorldNeedsUpdate = true;
+      const sk = (1 - 0.35 * Math.min(1, motion.offsetY / 0.4)) * (0.4 + 0.6 * fade);
+      blobs.push(place(p.x, 0.02, p.z, 0, fig.width * BILLBOARD.shadowWidth * sk, 1, fig.width * BILLBOARD.shadowDepth * sk));
+    } else {
+      const hero = world.hero;
+      const yaw = Math.atan2(hero.x - p.x, hero.z - p.z) + (e.fleeing ? Math.PI : 0);
+      fig.object.position.set(p.x, 0, p.z);
+      fig.object.rotation.y = yaw;
+      animateCharacter(fig.object, { speed: e.speed, time: t + ph, attackT });
+    }
+    if (fade > 0.01) shadowAura.push(place(p.x, 0.025, p.z, 0, (0.6 + 0.05 * Math.sin(t * 4)) * (0.5 + 0.5 * fade)));
+  }
+
   function drawPaintedEnemies(world, alpha, t) {
     updateGait(world);
     const hero = world.hero;
     for (const e of world.enemies) {
       const dx = e.x - hero.x, dz = e.z - hero.z;
       if (dx * dx + dz * dz > CULL_DISTANCE * CULL_DISTANCE) continue;
+      if (e.shadow) { drawShadow(world, e, alpha, t); continue; }
       const def = ENEMIES[e.type];
       const pool = enemyPools[e.type] || fallbackPool;
       const sprite = ENEMY_SPRITES[e.type] || ENEMY_SPRITES.ratte;
@@ -465,7 +539,7 @@ export function createEnemyView(scene, { sprites, camera } = {}) {
 
       const motion = spriteMotion(sprite.motion, { speed: stunned ? 0 : g?.speed ?? 0, time: t + ph });
       const lift = sprite.motion === 'fly' ? CROW_FLIGHT_HEIGHT * k : 0;
-      pool.push(composeSprite(m, orient, p.x, lift, p.z, size.width * k, size.height * k, g?.face ?? 1, motion), color);
+      pool.push(composeSprite(m, orient, p.x, lift, p.z, size.width * k, size.height * k, g?.face ?? 1, motion, sprite.footOffset * k), color);
       const air = lift + motion.offsetY;
       const sk = k * (1 - 0.35 * Math.min(1, air / 1.2));
       blobs.push(place(p.x, 0.02, p.z, 0, size.width * BILLBOARD.shadowWidth * sk, 1, size.width * BILLBOARD.shadowDepth * sk));
@@ -473,11 +547,13 @@ export function createEnemyView(scene, { sprites, camera } = {}) {
   }
 
   function drawEnemies(world, alpha, t) {
+    if (shadowFigure) shadowFigure.object.visible = false;
     if (painted) { drawPaintedEnemies(world, alpha, t); return; }
     const hero = world.hero;
     for (const e of world.enemies) {
       const dx = e.x - hero.x, dz = e.z - hero.z;
       if (dx * dx + dz * dz > CULL_DISTANCE * CULL_DISTANCE) continue;
+      if (e.shadow) { drawShadow(world, e, alpha, t); continue; }
       const def = ENEMIES[e.type];
       const pool = enemyPools[e.type] || fallbackPool;
       const p = tracker.pos(e.id, e.x, e.z, alpha);
@@ -533,8 +609,13 @@ export function createEnemyView(scene, { sprites, camera } = {}) {
     for (const pr of world.enemyProjectiles) {
       const p = tracker.pos(pr, pr.x, pr.z, alpha);
       const r = pr.radius * (1 + 0.1 * Math.sin(t * 20));
-      spitCore.push(place(p.x, 0.6, p.z, 0, r * 0.75));
-      spitHalo.push(place(p.x, 0.6, p.z, 0, r * 1.35));
+      if (pr.shadow) {
+        shadowShotCore.push(place(p.x, 0.8, p.z, 0, r * 0.6));
+        shadowShotHalo.push(place(p.x, 0.8, p.z, Math.atan2(pr.dirX, pr.dirZ), r * 0.95, r * 0.95, r * 1.6));
+      } else {
+        spitCore.push(place(p.x, 0.6, p.z, 0, r * 0.75));
+        spitHalo.push(place(p.x, 0.6, p.z, 0, r * 1.35));
+      }
     }
   }
 
@@ -609,6 +690,7 @@ export function createEnemyView(scene, { sprites, camera } = {}) {
 
   function dispose() {
     for (const pool of allPools) pool.dispose();
+    if (shadowFigure) root.remove(shadowFigure.object);
     scene.remove(root);
     for (const g of owned.geometries) g.dispose();
     for (const mm of owned.materials) mm.dispose();

@@ -63,6 +63,21 @@ export const SFX = {
     ...arpeggio('sine', [1175, 1568, 2093], 0.07, 0.25, 0.22),
     { kind: 'noise', filter: 'highpass', freq: [6000, 3000], dur: 0.3, gain: 0.12 },
   ],
+  // Dein Schatten: tiefes, schwebendes Rauschen beim Erscheinen, ein abfallendes Wimmern bei der Flucht,
+  // ein leises Verwehen beim Auflösen.
+  shadowAppear: [
+    { kind: 'tone', wave: 'triangle', freq: [110, 220], dur: 0.9, gain: 0.28, attack: 0.25 },
+    { kind: 'tone', wave: 'sine', freq: [116, 233], dur: 0.9, gain: 0.2, attack: 0.25 },
+    { kind: 'noise', filter: 'bandpass', freq: [300, 1200], dur: 0.8, gain: 0.25, attack: 0.2 },
+  ],
+  shadowFlee: [
+    { kind: 'tone', wave: 'square', freq: [660, 180], dur: 0.45, gain: 0.12 },
+    { kind: 'noise', filter: 'highpass', freq: [2500, 600], dur: 0.35, gain: 0.15 },
+  ],
+  shadowVanish: [
+    { kind: 'noise', filter: 'bandpass', freq: [1400, 250], dur: 0.7, gain: 0.22, attack: 0.05 },
+    { kind: 'tone', wave: 'sine', freq: [330, 110], dur: 0.7, gain: 0.12, attack: 0.05 },
+  ],
   click: [
     { kind: 'tone', wave: 'triangle', freq: [660, 440], dur: 0.05, gain: 0.18 },
   ],

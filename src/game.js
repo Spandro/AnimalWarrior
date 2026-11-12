@@ -148,6 +148,7 @@ export function startGame({
 
   function handleEvents() {
     heroView.handle(run.events, world);
+    hud.handle(run.events, world);
     effects.handle(run.events, world);
     sfx?.handle(run.events);
   }

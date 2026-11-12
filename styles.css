@@ -289,14 +289,33 @@ p { margin: 0; }
 .hud-counters > span { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 8px; background: rgba(15, 18, 14, 0.5); }
 .hud-gold .hud-icon { color: #ffd040; }
 .hud-kills .hud-icon { color: #e8b8a8; }
-.hud-boss {
+/* Bär und Schatten stehen untereinander, darunter der Spruch des Schattens. */
+.hud-bosses {
   position: absolute; top: calc(var(--hud-top) + 58px); left: 50%; transform: translateX(-50%);
-  width: min(520px, calc(100% - 24px)); display: flex; flex-direction: column; align-items: center; gap: 3px;
+  width: min(520px, calc(100% - 24px)); display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
+.hud-boss { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .hud-boss[hidden] { display: none; }
 .hud-boss-name { font-family: var(--serif); font-weight: 600; font-size: 1.05rem; letter-spacing: 0.04em; }
 .hud-boss-bar { width: 100%; flex: none; height: 16px; border-color: #3a0d08; }
 .hud-boss-bar .hud-bar-fill { background: linear-gradient(180deg, #c8402c, #6e1a10); }
+.hud-shadow-head { display: flex; align-items: baseline; gap: 10px; }
+.hud-shadow .hud-boss-name { color: #d9c4ff; }
+.hud-shadow-time { font-weight: 700; font-size: 0.85rem; font-variant-numeric: tabular-nums; color: #d9c4ff; }
+.hud-shadow-bar { width: 100%; flex: none; height: 14px; border-color: #1e0f38; }
+.hud-shadow-bar .hud-bar-fill { background: linear-gradient(180deg, #9a6cf0, #45208a); }
+.hud-taunt {
+  position: relative; margin-top: 6px; max-width: 100%; padding: 6px 14px; border-radius: 14px; box-sizing: border-box;
+  font-weight: 700; font-size: 0.95rem; font-style: italic; text-align: center; color: #f1e8ff;
+  background: rgba(36, 20, 62, 0.88); border: 1px solid #7a52c8; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  animation: hud-taunt-in 0.18s ease-out;
+}
+.hud-taunt::before {
+  content: ''; position: absolute; top: -7px; left: 50%; margin-left: -6px;
+  border: 6px solid transparent; border-top: 0; border-bottom: 7px solid #7a52c8;
+}
+.hud-taunt[hidden] { display: none; }
+@keyframes hud-taunt-in { from { opacity: 0; transform: translateY(-4px) scale(0.96); } to { opacity: 1; transform: none; } }
 .hud-abilities {
   position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
   margin: 0; padding: 0; list-style: none; display: flex; gap: 8px;
@@ -320,7 +339,9 @@ p { margin: 0; }
   .hud-vitals { max-width: none; }
   .hud-timer { grid-column: 1 / -1; grid-row: 2; font-size: 1.15rem; padding: 1px 8px; }
   .hud-counters { flex-direction: column; align-items: flex-end; gap: 4px; font-size: 0.85rem; }
-  .hud-boss { top: calc(var(--hud-top) + 92px); }
+  .hud-bosses { top: calc(var(--hud-top) + 92px); gap: 4px; }
+  .hud-boss-name { font-size: 0.95rem; }
+  .hud-taunt { font-size: 0.85rem; padding: 5px 10px; }
   .hud-ability { width: 34px; height: 34px; }
 }
 .fps-readout {

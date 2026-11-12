@@ -1,6 +1,6 @@
 // Gemalte Figuren: Bildbögen laden, weißen Hintergrund entfernen, Texturen anlegen, Bewegung berechnen.
 import * as THREE from '../../vendor/three.module.min.js';
-import { SHEETS, BACKGROUND, BILLBOARD, MOTION, IDLE, ATTACK, MOTION_FULL_SPEED } from '../data/sprites.js';
+import { SHEETS, BACKGROUND, BILLBOARD, MOTION, IDLE, ATTACK, MOTION_FULL_SPEED, HOP_BACK_LEAN } from '../data/sprites.js';
 
 /**
  * @typedef {{ width: number, height: number, data: Uint8ClampedArray|Uint8Array }} ImageDataLike
@@ -228,19 +228,27 @@ export function spriteUv(sprite, sheetSize) {
  * hinten geneigt, damit die Bilder unter dem steilen Kamerawinkel nicht gestaucht wirken. Die Kamera dreht
  * sich im Spiel nie, daher genügt es, dies einmal zu berechnen. Alle Tafeln liegen so in parallelen
  * Ebenen und schneiden einander nie.
- * @param {THREE.Camera} [camera] ohne Kamera: Blick entlang -z
- * @returns {{ quaternion: THREE.Quaternion, right: THREE.Vector3 }} right: Bildschirm-rechts auf dem Boden
+ * `foot`: Verschiebung am Boden (zur Kamera hin) je Meter Fußhöhe im Bild. Damit landet der Standpunkt einer
+ * Figur, der `footOffset` Meter über der Bildunterkante liegt, auf dem Bildschirm genau über ihrer Bodenposition,
+ * ohne dass die Tafel in den Boden sinkt (dort würde der Boden die Füße verdecken).
+ * @param {THREE.Camera} [camera] ohne Kamera: Blick entlang -z, senkrecht auf die Tafeln
+ * @returns {{ quaternion: THREE.Quaternion, right: THREE.Vector3, foot: THREE.Vector3 }} right: Bildschirm-rechts auf dem Boden
  */
 export function billboardOrientation(camera) {
-  let yaw = 0;
+  const tilt = THREE.MathUtils.degToRad(BILLBOARD.tiltDeg);
+  let yaw = 0, elevation = Math.PI / 2 - tilt;
   if (camera) {
     const dir = camera.getWorldDirection(new THREE.Vector3());
-    if (Math.hypot(dir.x, dir.z) > 1e-6) yaw = Math.atan2(-dir.x, -dir.z);
+    const flat = Math.hypot(dir.x, dir.z);
+    if (flat > 1e-6) yaw = Math.atan2(-dir.x, -dir.z);
+    elevation = Math.atan2(-dir.y, flat);
   }
-  const quaternion = new THREE.Quaternion().setFromEuler(
-    new THREE.Euler(-THREE.MathUtils.degToRad(BILLBOARD.tiltDeg), yaw, 0, 'YXZ'));
+  const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-tilt, yaw, 0, 'YXZ'));
   const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-  return { quaternion, right };
+  // Standpunkt auf den Sehstrahl durch die Bodenposition legen, Unterkante bleibt auf y = 0.
+  const k = elevation > 1e-3 ? Math.cos(tilt) / Math.tan(elevation) + Math.sin(tilt) : 0;
+  const foot = new THREE.Vector3(Math.sin(yaw) * k, 0, Math.cos(yaw) * k);
+  return { quaternion, right, foot };
 }
 
 /**
@@ -308,17 +316,19 @@ const _zAxis = new THREE.Vector3(0, 0, 1);
 
 /**
  * Setzt `out` für eine Bildtafel: Füße bei (x, y, z), Bewegung aus {@link spriteMotion}, gespiegelt für
- * `face` = -1 (Blick nach links).
+ * `face` = -1 (Blick nach links). `footOffset`: Höhe des Standpunkts über der Bildunterkante (m, schon skaliert).
  * @param {THREE.Matrix4} out
- * @param {{ quaternion: THREE.Quaternion, right: THREE.Vector3 }} orient
+ * @param {{ quaternion: THREE.Quaternion, right: THREE.Vector3, foot?: THREE.Vector3 }} orient
  * @param {number} x @param {number} y @param {number} z
  * @param {number} width @param {number} height Weltmaße
  * @param {1|-1} face
  * @param {ReturnType<typeof spriteMotion>} m
+ * @param {number} [footOffset]
  */
-export function composeSprite(out, orient, x, y, z, width, height, face, m) {
+export function composeSprite(out, orient, x, y, z, width, height, face, m, footOffset = 0) {
   const lunge = m.lunge * face;
-  _pos.set(x + orient.right.x * lunge, y + m.offsetY, z + orient.right.z * lunge);
+  const fx = orient.foot ? orient.foot.x * footOffset : 0, fz = orient.foot ? orient.foot.z * footOffset : 0;
+  _pos.set(x + orient.right.x * lunge + fx, y + m.offsetY, z + orient.right.z * lunge + fz);
   _q.copy(orient.quaternion).multiply(_rz.setFromAxisAngle(_zAxis, -m.tilt * face));
   _scl.set(width * m.scaleX * face, height * m.scaleY, 1);
   return out.compose(_pos, _q, _scl);
@@ -349,10 +359,12 @@ export function spriteMotion(motion, { speed = 0, time = 0, attackT } = {}) {
 
   switch (motion) {
     case 'hop': {
-      // Sprünge im Bogen: in der Luft gestreckt, bei der Landung gestaucht, Nase hoch beim Absprung.
+      // Sprünge im Bogen (ein Sprung je halber Periode): in der Luft gestreckt, bei der Landung gestaucht.
+      // Neigung stetig: beim Steigen nach vorn, im Scheitel gerade, beim Fallen leicht zurück, am Boden 0.
       const h = Math.abs(s);
       offsetY += m.bob * h * move;
-      tilt -= m.tilt * Math.cos(phase) * Math.sign(s) * move;
+      const lean = Math.sin(phase * 2);
+      tilt += m.tilt * lean * (lean >= 0 ? 1 : HOP_BACK_LEAN) * move;
       stretch += m.squash * (h * 2 - 1) * move;
       break;
     }

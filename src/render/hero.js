@@ -155,7 +155,7 @@ function createSpriteBody(scene, animalId, classId, sprites, camera) {
       if (facing.x > BILLBOARD.flipHysteresis) face = 1;
       else if (facing.x < -BILLBOARD.flipHysteresis) face = -1;
       const m = spriteMotion(def.motion, { speed, time, attackT });
-      composeSprite(figure.matrix, orient, position.x, 0, position.z, width, height, face, m);
+      composeSprite(figure.matrix, orient, position.x, 0, position.z, width, height, face, m, def.footOffset);
       figure.matrixWorldNeedsUpdate = true;
       figure.visible = visible;
       placeBlob(position.x, position.z, 1, m.offsetY);
@@ -175,7 +175,7 @@ function createSpriteBody(scene, animalId, classId, sprites, camera) {
         const fade = Math.min(1, s.timeLeft / 0.4);
         const k = 0.6 + 0.4 * fade;
         const m = spriteMotion(def.motion, { speed: 0, time: t * 1.3 + i });
-        composeSprite(c.matrix, orient, s.x, 0, s.z, width * k, height * k, cloneFace.get(s), m);
+        composeSprite(c.matrix, orient, s.x, 0, s.z, width * k, height * k, cloneFace.get(s), m, def.footOffset * k);
         c.matrixWorldNeedsUpdate = true;
         c.visible = true;
         i++;

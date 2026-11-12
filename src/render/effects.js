@@ -476,8 +476,9 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
 
   function bossTelegraph(e) {
     const swipe = e.kind === 'swipe';
-    const geoFill = swipe ? shapes.sector(2 * BOSS.swipe.halfAngle / DEG) : shapes.disc;
-    const geoEdge = swipe ? shapes.sector(2 * BOSS.swipe.halfAngle / DEG, 0.93) : shapes.ring;
+    const halfAngle = e.halfAngle ?? BOSS.swipe.halfAngle;
+    const geoFill = swipe ? shapes.sector(2 * halfAngle / DEG) : shapes.disc;
+    const geoEdge = swipe ? shapes.sector(2 * halfAngle / DEG, 0.93) : shapes.ring;
     const o = { color: 0xd81c1c, life: e.delay, x: e.x, z: e.z, yaw: yawToward(e.dirX, e.dirZ), clock: 'world', start: world.time };
     decals.add(geoEdge, { ...o, y: 0.07, color: 0xff3a2a }, (k, d) => {
       d.mesh.scale.setScalar(e.radius);
@@ -502,6 +503,14 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
     }
   }
 
+  /** Dunkler Rauch mit violetten Funken, wo der Schatten erscheint oder sich auflöst. */
+  function shadowSmoke(e, strength = 1) {
+    burst(dust, Math.round(16 * strength), e.x, 0.5, e.z, {
+      speed: 2.6, up: 1.6, life: 0.8, size: 0.2, endSize: 0.42, color: 0x3a2a52, gravity: -0.6, drag: 2.5, spread: 0.6,
+    });
+    burst(glow, Math.round(12 * strength), e.x, 0.9, e.z, { speed: 2.5, up: 2, life: 0.6, size: 0.07, color: 0x9a5cff, gravity: 1, drag: 2 });
+  }
+
   function revive(hero) {
     decals.add(shapes.ring, { color: 0xffffff, additive: true, life: 0.7, x: hero.x, z: hero.z, y: 0.08 }, grow(6, 0.1, 1, 1));
     levelup(hero);
@@ -523,6 +532,8 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
         case 'bossTelegraph': bossTelegraph(e); break;
         case 'levelup': levelup(hero); break;
         case 'revive': revive(hero); break;
+        case 'shadowAppear': case 'shadowVanish': shadowSmoke(e); break;
+        case 'shadowFlee': shadowSmoke(e, 0.5); break;
         case 'heroHit':
           vignette.hit(0.45 + (e.amount / hero.stats.maxHp) * 4);
           break;

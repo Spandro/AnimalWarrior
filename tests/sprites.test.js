@@ -73,6 +73,27 @@ test('sprites: Hoppeln hebt ab und sinkt nie unter den Boden', () => {
   assertTrue(max > 0.1, `höchster Hub ${max}`);
 });
 
+test('sprites: Neigung ändert sich im Lauf stetig, ohne Sprung bei Landung und Absprung', () => {
+  const dt = 1 / 120;
+  for (const motion of Object.keys(MOTION)) {
+    const cycle = 1 / MOTION[motion].freq;
+    let prev = spriteMotion(motion, { speed: 5, time: 0 }).tilt;
+    for (let t = dt; t <= cycle + 1e-9; t += dt) {
+      const tilt = spriteMotion(motion, { speed: 5, time: t }).tilt;
+      assertTrue(Math.abs(tilt - prev) <= 0.05, `${motion} t=${t.toFixed(3)}: ${prev.toFixed(3)} → ${tilt.toFixed(3)}`);
+      prev = tilt;
+    }
+  }
+});
+
+test('sprites: Hoppeln neigt beim Steigen nach vorn und steht bei Bodenkontakt gerade', () => {
+  const { freq } = MOTION.hop;
+  const half = 1 / (2 * freq); // ein Sprung
+  assertTrue(spriteMotion('hop', { speed: 5, time: half * 0.25 }).tilt > 0, 'steigt nicht nach vorn geneigt');
+  assertTrue(spriteMotion('hop', { speed: 5, time: half * 0.75 }).tilt < 0, 'fällt nicht leicht zurückgeneigt');
+  assertClose(spriteMotion('hop', { speed: 5, time: half }).tilt, 0, 0.01);
+});
+
 test('sprites: Angriff gibt einen Ausfall nach vorn', () => {
   assertTrue(spriteMotion('hop', { speed: 0, time: 1, attackT: 0.5 }).lunge > 0);
   assertEqual(spriteMotion('hop', { speed: 0, time: 1 }).lunge, 0);
@@ -98,6 +119,7 @@ test('sprites: jede Heldenkombination und jeder Gegnertyp hat ein Bild', () => {
   const check = (key, s) => {
     assertTrue(s, `${key} fehlt`);
     assertTrue(s.w > 0 && s.h > 0 && s.heightM > 0, `${key}: Maße`);
+    assertTrue(s.footOffset >= 0 && s.footOffset < s.heightM * 0.2, `${key}: footOffset ${s.footOffset}`);
     assertTrue(Object.hasOwn(MOTION, s.motion), `${key}: Gangart ${s.motion}`);
   };
   for (const a of Object.keys(ANIMALS)) for (const c of Object.keys(CLASSES)) check(`${a}-${c}`, HERO_SPRITES[`${a}-${c}`]);

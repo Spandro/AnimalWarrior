@@ -1,7 +1,8 @@
-import { createWorld, stepWorld, spawnEnemy, knockback } from '../core/world.js';
+import { createWorld, stepWorld, spawnEnemy, spawnShadow, cappedEnemyCount, knockback } from '../core/world.js';
 import { pendingLevelUps, rollCards, applyCard, openChest } from '../core/progression.js';
 import { obstaclesNear } from '../core/terrain.js';
 import { ENEMIES, ELITE } from '../data/enemies.js';
+import { SHADOW, SHADOW_LINES, shadowMaxHp } from '../data/shadow.js';
 import {
   RUN_DURATION, MAX_ENEMIES, unlockMinute, weights, MAX_FORMULA_MINUTE, spawnPerSecond, hpMul, dmgMul,
   ELITE_INTERVAL, BOSS_TIMES, BOSS_HP_MUL, LEASH_DISTANCE, CAP_BACKLOG, SPAWN_REROLLS, MAX_SUBSTEP, REVIVE,
@@ -13,15 +14,19 @@ import {
  * `chooseCard`, `setPaused` und `setView`.
  *
  * Ereignisse: Nach jedem `stepRun` stehen in `run.events` alle Ereignisse dieses Aufrufs (aus allen
- * Teilschritten, inklusive der Modus-Ereignisse `levelup`, `bossSpawn`, `revive`, `death`, `victory`, `chest`).
+ * Teilschritten, inklusive der Modus-Ereignisse `levelup`, `bossSpawn`, `revive`, `death`, `victory`, `chest`,
+ * `shadowAppear`, `shadowVanish`; `shadowFlee` kommt aus der Welt).
  * Verbraucher lesen `run.events`, nicht `world.events` (das enthält nur den letzten Teilschritt).
+ *
+ * Schatten: `{ type: 'shadowAppear'|'shadowFlee', line, x, z }`, `{ type: 'shadowVanish', line, x, z, rewarded }`
+ * (`line` ist null beim Verschwinden nach der Flucht – der Spruch kam schon mit `shadowFlee`).
  *
  * @typedef {import('../core/world.js').World} World
  * @typedef {import('../core/progression.js').Card} Card
  * @typedef {import('../data/animals.js').Modifier} Modifier
  * @typedef {'playing'|'levelup'|'paused'|'won'|'lost'} RunState
  * @typedef {{ acc: number, backlog: number, strongPending: number, nextEliteAt: number, bossIndex: number,
- *   finalBoss: import('../core/world.js').Enemy|null }} SpawnState
+ *   finalBoss: import('../core/world.js').Enemy|null, shadowIndex: number }} SpawnState
  * @typedef {{ world: World, state: RunState, cards: Card[]|null, view: { halfW: number, halfH: number },
  *   timeScale: number, events: object[], spawn: SpawnState }} Run
  */
@@ -35,7 +40,7 @@ export function createSurvivorRun({ seed, animalId, classId, modifiers = [], rev
   world.run.revivesLeft = revive ? 1 : 0;
   return {
     world, state: 'playing', cards: null, view: { ...DEFAULT_VIEW }, timeScale, events: [],
-    spawn: { acc: 0, backlog: 0, strongPending: 0, nextEliteAt: ELITE_INTERVAL, bossIndex: 0, finalBoss: null },
+    spawn: { acc: 0, backlog: 0, strongPending: 0, nextEliteAt: ELITE_INTERVAL, bossIndex: 0, finalBoss: null, shadowIndex: 0 },
   };
 }
 
@@ -61,6 +66,7 @@ function subStep(run, dt, input) {
   stepWorld(world, dt, input);
   const chests = world.events.filter((e) => e.type === 'pickup' && e.kind === 'chest').length;
   for (let i = 0; i < chests; i++) openChest(world);
+  updateShadow(run);
   spawnWaves(run, dt);
   leash(run);
   checkOutcome(run);
@@ -70,6 +76,35 @@ function subStep(run, dt, input) {
     world.events.push({ type: 'levelup', level: world.run.level + 1 });
   }
   run.events.push(...world.events);
+}
+
+/**
+ * Schatten: verschwindet nach Ablauf seiner Zeit (ohne Belohnung) oder am Ende der Flucht (die Truhe liegt dann
+ * schon); erscheint zu den Zeiten aus SHADOW.times, nicht ab RUN_DURATION, nicht neben einem anderen Schatten
+ * und nicht mehr, wenn sein Zeitfenster schon vorbei ist.
+ */
+function updateShadow(run) {
+  const { world, spawn } = run;
+  for (let i = world.enemies.length - 1; i >= 0; i--) {
+    const e = world.enemies[i];
+    if (!e.shadow) continue;
+    const done = e.fleeing ? world.time >= e.fleeUntil : world.time >= e.expiresAt;
+    if (!done) continue;
+    world.enemies.splice(i, 1);
+    world.events.push({
+      type: 'shadowVanish', line: e.fleeing ? null : world.rng.pick(SHADOW_LINES.timeout), x: e.x, z: e.z, rewarded: !!e.fleeing,
+    });
+  }
+  while (spawn.shadowIndex < SHADOW.times.length && world.time >= SHADOW.times[spawn.shadowIndex]) {
+    const visit = spawn.shadowIndex++;
+    const expiresAt = SHADOW.times[visit] + SHADOW.duration;
+    if (world.time >= RUN_DURATION || world.time >= expiresAt || world.enemies.some((e) => e.shadow)) continue;
+    const pos = ringPosition(run, SHADOW.radius, false, true);
+    spawnShadow(world, pos.x, pos.z, {
+      hp: shadowMaxHp(world.run.level, visit), damage: SHADOW.baseDamage * dmgMul(currentMinute(world)), expiresAt,
+    });
+    world.events.push({ type: 'shadowAppear', line: world.rng.pick(SHADOW_LINES.appear), x: pos.x, z: pos.z });
+  }
 }
 
 /** Minute für die Formeln, gedeckelt. */
@@ -84,7 +119,7 @@ function spawnWaves(run, dt) {
   // Bosse (nie mehr als fällig; im echten Spiel höchstens einer pro Schritt)
   while (spawn.bossIndex < BOSS_TIMES.length && world.time >= BOSS_TIMES[spawn.bossIndex]) {
     const index = spawn.bossIndex++;
-    const pos = ringPosition(run, 'baer', false, true);
+    const pos = ringPosition(run, ENEMIES.baer.radius, false, true);
     const boss = spawnEnemy(world, 'baer', pos.x, pos.z, { hpMul: BOSS_HP_MUL[index], dmgMul: dmgMul(minute) });
     world.events.push({ type: 'bossSpawn', index });
     if (index === BOSS_TIMES.length - 1) spawn.finalBoss = boss;
@@ -95,7 +130,7 @@ function spawnWaves(run, dt) {
   if (world.time >= spawn.nextEliteAt && spawn.nextEliteAt < RUN_DURATION) {
     spawn.nextEliteAt = (Math.floor(world.time / ELITE_INTERVAL) + 1) * ELITE_INTERVAL;
     const type = pickType(world, minute);
-    const pos = ringPosition(run, type, true, true);
+    const pos = ringPosition(run, ENEMIES[type].radius * ELITE.scale, ENEMIES[type].flying, true);
     spawnEnemy(world, type, pos.x, pos.z, { elite: true, hpMul: hpMul(minute), dmgMul: dmgMul(minute) });
   }
 
@@ -103,12 +138,12 @@ function spawnWaves(run, dt) {
   spawn.acc += spawnPerSecond(minute) * dt;
   while (spawn.acc >= 1) {
     spawn.acc -= 1;
-    if (world.enemies.length >= MAX_ENEMIES) {
+    if (cappedEnemyCount(world) >= MAX_ENEMIES) {
       if (++spawn.backlog >= CAP_BACKLOG.batch) { spawn.backlog -= CAP_BACKLOG.batch; spawn.strongPending++; }
       continue;
     }
     const type = pickType(world, minute);
-    const pos = ringPosition(run, type, false, false);
+    const pos = ringPosition(run, ENEMIES[type].radius, ENEMIES[type].flying, false);
     if (!pos) continue;
     const strong = spawn.strongPending > 0;
     const enemy = spawnEnemy(world, type, pos.x, pos.z,
@@ -128,29 +163,31 @@ function pickType(world, minute) {
 /**
  * Zufälliger Punkt auf dem Erscheinungsring um den Helden. Bodengegner nicht in Hindernissen:
  * bis zu SPAWN_REROLLS neue Winkel, dann null – oder mit `force` der letzte Punkt (die Welt schiebt ihn heraus).
+ * @param {Run} run
+ * @param {number} radius Körperradius des Gegners
+ * @param {boolean} flying
+ * @param {boolean} force
  */
-function ringPosition(run, type, elite, force) {
+function ringPosition(run, radius, flying, force) {
   const { world, view } = run;
-  const def = ENEMIES[type];
   const r = spawnRadius(view.halfW, view.halfH);
-  const radius = def.radius * (elite ? ELITE.scale : 1);
   let pos = null;
   for (let i = 0; i <= SPAWN_REROLLS; i++) {
     const a = world.rng.range(0, Math.PI * 2);
     pos = { x: world.hero.x + Math.cos(a) * r, z: world.hero.z + Math.sin(a) * r };
-    if (def.flying || obstaclesNear(world.seed, pos.x, pos.z, radius).length === 0) return pos;
+    if (flying || obstaclesNear(world.seed, pos.x, pos.z, radius).length === 0) return pos;
   }
   return force ? pos : null;
 }
 
-/** Gegner (außer Bossen), die zu weit weg sind, kommen zurück auf den Ring. */
+/** Gegner (außer Bossen und dem Schatten), die zu weit weg sind, kommen zurück auf den Ring. */
 function leash(run) {
   const { world, view } = run;
   const limit = Math.max(LEASH_DISTANCE, spawnRadius(view.halfW, view.halfH) + 1);
   const hero = world.hero;
   for (const e of world.enemies) {
-    if (e.boss || (e.x - hero.x) ** 2 + (e.z - hero.z) ** 2 <= limit * limit) continue;
-    const pos = ringPosition(run, e.type, e.elite, false);
+    if (e.boss || e.shadow || (e.x - hero.x) ** 2 + (e.z - hero.z) ** 2 <= limit * limit) continue;
+    const pos = ringPosition(run, e.radius, e.flying, false);
     if (pos) { e.x = pos.x; e.z = pos.z; }
   }
 }

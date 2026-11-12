@@ -8,6 +8,7 @@ import { CLASSES } from '../data/classes.js';
 import { bonusModifiers } from '../data/bonuses.js';
 import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, CONTACT_TOLERANCE, HERO_RADIUS, SEPARATION_CELL, MAX_ENEMIES,
   CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS } from '../data/enemies.js';
+import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
 
 /**
  * @typedef {import('./stats.js').Stats} Stats
@@ -19,11 +20,15 @@ import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, CONTACT_TOLERANCE, HERO_RADIUS
  * @typedef {{ id: number, type: string, x: number, z: number, hp: number, maxHp: number, radius: number, speed: number,
  *   damage: number, elite: boolean, boss: boolean, flying: boolean, behavior: string, slowUntil: number, slowFactor: number,
  *   confusedUntil: number, stunnedUntil: number, contactReadyAt: number, hitReadyAt: Record<string, number>, ai: object,
- *   wander?: { x: number, z: number, rerollAt: number } }} Enemy
+ *   wander?: { x: number, z: number, rerollAt: number },
+ *   shadow?: boolean, style?: string, expiresAt?: number, fleeing?: boolean, fleeUntil?: number, untargetable?: boolean }} Enemy
+ *   Der Schatten (`shadow`) kämpft im Stil `style` (Klasse des Helden), verschwindet bei `expiresAt` und flieht
+ *   bei 1 Leben bis `fleeUntil`; währenddessen ist er `untargetable`.
  * @typedef {{ kind: 'xp'|'gold'|'potion'|'chest', x: number, z: number, value: number }} Pickup
  * @typedef {{ level: number, xp: number, kills: number, gold: number, bonuses: object, damageByAbility: Record<string, number>, revivesLeft: number }} Run
- * @typedef {{ x: number, z: number, dirX: number, dirZ: number, speed: number, damage: number, radius: number, timeLeft: number }} EnemyProjectile
- *   Gegnergeschoss: trifft nur den Held, wird von Hindernissen aufgehalten.
+ * @typedef {{ x: number, z: number, dirX: number, dirZ: number, speed: number, damage: number, radius: number, timeLeft: number,
+ *   shadow?: boolean }} EnemyProjectile
+ *   Gegnergeschoss: trifft nur den Held, wird von Hindernissen aufgehalten. `shadow`: vom Schatten geworfen.
  * @typedef {{ time: number, seed: number, rng: import('./rng.js').Rng, hero: Hero, enemies: Enemy[], projectiles: object[],
  *   enemyProjectiles: EnemyProjectile[], zones: object[], orbitals: object[], summons: object[], pickups: Pickup[],
  *   events: object[], run: Run, nextId: number }} World
@@ -86,39 +91,12 @@ const BEHAVIORS = {
 
   /** Hält Abstand und schießt auf den Helden. */
   ranged(world, enemy, dt) {
-    const ai = enemy.ai, t = world.time;
-    if (ai.fireAt === undefined) ai.fireAt = t + RANGED.fireInterval;
-    const to = towards(enemy, enemyTarget(world, enemy));
-    const step = enemySpeed(world, enemy) * dt;
-    if (to.d > RANGED.maxRange) moveDir(enemy, to.x, to.z, Math.min(step, to.d - RANGED.maxRange));
-    else if (to.d < RANGED.minRange) moveDir(enemy, -to.x, -to.z, Math.min(step, RANGED.minRange - to.d));
-    if (t < ai.fireAt) return;
-    const aim = towards(enemy, world.hero);
-    if (aim.d > RANGED.fireRange) return;
-    ai.fireAt = t + RANGED.fireInterval;
-    world.enemyProjectiles.push({
-      x: enemy.x, z: enemy.z, dirX: aim.x, dirZ: aim.z, speed: RANGED.projectileSpeed,
-      damage: enemy.damage, radius: RANGED.projectileRadius, timeLeft: RANGED.projectileLife,
-    });
+    keepRangeAndFire(world, enemy, dt, RANGED, 1, 0, enemy.damage, false);
   },
 
   /** Verfolgt, umkreist dann in festem Abstand und stößt regelmäßig vor. */
   circle(world, enemy, dt) {
-    const ai = enemy.ai, t = world.time;
-    if (!ai.side) { ai.side = enemy.id % 2 ? 1 : -1; ai.lungeAt = t + CIRCLE.lungeInterval; }
-    const speed = enemySpeed(world, enemy);
-    if (ai.lungeUntil > t) { moveDir(enemy, ai.dirX, ai.dirZ, speed * CIRCLE.lungeSpeedMul * dt); return; }
-    const to = towards(enemy, enemyTarget(world, enemy));
-    if (to.d > CIRCLE.engageRange) { BEHAVIORS.chase(world, enemy, dt); return; }
-    if (t >= ai.lungeAt) {
-      ai.lungeUntil = t + CIRCLE.lungeDuration; ai.lungeAt = ai.lungeUntil + CIRCLE.lungeInterval;
-      ai.dirX = to.x; ai.dirZ = to.z;
-      return;
-    }
-    const radial = Math.max(-1, Math.min(1, (to.d - CIRCLE.radius) / 2));
-    const vx = to.x * radial - to.z * ai.side, vz = to.z * radial + to.x * ai.side;
-    const len = Math.hypot(vx, vz);
-    moveDir(enemy, vx / len, vz / len, speed * dt);
+    circleAndLunge(world, enemy, dt, CIRCLE);
   },
 
   /** Verfolgen, dann Prankenhieb (nah) oder Sprung (fern) mit Vorwarnung, dann kurze Pause. */
@@ -136,31 +114,148 @@ const BEHAVIORS = {
     }
     if (ai.phase === 'recover' && t >= ai.until) { ai.phase = 'chase'; ai.until = t + BOSS.chaseTime; }
   },
+
+  /** Dein Schatten: kämpft im Stil der Heldenklasse; nach dem Brechen flieht er vom Helden weg. */
+  shadow(world, enemy, dt) {
+    const hero = world.hero;
+    if (enemy.fleeing) {
+      enemy.speed = hero.stats.moveSpeed * SHADOW.fleeSpeedFactor;
+      const away = towards(hero, enemy, hero.facing);
+      moveDir(enemy, away.x, away.z, enemySpeed(world, enemy) * dt);
+      return;
+    }
+    enemy.speed = hero.stats.moveSpeed * SHADOW.speedFactor;
+    if (enemy.style === 'magier') {
+      const c = SHADOW.magier;
+      keepRangeAndFire(world, enemy, dt, c, c.count, c.spreadDeg, enemy.damage * c.damageMul, true);
+    } else if (enemy.style === 'dieb') {
+      const c = SHADOW.dieb;
+      if (circleAndLunge(world, enemy, dt, c)) fireAt(world, enemy, c, c.count, c.spreadDeg, enemy.damage * c.damageMul, true);
+    } else {
+      shadowMelee(world, enemy, dt, SHADOW.krieger);
+    }
+  },
 };
 
-function startBossAttack(world, enemy) {
-  const ai = enemy.ai, hero = world.hero;
+/**
+ * Hält `c.minRange`–`c.maxRange` Abstand zum Ziel und feuert alle `c.fireInterval` s `count` Geschosse auf den
+ * Helden, wenn er höchstens `c.fireRange` entfernt ist.
+ */
+function keepRangeAndFire(world, enemy, dt, c, count, spreadDeg, damage, shadow) {
+  const ai = enemy.ai, t = world.time;
+  if (ai.fireAt === undefined) ai.fireAt = t + c.fireInterval;
+  const to = towards(enemy, enemyTarget(world, enemy));
+  const step = enemySpeed(world, enemy) * dt;
+  if (to.d > c.maxRange) moveDir(enemy, to.x, to.z, Math.min(step, to.d - c.maxRange));
+  else if (to.d < c.minRange) moveDir(enemy, -to.x, -to.z, Math.min(step, c.minRange - to.d));
+  if (t < ai.fireAt) return;
+  if (towards(enemy, world.hero).d > c.fireRange) return;
+  ai.fireAt = t + c.fireInterval;
+  fireAt(world, enemy, c, count, spreadDeg, damage, shadow);
+}
+
+/** `count` Gegnergeschosse auf den Helden, gleichmäßig über `spreadDeg` Grad gefächert. */
+function fireAt(world, enemy, c, count, spreadDeg, damage, shadow) {
+  const aim = towards(enemy, world.hero);
+  const base = Math.atan2(aim.z, aim.x);
+  const step = count > 1 ? (spreadDeg * Math.PI) / 180 / (count - 1) : 0;
+  for (let i = 0; i < count; i++) {
+    const a = base + (i - (count - 1) / 2) * step;
+    /** @type {EnemyProjectile} */
+    const p = {
+      x: enemy.x, z: enemy.z, dirX: count > 1 ? Math.cos(a) : aim.x, dirZ: count > 1 ? Math.sin(a) : aim.z,
+      speed: c.projectileSpeed, damage, radius: c.projectileRadius, timeLeft: c.projectileLife,
+    };
+    if (shadow) p.shadow = true;
+    world.enemyProjectiles.push(p);
+  }
+}
+
+/**
+ * Verfolgt bis `c.engageRange`, umkreist dann in `c.radius` Abstand und stößt alle `c.lungeInterval` s für
+ * `c.lungeDuration` s mit `c.lungeSpeedMul`-fachem Tempo geradeaus vor.
+ * @returns {boolean} ob in diesem Schritt ein Vorstoß zu Ende ging
+ */
+function circleAndLunge(world, enemy, dt, c) {
+  const ai = enemy.ai, t = world.time;
+  if (!ai.side) { ai.side = enemy.id % 2 ? 1 : -1; ai.lungeAt = t + c.lungeInterval; }
+  const speed = enemySpeed(world, enemy);
+  if (ai.lungeUntil > t) { moveDir(enemy, ai.dirX, ai.dirZ, speed * c.lungeSpeedMul * dt); return false; }
+  const ended = ai.lunging === true;
+  ai.lunging = false;
+  const to = towards(enemy, enemyTarget(world, enemy));
+  if (to.d > c.engageRange) { BEHAVIORS.chase(world, enemy, dt); return ended; }
+  if (t >= ai.lungeAt) {
+    ai.lungeUntil = t + c.lungeDuration; ai.lungeAt = ai.lungeUntil + c.lungeInterval;
+    ai.dirX = to.x; ai.dirZ = to.z; ai.lunging = true;
+    return ended;
+  }
+  const radial = Math.max(-1, Math.min(1, (to.d - c.radius) / 2));
+  const vx = to.x * radial - to.z * ai.side, vz = to.z * radial + to.x * ai.side;
+  const len = Math.hypot(vx, vz);
+  moveDir(enemy, vx / len, vz / len, speed * dt);
+  return ended;
+}
+
+/**
+ * Nahkampf des Krieger-Schattens: verfolgt mindestens `c.chaseTime` s; ist der Held dann nah genug, Hieb mit
+ * Vorwarnung, danach `c.recover` s Pause. Ohne Held in Reichweite verfolgt er weiter (kein Sprung wie der Bär).
+ */
+function shadowMelee(world, enemy, dt, c) {
+  const ai = enemy.ai, t = world.time, hero = world.hero;
+  if (!ai.phase) { ai.phase = 'chase'; ai.until = t + c.chaseTime; }
+  if (ai.phase === 'swipe') { if (t >= ai.until) resolveAttack(world, enemy, c.recover); return; }
+  if (ai.phase === 'recover') {
+    if (t < ai.until) return;
+    ai.phase = 'chase'; ai.until = t + c.chaseTime;
+  }
   const to = towards(enemy, hero, hero.facing);
-  const swipe = to.d <= enemy.radius + BOSS.swipe.triggerRange;
-  const a = swipe
-    ? { kind: 'swipe', x: enemy.x, z: enemy.z, radius: enemy.radius + BOSS.swipe.reach, delay: BOSS.swipe.windup }
-    : { kind: 'leap', x: hero.x, z: hero.z, radius: BOSS.leap.radius, delay: BOSS.leap.windup };
+  if (t >= ai.until && to.d <= enemy.radius + c.triggerRange) { startSwipe(world, enemy, to, c); return; }
+  BEHAVIORS.chase(world, enemy, dt);
+}
+
+function startBossAttack(world, enemy) {
+  const hero = world.hero;
+  const to = towards(enemy, hero, hero.facing);
+  if (to.d <= enemy.radius + BOSS.swipe.triggerRange) { startSwipe(world, enemy, to, BOSS.swipe); return; }
+  telegraph(world, enemy, {
+    kind: 'leap', x: hero.x, z: hero.z, radius: BOSS.leap.radius, delay: BOSS.leap.windup,
+    dirX: to.x, dirZ: to.z, damageMul: BOSS.leap.damageMul,
+  });
+}
+
+/** Hieb im Bogen vor dem Angreifer (Reichweite `s.reach` ab seinem Rand, halber Öffnungswinkel `s.halfAngle`). */
+function startSwipe(world, enemy, to, s) {
+  telegraph(world, enemy, {
+    kind: 'swipe', x: enemy.x, z: enemy.z, radius: enemy.radius + s.reach, delay: s.windup,
+    dirX: to.x, dirZ: to.z, halfAngle: s.halfAngle, damageMul: s.damageMul,
+  });
+}
+
+/** Kündigt einen Angriff an (Ereignis `bossTelegraph`); er wirkt nach `a.delay` s. */
+function telegraph(world, enemy, a) {
+  const ai = enemy.ai;
   ai.phase = a.kind; ai.until = world.time + a.delay;
-  ai.attack = { ...a, dirX: to.x, dirZ: to.z };
-  world.events.push({ type: 'bossTelegraph', ...ai.attack });
+  ai.attack = a;
+  world.events.push({ type: 'bossTelegraph', ...a });
 }
 
 function resolveBossAttack(world, enemy) {
+  resolveAttack(world, enemy, BOSS.recover);
+}
+
+/** Schaden, wenn der Held jetzt in der angekündigten Form steht; dann `recover` s Pause. */
+function resolveAttack(world, enemy, recover) {
   const ai = enemy.ai, a = ai.attack, hero = world.hero;
   if (a.kind === 'leap') { enemy.x = a.x; enemy.z = a.z; }
   const dx = hero.x - a.x, dz = hero.z - a.z;
   const d = Math.hypot(dx, dz);
   let inside = d <= a.radius;
   if (inside && a.kind === 'swipe' && d > enemy.radius) {
-    inside = (dx * a.dirX + dz * a.dirZ) / d >= Math.cos(BOSS.swipe.halfAngle);
+    inside = (dx * a.dirX + dz * a.dirZ) / d >= Math.cos(a.halfAngle);
   }
-  if (inside) damageHero(world, enemy.damage * BOSS[a.kind].damageMul);
-  ai.phase = 'recover'; ai.until = world.time + BOSS.recover; ai.attack = null;
+  if (inside) damageHero(world, enemy.damage * a.damageMul);
+  ai.phase = 'recover'; ai.until = world.time + recover; ai.attack = null;
 }
 
 /**
@@ -171,6 +266,7 @@ function resolveBossAttack(world, enemy) {
  */
 export function enemyTarget(world, enemy) {
   let best = world.hero, bestD2 = Infinity;
+  if (enemy.shadow) return best; // lässt sich vom Schattenklon nicht täuschen
   for (const s of world.summons) {
     const dx = s.x - enemy.x, dz = s.z - enemy.z;
     const d2 = dx * dx + dz * dz;
@@ -189,32 +285,33 @@ export function enemySpeed(world, enemy) {
 }
 
 /**
- * Setzt Zustände auf einen Gegner. Bosse sind immun gegen Betäubung und Verwirrung, Verlangsamung wirkt halb.
- * Längere bzw. stärkere Wirkungen werden nicht durch schwächere überschrieben.
+ * Setzt Zustände auf einen Gegner. Bosse und der Schatten sind immun gegen Betäubung und Verwirrung,
+ * Verlangsamung wirkt halb. Längere bzw. stärkere Wirkungen werden nicht durch schwächere überschrieben.
  * @param {World} world
  * @param {Enemy} enemy
  * @param {{ slow?: number, slowDuration?: number, stun?: number, confuse?: number }} status
  */
 export function applyStatus(world, enemy, { slow = 0, slowDuration = 0, stun = 0, confuse = 0 }) {
   const t = world.time;
+  const tough = enemy.boss || enemy.shadow;
   if (slow > 0 && slowDuration > 0) {
-    const factor = enemy.boss ? slow * BOSS_SLOW_FACTOR : slow;
+    const factor = tough ? slow * BOSS_SLOW_FACTOR : slow;
     if (t >= enemy.slowUntil || factor >= enemy.slowFactor) enemy.slowFactor = factor;
     enemy.slowUntil = Math.max(enemy.slowUntil, t + slowDuration);
   }
-  if (enemy.boss) return;
+  if (tough) return;
   if (stun > 0) enemy.stunnedUntil = Math.max(enemy.stunnedUntil, t + stun);
   if (confuse > 0) enemy.confusedUntil = Math.max(enemy.confusedUntil, t + confuse);
 }
 
 /**
- * Stößt einen Gegner direkt vom Helden weg; Bodengegner bleiben an Hindernissen hängen. Bosse sind immun.
+ * Stößt einen Gegner direkt vom Helden weg; Bodengegner bleiben an Hindernissen hängen. Bosse und der Schatten sind immun.
  * @param {World} world
  * @param {Enemy} enemy
  * @param {number} distance
  */
 export function knockback(world, enemy, distance) {
-  if (enemy.boss || distance <= 0) return;
+  if (enemy.boss || enemy.shadow || distance <= 0) return;
   let dx = enemy.x - world.hero.x, dz = enemy.z - world.hero.z;
   const d = Math.hypot(dx, dz);
   if (d < 1e-9) { dx = world.hero.facing.x; dz = world.hero.facing.z; } else { dx /= d; dz /= d; }
@@ -285,7 +382,7 @@ export function recomputeHeroStats(world) {
 export function spawnEnemy(world, type, x, z, { elite = false, hpMul = 1, dmgMul = 1 } = {}) {
   const def = ENEMIES[type];
   if (!def) throw new Error(`Unbekannter Gegner: ${type}`);
-  if (!elite && def.behavior !== 'boss' && world.enemies.length >= MAX_ENEMIES) return null;
+  if (!elite && def.behavior !== 'boss' && cappedEnemyCount(world) >= MAX_ENEMIES) return null;
   const maxHp = def.hp * hpMul * (elite ? ELITE.hpMul : 1);
   const enemy = {
     id: world.nextId++, type, x, z, hp: maxHp, maxHp,
@@ -299,6 +396,48 @@ export function spawnEnemy(world, type, x, z, { elite = false, hpMul = 1, dmgMul
 }
 
 /**
+ * Gegner, die zum Limit von 300 zählen: alle außer dem Schatten.
+ * @param {World} world
+ */
+export function cappedEnemyCount(world) {
+  let n = world.enemies.length;
+  for (const e of world.enemies) if (e.shadow) n--;
+  return n;
+}
+
+/**
+ * Ob Fähigkeiten, Treffer, Berührung und Hinausschieben einen Gegner erfassen: lebend und nicht unantastbar
+ * (der fliehende Schatten ist es nicht).
+ * @param {Enemy} enemy
+ */
+export function isTargetable(enemy) {
+  return enemy.hp > 0 && !enemy.untargetable;
+}
+
+/**
+ * Setzt den Schatten des Helden in die Welt: Bild und Kampfstil wie die Heldenklasse, außerhalb des Limits,
+ * ohne Eintrag in ENEMIES (Werte aus SHADOW). Tempo folgt in jedem Schritt dem Helden.
+ * @param {World} world
+ * @param {number} x
+ * @param {number} z
+ * @param {{ hp: number, damage: number, expiresAt: number }} opts
+ * @returns {Enemy}
+ */
+export function spawnShadow(world, x, z, { hp, damage, expiresAt }) {
+  const enemy = {
+    id: world.nextId++, type: 'schatten', x, z, hp, maxHp: hp, radius: SHADOW.radius,
+    speed: world.hero.stats.moveSpeed * SHADOW.speedFactor, damage,
+    elite: false, boss: false, flying: false, behavior: 'shadow',
+    slowUntil: 0, slowFactor: 0, confusedUntil: 0, stunnedUntil: 0, contactReadyAt: 0, hitReadyAt: {}, ai: {},
+    shadow: true, style: world.hero.classId, expiresAt, fleeing: false, fleeUntil: Infinity, untargetable: false,
+  };
+  world.enemies.push(enemy);
+  return enemy;
+}
+
+/**
+ * Schaden an einem Gegner. Unantastbare nehmen keinen. Der Schatten fällt nie unter 1 Leben: erreicht er 1,
+ * flieht er (`shadowFlee`) und lässt an dieser Stelle eine Truhe fallen; er zählt nie als Tötung.
  * @param {World} world
  * @param {Enemy} enemy
  * @param {{ amount: number, crit: boolean }} hit
@@ -306,10 +445,17 @@ export function spawnEnemy(world, type, x, z, { elite = false, hpMul = 1, dmgMul
  */
 export function damageEnemy(world, enemy, hit, abilityId) {
   const index = world.enemies.indexOf(enemy);
-  if (index < 0) return;
+  if (index < 0 || enemy.untargetable) return;
   world.events.push({ type: 'hit', x: enemy.x, z: enemy.z, amount: hit.amount, crit: hit.crit });
-  enemy.hp -= hit.amount;
   const dbA = world.run.damageByAbility;
+  if (enemy.shadow) {
+    const dealt = Math.max(0, Math.min(hit.amount, enemy.hp - 1));
+    enemy.hp -= dealt;
+    dbA[abilityId] = (dbA[abilityId] || 0) + dealt;
+    if (enemy.hp <= 1) startShadowFlee(world, enemy);
+    return;
+  }
+  enemy.hp -= hit.amount;
   dbA[abilityId] = (dbA[abilityId] || 0) + hit.amount;
   if (enemy.hp > 0) return;
 
@@ -322,6 +468,17 @@ export function damageEnemy(world, enemy, hit, abilityId) {
   if (world.rng.chance(DROPS.goldChance)) drop('gold', world.rng.int(1, 3));
   if (world.rng.chance(DROPS.potionChance)) drop('potion', DROPS.potionHeal);
   if (enemy.elite) drop('chest', DROPS.chestGold);
+}
+
+/** Der Schatten ist gebrochen: Truhe an seiner Stelle, dann flieht er unantastbar `SHADOW.fleeDuration` s. */
+function startShadowFlee(world, enemy) {
+  enemy.hp = 1;
+  enemy.fleeing = true;
+  enemy.untargetable = true;
+  enemy.fleeUntil = world.time + SHADOW.fleeDuration;
+  enemy.ai = {};
+  world.pickups.push({ kind: 'chest', x: enemy.x, z: enemy.z, value: DROPS.chestGold });
+  world.events.push({ type: 'shadowFlee', line: world.rng.pick(SHADOW_LINES.flee), x: enemy.x, z: enemy.z });
 }
 
 /**
@@ -355,8 +512,9 @@ function pushOutOfObstacles(world, e) {
 
 function separateEnemies(world) {
   const grid = createGrid(SEPARATION_CELL);
-  for (const e of world.enemies) grid.insert(e);
+  for (const e of world.enemies) if (!e.untargetable) grid.insert(e);
   for (const e of world.enemies) {
+    if (e.untargetable) continue;
     for (const o of grid.queryCircle(e.x, e.z, e.radius)) {
       if (o.id <= e.id) continue; // jedes Paar nur einmal
       const dx = o.x - e.x, dz = o.z - e.z;
@@ -372,10 +530,11 @@ function separateEnemies(world) {
   }
 }
 
-/** Schiebt jeden Gegner, der den Heldenkreis überlappt, geradlinig hinaus (der Held bleibt unbewegt). */
+/** Schiebt jeden erfassbaren Gegner, der den Heldenkreis überlappt, geradlinig hinaus (der Held bleibt unbewegt). */
 function pushEnemiesOutOfHero(world) {
   const hero = world.hero;
   for (const e of world.enemies) {
+    if (!isTargetable(e)) continue;
     const min = e.radius + hero.radius;
     const to = towards(hero, e);
     if (to.d >= min) continue;
@@ -462,7 +621,7 @@ export function stepWorld(world, dt, input) {
 
   // Berührungsschaden
   for (const e of world.enemies) {
-    if (world.time < e.stunnedUntil) continue;
+    if (world.time < e.stunnedUntil || !isTargetable(e)) continue;
     const dx = e.x - hero.x, dz = e.z - hero.z;
     const min = e.radius + hero.radius + CONTACT_TOLERANCE;
     if (dx * dx + dz * dz <= min * min && world.time >= e.contactReadyAt) {
