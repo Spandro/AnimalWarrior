@@ -18,6 +18,8 @@ export const DROPS = { goldChance: 0.04, potionChance: 0.005, potionHeal: 0.2, c
 
 /** Sekunden zwischen Berührungstreffern desselben Gegners. */
 export const CONTACT_INTERVAL = 0.5;
+/** Spielraum beim Berührungstest: Gegner stehen nach dem Hinausschieben genau am Heldenrand. */
+export const CONTACT_TOLERANCE = 0.05;
 
 export const HERO_RADIUS = 0.5;
 /** Zellgröße des Rasters für Gegnertrennung. */

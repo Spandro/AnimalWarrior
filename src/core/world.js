@@ -6,7 +6,7 @@ import { obstaclesNear } from './terrain.js';
 import { stepAbilities } from './abilities.js';
 import { CLASSES } from '../data/classes.js';
 import { bonusModifiers } from '../data/bonuses.js';
-import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, HERO_RADIUS, SEPARATION_CELL, MAX_ENEMIES,
+import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, CONTACT_TOLERANCE, HERO_RADIUS, SEPARATION_CELL, MAX_ENEMIES,
   CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS } from '../data/enemies.js';
 
 /**
@@ -372,6 +372,19 @@ function separateEnemies(world) {
   }
 }
 
+/** Schiebt jeden Gegner, der den Heldenkreis überlappt, geradlinig hinaus (der Held bleibt unbewegt). */
+function pushEnemiesOutOfHero(world) {
+  const hero = world.hero;
+  for (const e of world.enemies) {
+    const min = e.radius + hero.radius;
+    const to = towards(hero, e);
+    if (to.d >= min) continue;
+    e.x = hero.x + to.x * min;
+    e.z = hero.z + to.z * min;
+    if (!e.flying) pushOutOfObstacles(world, e);
+  }
+}
+
 function stepEnemyProjectiles(world, dt) {
   const hero = world.hero;
   world.enemyProjectiles = world.enemyProjectiles.filter((p) => {
@@ -444,14 +457,15 @@ export function stepWorld(world, dt, input) {
   }
   separateEnemies(world);
   for (const e of world.enemies) if (!e.flying) pushOutOfObstacles(world, e);
+  pushEnemiesOutOfHero(world);
   stepEnemyProjectiles(world, dt);
 
   // Berührungsschaden
   for (const e of world.enemies) {
     if (world.time < e.stunnedUntil) continue;
     const dx = e.x - hero.x, dz = e.z - hero.z;
-    const min = e.radius + hero.radius;
-    if (dx * dx + dz * dz < min * min && world.time >= e.contactReadyAt) {
+    const min = e.radius + hero.radius + CONTACT_TOLERANCE;
+    if (dx * dx + dz * dz <= min * min && world.time >= e.contactReadyAt) {
       e.contactReadyAt = world.time + CONTACT_INTERVAL;
       damageHero(world, e.damage);
     }

@@ -170,13 +170,13 @@ test('abilities: Gegner läuft auf den Klon zu, nicht auf den Helden', () => {
 
 test('abilities: Rauchbombe verwirrt, Frostring verlangsamt auf 60 % Strecke', () => {
   const w = newWorld();
-  const rat = spawnEnemy(w, 'ratte', 3, 0);
+  const rat = spawnEnemy(w, 'ratte', 3.4, 0); // im Frostring, aber weit genug weg, damit sie nicht am Heldenkreis anstößt
   rat.hp = 1000;
   castAbility(w, 'frostring', 1);
   assertClose(rat.slowUntil, 2);
   assertClose(rat.slowFactor, 0.4);
   run(w, 1);
-  assertClose(3 - rat.x, 0.6 * ENEMIES.ratte.speed, 1e-6);
+  assertClose(3.4 - rat.x, 0.6 * ENEMIES.ratte.speed, 1e-6);
 
   const w2 = newWorld();
   const e = dummy(w2, 2, 2);
@@ -196,11 +196,11 @@ test('abilities: verwirrter Gegner läuft nicht zum Helden', () => {
 
 test('abilities: betäubter Gegner bewegt sich nicht und schadet nicht', () => {
   const w = newWorld();
-  const rat = spawnEnemy(w, 'ratte', 0.5, 0);
+  const rat = spawnEnemy(w, 'ratte', 0.85, 0); // genau am Heldenrand (außerhalb wird nicht hinausgeschoben)
   applyStatus(w, rat, { stun: 1 });
   const hp0 = w.hero.hp;
   run(w, 0.9);
-  assertClose(rat.x, 0.5);
+  assertClose(rat.x, 0.85);
   assertEqual(w.hero.hp, hp0);
 });
 

@@ -246,3 +246,42 @@ test('world: Boss und Elite ignorieren das Gegnerlimit, reguläre Gegner nicht',
   assertTrue(spawnEnemy(w, 'wolf', 0, 40, { elite: true }).elite);
   assertEqual(w.enemies.length, 302);
 });
+
+test('world: Ratte bleibt außerhalb des Heldenkreises und trifft ihn trotzdem', () => {
+  const w = newWorld({ animalId: 'waschbaer' });
+  const rat = spawnEnemy(w, 'ratte', 3, 0);
+  const hp0 = w.hero.hp;
+  run(w, 3, 0.05, NONE);
+  assertTrue(Math.hypot(rat.x - w.hero.x, rat.z - w.hero.z) >= w.hero.radius + rat.radius - 1e-6);
+  assertTrue(w.hero.hp < hp0);
+});
+
+test('world: zehn Ratten dringen nicht in den Heldenkreis ein', () => {
+  const w = newWorld();
+  const rats = [];
+  for (let i = 0; i < 10; i++) {
+    const a = i / 10 * Math.PI * 2;
+    rats.push(spawnEnemy(w, 'ratte', Math.cos(a) * 4, Math.sin(a) * 4));
+  }
+  run(w, 3, 0.05, NONE);
+  for (const r of rats) {
+    assertTrue(Math.hypot(r.x - w.hero.x, r.z - w.hero.z) >= w.hero.radius + r.radius - 1e-6);
+  }
+});
+
+test('world: Ratte genau auf dem Helden wird hinausgeschoben, ohne NaN', () => {
+  const w = newWorld();
+  const rat = spawnEnemy(w, 'ratte', 0, 0);
+  stepWorld(w, 0.01, NONE);
+  assertTrue(Number.isFinite(rat.x) && Number.isFinite(rat.z));
+  assertClose(Math.hypot(rat.x - w.hero.x, rat.z - w.hero.z), w.hero.radius + rat.radius, 1e-6);
+});
+
+test('world: Boss bleibt außerhalb des Heldenkreises', () => {
+  const w = newWorld();
+  const bear = spawnEnemy(w, 'baer', 5, 0);
+  for (let i = 0; i < 100; i++) {
+    stepWorld(w, 0.05, NONE);
+    assertTrue(Math.hypot(bear.x - w.hero.x, bear.z - w.hero.z) >= w.hero.radius + bear.radius - 1e-6);
+  }
+});
