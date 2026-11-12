@@ -1,29 +1,40 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { buildCharacter, animateCharacter } from './character.js';
 import { createTracker } from './enemies.js';
+import {
+  billboardOrientation, spriteGeometry, spriteWidth, spriteMaterial, shadowMaterial, composeSprite, spriteMotion,
+} from './sprites.js';
 import { CLASSES } from '../data/classes.js';
+import { HERO_SPRITES, BILLBOARD } from '../data/sprites.js';
 
 /** Dauer der Hiebanimation in Weltsekunden. */
 const ATTACK_DURATION = 0.35;
-/** Wie schnell sich die Figur zur Blickrichtung dreht (Anteil je 1/60 s). */
+/** Wie schnell sich die 3D-Ersatzfigur zur Blickrichtung dreht (Anteil je 1/60 s). */
 const TURN_RATE = 0.3;
 /** Glättung der aus der Bewegung geschätzten Geschwindigkeit. */
 const SPEED_SMOOTHING = 0.35;
 /** Blinkfrequenz während der Unverwundbarkeit nach der Wiederbelebung. */
 const BLINK_HZ = 10;
+/** Farbe der Schattenklone (multipliziert das Bild) und ihre Deckkraft. */
+const CLONE_COLOR = 0x3c3060;
+const CLONE_OPACITY = 0.7;
 
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 /**
  * Heldenfigur in der laufenden Welt und die Schattenklone (Beschwörungen) als dunkle, durchscheinende
  * Kopien derselben Figur. Liest die Welt nur.
+ *
+ * Mit geladenen Bildbögen ist der Held ein gemaltes Bild auf einer Tafel (Füße am Boden, zur Kamera
+ * gewandt, nach links gespiegelt, wenn er nach links blickt) mit weichem Bodenschatten; sonst die
+ * 3D-Figur aus `character.js`.
  * @param {THREE.Scene} scene
  * @param {'hase'|'ente'|'waschbaer'} animalId
  * @param {'krieger'|'magier'|'dieb'} classId
+ * @param {{ sprites?: import('./sprites.js').SpriteSheets, camera?: THREE.Camera }} [options]
  */
-export function createHeroView(scene, animalId, classId) {
-  const figure = buildCharacter(animalId, classId);
-  scene.add(figure);
+export function createHeroView(scene, animalId, classId, { sprites, camera } = {}) {
+  const body = sprites?.ok ? createSpriteBody(scene, animalId, classId, sprites, camera) : createFigureBody(scene, animalId, classId);
 
   // Heller Bodenring unter dem Helden, damit er im Gewühl auffindbar bleibt.
   const ringGeo = new THREE.RingGeometry(0.62, 0.74, 40).rotateX(-Math.PI / 2);
@@ -34,27 +45,11 @@ export function createHeroView(scene, animalId, classId) {
   ring.renderOrder = 10;
   scene.add(ring);
 
-  const shadowMat = new THREE.MeshStandardMaterial({
-    color: 0x1c1726, emissive: 0x2e2050, emissiveIntensity: 0.7, roughness: 0.9, transparent: true, opacity: 0.62,
-  });
-  /** @type {THREE.Group[]} */
-  const clones = [];
-  /** Drehung der Klone, beim ersten Erscheinen von der Heldenfigur übernommen. */
-  const cloneYaw = new WeakMap();
-
   const startAbility = CLASSES[classId].startAbility;
   const tracker = createTracker();
   const position = new THREE.Vector3();
   let attackAt = -Infinity;
-  let yaw = 0, speed = 0, lastX = NaN, lastZ = NaN, lastT = NaN, lastRenderT = NaN;
-
-  function makeClone() {
-    const c = buildCharacter(animalId, classId);
-    c.traverse((o) => { if (o.isMesh) { o.material = shadowMat; o.castShadow = false; o.receiveShadow = false; } });
-    scene.add(c);
-    clones.push(c);
-    return c;
-  }
+  let speed = 0, lastX = NaN, lastZ = NaN, lastT = NaN, lastRenderT = NaN;
 
   /**
    * Startet die Hiebanimation bei jedem Einsatz der Startfähigkeit.
@@ -85,40 +80,24 @@ export function createHeroView(scene, animalId, classId) {
       speed += ((Number.isFinite(v) ? v : 0) - speed) * SPEED_SMOOTHING;
       lastX = hero.x; lastZ = hero.z; lastT = world.time;
     }
-
     const frameDt = Number.isNaN(lastRenderT) ? 0 : Math.max(0, t - lastRenderT);
     lastRenderT = t;
-    const target = Math.atan2(hero.facing.x, hero.facing.z);
-    yaw = wrapAngle(yaw + wrapAngle(target - yaw) * Math.min(1, TURN_RATE * frameDt * 60));
 
     const since = t - attackAt;
-    animateCharacter(figure, { speed, time: t, attackT: since >= 0 && since < ATTACK_DURATION ? since / ATTACK_DURATION : undefined });
-    figure.position.copy(position);
-    figure.rotation.y = yaw;
-    figure.visible = !(world.time < hero.invulnerableUntil && Math.floor(t * BLINK_HZ) % 2);
+    body.update({
+      position, facing: hero.facing, speed, time: t, frameDt,
+      attackT: since >= 0 && since < ATTACK_DURATION ? since / ATTACK_DURATION : undefined,
+      visible: !(world.time < hero.invulnerableUntil && Math.floor(t * BLINK_HZ) % 2),
+    });
     ring.position.set(position.x, 0.03, position.z);
-
-    // Schattenklone
-    let i = 0;
-    for (const s of world.summons) {
-      const c = clones[i] || makeClone();
-      if (!cloneYaw.has(s)) cloneYaw.set(s, yaw);
-      c.visible = true;
-      c.position.set(s.x, 0, s.z);
-      c.rotation.y = cloneYaw.get(s);
-      const fade = Math.min(1, s.timeLeft / 0.4);
-      c.scale.setScalar(0.6 + 0.4 * fade);
-      animateCharacter(c, { speed: 0, time: t * 1.3 + i });
-      i++;
-    }
-    for (; i < clones.length; i++) clones[i].visible = false;
+    body.updateClones(world.summons, t);
   }
 
   function dispose() {
-    scene.remove(figure, ring, ...clones);
+    body.dispose();
+    scene.remove(ring);
     ringGeo.dispose();
     ringMat.dispose();
-    shadowMat.dispose();
   }
 
   return {
@@ -127,5 +106,141 @@ export function createHeroView(scene, animalId, classId) {
     dispose,
     /** Gezeichnete (überblendete) Heldenposition, Ziel der Kamera. */
     get position() { return position; },
+  };
+}
+
+/**
+ * @typedef {{ position: THREE.Vector3, facing: { x: number, z: number }, speed: number, time: number,
+ *   frameDt: number, attackT?: number, visible: boolean }} BodyInput
+ */
+
+/** Gemalter Held: eine Bildtafel mit Bodenschatten; Klone als dunkle Kopien derselben Tafel. */
+function createSpriteBody(scene, animalId, classId, sprites, camera) {
+  const def = HERO_SPRITES[`${animalId}-${classId}`];
+  const orient = billboardOrientation(camera);
+  const geometry = spriteGeometry(def, sprites.sizes[def.sheet]);
+  const material = spriteMaterial(sprites.textures[def.sheet]);
+  const width = spriteWidth(def), height = def.heightM;
+
+  const figure = new THREE.Mesh(geometry, material);
+  figure.matrixAutoUpdate = false;
+  figure.frustumCulled = false;
+  scene.add(figure);
+
+  const blobGeo = new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2);
+  const blobMat = shadowMaterial();
+  const blob = new THREE.Mesh(blobGeo, blobMat);
+  blob.renderOrder = 1;
+  scene.add(blob);
+
+  const cloneMat = new THREE.MeshBasicMaterial({
+    map: material.map, color: CLONE_COLOR, transparent: true, opacity: CLONE_OPACITY, alphaTest: BILLBOARD.alphaTest,
+    depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
+  });
+  /** @type {THREE.Mesh[]} */
+  const clones = [];
+  /** Blickseite der Klone, beim ersten Erscheinen vom Helden übernommen. */
+  const cloneFace = new WeakMap();
+  let face = 1;
+
+  const placeBlob = (x, z, scale, lift) => {
+    const k = scale * (1 - 0.35 * Math.min(1, lift / 0.4));
+    blob.position.set(x, 0.02, z);
+    blob.scale.set(width * BILLBOARD.shadowWidth * k, 1, width * BILLBOARD.shadowDepth * k);
+  };
+
+  return {
+    /** @param {BodyInput} input */
+    update({ position, facing, speed, time, attackT, visible }) {
+      if (facing.x > BILLBOARD.flipHysteresis) face = 1;
+      else if (facing.x < -BILLBOARD.flipHysteresis) face = -1;
+      const m = spriteMotion(def.motion, { speed, time, attackT });
+      composeSprite(figure.matrix, orient, position.x, 0, position.z, width, height, face, m);
+      figure.matrixWorldNeedsUpdate = true;
+      figure.visible = visible;
+      placeBlob(position.x, position.z, 1, m.offsetY);
+    },
+    updateClones(summons, t) {
+      let i = 0;
+      for (const s of summons) {
+        let c = clones[i];
+        if (!c) {
+          c = new THREE.Mesh(geometry, cloneMat);
+          c.matrixAutoUpdate = false;
+          c.frustumCulled = false;
+          scene.add(c);
+          clones.push(c);
+        }
+        if (!cloneFace.has(s)) cloneFace.set(s, face);
+        const fade = Math.min(1, s.timeLeft / 0.4);
+        const k = 0.6 + 0.4 * fade;
+        const m = spriteMotion(def.motion, { speed: 0, time: t * 1.3 + i });
+        composeSprite(c.matrix, orient, s.x, 0, s.z, width * k, height * k, cloneFace.get(s), m);
+        c.matrixWorldNeedsUpdate = true;
+        c.visible = true;
+        i++;
+      }
+      for (; i < clones.length; i++) clones[i].visible = false;
+    },
+    dispose() {
+      scene.remove(figure, blob, ...clones);
+      geometry.dispose();
+      material.dispose();
+      cloneMat.dispose();
+      blobGeo.dispose();
+      blobMat.dispose();
+    },
+  };
+}
+
+/** Ersatz ohne Bildbögen: die 3D-Figur aus `character.js`. */
+function createFigureBody(scene, animalId, classId) {
+  const figure = buildCharacter(animalId, classId);
+  scene.add(figure);
+  const shadowMat = new THREE.MeshStandardMaterial({
+    color: 0x1c1726, emissive: 0x2e2050, emissiveIntensity: 0.7, roughness: 0.9, transparent: true, opacity: 0.62,
+  });
+  /** @type {THREE.Group[]} */
+  const clones = [];
+  const cloneYaw = new WeakMap();
+  let yaw = 0;
+
+  function makeClone() {
+    const c = buildCharacter(animalId, classId);
+    c.traverse((o) => { if (o.isMesh) { o.material = shadowMat; o.castShadow = false; o.receiveShadow = false; } });
+    scene.add(c);
+    clones.push(c);
+    return c;
+  }
+
+  return {
+    /** @param {BodyInput} input */
+    update({ position, facing, speed, time, frameDt, attackT, visible }) {
+      const target = Math.atan2(facing.x, facing.z);
+      yaw = wrapAngle(yaw + wrapAngle(target - yaw) * Math.min(1, TURN_RATE * frameDt * 60));
+      animateCharacter(figure, { speed, time, attackT });
+      figure.position.copy(position);
+      figure.rotation.y = yaw;
+      figure.visible = visible;
+    },
+    updateClones(summons, t) {
+      let i = 0;
+      for (const s of summons) {
+        const c = clones[i] || makeClone();
+        if (!cloneYaw.has(s)) cloneYaw.set(s, yaw);
+        c.visible = true;
+        c.position.set(s.x, 0, s.z);
+        c.rotation.y = cloneYaw.get(s);
+        const fade = Math.min(1, s.timeLeft / 0.4);
+        c.scale.setScalar(0.6 + 0.4 * fade);
+        animateCharacter(c, { speed: 0, time: t * 1.3 + i });
+        i++;
+      }
+      for (; i < clones.length; i++) clones[i].visible = false;
+    },
+    dispose() {
+      scene.remove(figure, ...clones);
+      shadowMat.dispose();
+    },
   };
 }

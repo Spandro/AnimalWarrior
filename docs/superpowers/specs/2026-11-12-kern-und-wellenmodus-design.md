@@ -160,7 +160,7 @@ Im Wellen-Modus löst jede Fähigkeit aus, sobald ihre Abklingzeit abgelaufen is
 
 ### 5.5 Aussehen
 
-Jedes Tier hat einen eigenen Körper aus 3D-Formen: Hase mit langen Ohren und Stummelschwanz, Ente mit Schnabel und Bürzel, Waschbär mit Gesichtsmaske und Ringelschwanz. Die Klasse kommt als Ausstattung dazu: Rüstungsteile und Schwert, Robe und Stab, Kapuze und Dolche. Gedeckte, natürliche Farben; ein Sonnenlicht mit Schatten; einfache Lauf- und Angriffsbewegung durch Drehen der Körperteile. Der Figurenbau nimmt Tier und Klasse als Eingabe und hat benannte Befestigungspunkte (Hand, Kopf, Rumpf), damit später Ausrüstung sichtbar werden kann.
+Helden und Gegner sind gemalte 2D-Bilder, die der Nutzer geliefert hat (`assets/figuren/helden.webp` mit allen neun Kombinationen aus Tier und Klasse, `assets/figuren/gegner.webp` mit den sechs Gegnertieren). Sie stehen aufrecht in der 3D-Welt, sind der Kamera zugewandt (leicht nach hinten geneigt, damit sie unter dem steilen Blickwinkel nicht gestaucht wirken), werden nach links gespiegelt, wenn die Figur nach links läuft oder blickt, und haben einen weichen runden Schatten am Boden. Die Bewegung kommt aus dem Code und ist je Tier eigen: Hase hoppelt, Ente watschelt, Waschbär trippelt; Ratte huscht, Wildschwein trabt, Krähe fliegt flatternd, Giftkröte springt behäbig, Wolf läuft in weiten Sätzen, Bär wiegt schwer hin und her. Der weiße Hintergrund der Bildbögen wird beim Laden entfernt. Die aus 3D-Formen gebauten Figuren bleiben nur als Ersatz, wenn die Bilder nicht geladen werden können.
 
 ## 6. Wellen-Modus
 

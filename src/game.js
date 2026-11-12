@@ -33,15 +33,17 @@ const FPS_WINDOW = 5;
  * @param {{ canvas: HTMLCanvasElement, uiLayer: HTMLElement, view?: ReturnType<typeof createRenderer>,
  *   animalId: string, classId: string, seed: number, quality?: 'high'|'low', timeScale?: number,
  *   modifiers?: import('./data/animals.js').Modifier[], revive?: boolean,
- *   debug?: boolean, stress?: boolean, autopick?: boolean, onEnd?: (summary: Summary) => void }} options
- *   `view` ist der gemeinsame Renderer der App (sonst wird einer für `canvas` angelegt).
+ *   debug?: boolean, stress?: boolean, autopick?: boolean, sprites?: import('./render/sprites.js').SpriteSheets,
+ *   onEnd?: (summary: Summary) => void }} options
+ *   `view` ist der gemeinsame Renderer der App (sonst wird einer für `canvas` angelegt). `sprites` sind die
+ *   geladenen Bildbögen (`loadSpriteSheets`); fehlen sie oder sind sie nicht `ok`, erscheinen die 3D-Figuren.
  *   Nur mit `debug`: `stress` füllt die Welt mit Ratten, `autopick` wählt Karten selbst, Taste K besiegt
  *   alle Gegner, L gibt ein Level. `onEnd` kommt einmal nach Sieg, Tod oder Aufgeben.
  * @returns {{ stop(): void }}
  */
 export function startGame({
   canvas, uiLayer, view, animalId, classId, seed, quality = 'high', timeScale = 1, modifiers = [], revive = false,
-  debug = false, stress = false, autopick = false, onEnd,
+  debug = false, stress = false, autopick = false, sprites, onEnd,
 }) {
   if (!view) view = createRenderer(canvas, { quality });
   else view.setQuality(quality);
@@ -51,8 +53,8 @@ export function startGame({
   const run = createSurvivorRun({ seed, animalId, classId, modifiers, revive, timeScale });
   const world = run.world;
   const terrain = createTerrainView(view.scene, world.seed);
-  const enemyView = createEnemyView(view.scene);
-  const heroView = createHeroView(view.scene, animalId, classId);
+  const enemyView = createEnemyView(view.scene, { sprites, camera: view.camera });
+  const heroView = createHeroView(view.scene, animalId, classId, { sprites, camera: view.camera });
   const effects = createEffects(view.scene, uiLayer, { quality, camera: view.camera });
   const hud = createHud(uiLayer);
   const levelUp = createLevelUpDialog(uiLayer, { onChoose: (i) => chooseCard(run, i) });

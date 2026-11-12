@@ -1,6 +1,10 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { ENEMIES } from '../data/enemies.js';
 import { ABILITIES } from '../data/abilities.js';
+import { ENEMY_SPRITES, CROW_FLIGHT_HEIGHT, BILLBOARD } from '../data/sprites.js';
+import {
+  billboardOrientation, spriteGeometry, spriteWidth, spriteMaterial, shadowMaterial, composeSprite, spriteMotion,
+} from './sprites.js';
 
 /**
  * Darstellung aller Weltobjekte außer Held und Gelände: Gegner, Heldengeschosse, Gegnergeschosse,
@@ -200,6 +204,8 @@ const wingParts = (s) => [
 const ENEMY_CAPACITY = 320;
 const BOSS_CAPACITY = 4;
 const CROW_HEIGHT = 1.3;
+/** Gemalte Gegner wechseln die Blickseite nur, wenn der waagrechte Anteil der Bewegung mindestens so groß ist. */
+const SPRITE_FLIP_RATIO = 0.25;
 /** Objekte weiter als dies vom Helden werden nicht gezeichnet (Instanzen haben kein Frustum-Culling). */
 const CULL_DISTANCE = 42;
 
@@ -265,20 +271,22 @@ function createPool(scene, geometry, material, capacity, { grow = true, castShad
 // ---------------------------------------------------------------- Ansicht
 
 /**
+ * Mit geladenen Bildbögen (`sprites.ok`) sind die Gegner gemalte Bildtafeln, sonst die 3D-Formen oben.
  * @param {THREE.Scene} scene
+ * @param {{ sprites?: import('./sprites.js').SpriteSheets, camera?: THREE.Camera }} [options]
  * @returns {{ sync(world: import('../core/world.js').World, alpha: number): void, dispose(): void }}
  */
-export function createEnemyView(scene) {
+export function createEnemyView(scene, { sprites, camera } = {}) {
   const root = new THREE.Group();
   root.name = 'enemies';
   scene.add(root);
+  const painted = !!sprites?.ok;
 
   const owned = { geometries: [], materials: [] };
   const geo = (g) => (owned.geometries.push(g), g);
   const mat = (m) => (owned.materials.push(m), m);
   const flat = (g) => geo(g.rotateX(-HALF_PI));
 
-  const furMat = mat(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88 }));
   const glowMat = (color, opacity = 1, additive = false) => mat(new THREE.MeshBasicMaterial({
     color, transparent: opacity < 1 || additive, opacity, depthWrite: !(opacity < 1 || additive),
     blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
@@ -287,20 +295,38 @@ export function createEnemyView(scene) {
     color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide,
     blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
   }));
-
-  // Gegner
-  /** @type {Record<string, ReturnType<typeof createPool>>} */
-  const enemyPools = {};
-  for (const type of Object.keys(ENEMY_PARTS)) {
-    enemyPools[type] = createPool(root, geo(mergeParts(ENEMY_PARTS[type])), furMat,
-      type === 'baer' ? BOSS_CAPACITY : ENEMY_CAPACITY, { grow: false, castShadow: true });
-  }
-  const fallbackPool = enemyPools.ratte;
-  const wingL = createPool(root, geo(mergeParts(wingParts(1))), furMat, ENEMY_CAPACITY, { grow: false, castShadow: true });
-  const wingR = createPool(root, geo(mergeParts(wingParts(-1))), furMat, ENEMY_CAPACITY, { grow: false, castShadow: true });
   const discGeo = flat(new THREE.CircleGeometry(1, 40));
   const ringGeo = flat(new THREE.RingGeometry(0.9, 1, 48));
-  const blobs = createPool(root, discGeo, decalMat(0x000000, 0.28), ENEMY_CAPACITY, { grow: false });
+
+  // Gegner: je Typ ein Instanzvorrat, gemalt oder als 3D-Form.
+  /** @type {Record<string, ReturnType<typeof createPool>>} */
+  const enemyPools = {};
+  const capacity = (type) => (type === 'baer' ? BOSS_CAPACITY : ENEMY_CAPACITY);
+  /** @type {ReturnType<typeof createPool>[]} */
+  let enemyExtras = [];
+  let wingL = null, wingR = null, blobs;
+  /** Bildmaße je Gegnertyp (nur gemalt). */
+  const spriteSize = {};
+  let orient = null;
+  if (painted) {
+    orient = billboardOrientation(camera);
+    const spriteMat = mat(spriteMaterial(sprites.textures.gegner));
+    for (const [type, def] of Object.entries(ENEMY_SPRITES)) {
+      enemyPools[type] = createPool(root, geo(spriteGeometry(def, sprites.sizes[def.sheet])), spriteMat, capacity(type), { grow: false });
+      spriteSize[type] = { width: spriteWidth(def), height: def.heightM };
+    }
+    blobs = createPool(root, discGeo, mat(shadowMaterial()), ENEMY_CAPACITY, { grow: false });
+  } else {
+    const furMat = mat(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88 }));
+    for (const type of Object.keys(ENEMY_PARTS)) {
+      enemyPools[type] = createPool(root, geo(mergeParts(ENEMY_PARTS[type])), furMat, capacity(type), { grow: false, castShadow: true });
+    }
+    wingL = createPool(root, geo(mergeParts(wingParts(1))), furMat, ENEMY_CAPACITY, { grow: false, castShadow: true });
+    wingR = createPool(root, geo(mergeParts(wingParts(-1))), furMat, ENEMY_CAPACITY, { grow: false, castShadow: true });
+    blobs = createPool(root, discGeo, decalMat(0x000000, 0.28), ENEMY_CAPACITY, { grow: false });
+    enemyExtras = [wingL, wingR];
+  }
+  const fallbackPool = enemyPools.ratte;
   // Warmer Lichthof unter Elite-Gegnern: die Instanzfarbe allein hellt dunkle Felle (Krähe) kaum auf.
   const eliteHalo = createPool(root, discGeo, decalMat(0xffa040, 0.3, true), 64);
 
@@ -354,7 +380,7 @@ export function createEnemyView(scene) {
   ])), pickupMat, 8, { castShadow: true });
 
   const allPools = [
-    ...Object.values(enemyPools), wingL, wingR, blobs, eliteHalo, fireCore, fireHalo, daggers, daggerTrail, spitCore, spitHalo,
+    ...Object.values(enemyPools), ...enemyExtras, blobs, eliteHalo, fireCore, fireHalo, daggers, daggerTrail, spitCore, spitHalo,
     orbCore, orbHalo, poisonDisc, poisonRing, burnDisc, burnRing, targetRing, targetFill, otherDisc, meteorRock,
     xpPool, goldPool, potionPool, chestPool,
   ];
@@ -379,7 +405,75 @@ export function createEnemyView(scene) {
     return p;
   }
 
+  // Gangzustand je Gegner-id (nur gemalt): Position im letzten Logikschritt, geglättetes Tempo, Blickseite.
+  /** @type {Map<number, { x: number, z: number, speed: number, face: 1|-1 }>} */
+  let gait = new Map(), gaitNext = new Map();
+  let gaitTime = NaN;
+
+  /** Einmal je Logikschritt: Tempo und Blickseite aus der Bewegung seit dem letzten Schritt. */
+  function updateGait(world) {
+    if (world.time === gaitTime) return;
+    const dt = world.time - gaitTime;
+    gaitTime = world.time;
+    const hero = world.hero;
+    for (const e of world.enemies) {
+      let g = gait.get(e.id);
+      if (!g) {
+        g = { x: e.x, z: e.z, speed: 0, face: hero.x >= e.x ? 1 : -1 };
+      } else {
+        const dx = e.x - g.x, dz = e.z - g.z;
+        const d = Math.hypot(dx, dz);
+        if (dt > 0 && d < SNAP_DISTANCE) g.speed += (d / dt - g.speed) * 0.35;
+        // Fast senkrechte Bewegung behält die alte Seite.
+        if (d > 1e-4 && Math.abs(dx) > SPRITE_FLIP_RATIO * d) g.face = dx > 0 ? 1 : -1;
+        g.x = e.x; g.z = e.z;
+      }
+      gaitNext.set(e.id, g);
+    }
+    const old = gait;
+    gait = gaitNext;
+    gaitNext = old;
+    gaitNext.clear();
+  }
+
+  function drawPaintedEnemies(world, alpha, t) {
+    updateGait(world);
+    const hero = world.hero;
+    for (const e of world.enemies) {
+      const dx = e.x - hero.x, dz = e.z - hero.z;
+      if (dx * dx + dz * dz > CULL_DISTANCE * CULL_DISTANCE) continue;
+      const def = ENEMIES[e.type];
+      const pool = enemyPools[e.type] || fallbackPool;
+      const sprite = ENEMY_SPRITES[e.type] || ENEMY_SPRITES.ratte;
+      const size = spriteSize[e.type] || spriteSize.ratte;
+      const p = tracker.pos(e.id, e.x, e.z, alpha);
+      const k = def ? e.radius / def.radius : 1;
+      const stunned = world.time < e.stunnedUntil;
+      const confused = world.time < e.confusedUntil && e.wander;
+      const ph = e.id * 1.7;
+      const g = gait.get(e.id);
+
+      color.setRGB(1, 1, 1);
+      if (e.elite) {
+        const pulse = Math.sin(t * 5 + ph);
+        color.multiply(TINT.elite).multiplyScalar(1 + 0.12 * pulse);
+        eliteHalo.push(place(p.x, 0.03, p.z, 0, e.radius * (1.2 + 0.08 * pulse)));
+      }
+      if (stunned) color.multiply(TINT.stun);
+      else if (confused) color.multiply(TINT.confuse);
+      if (world.time < e.slowUntil) color.multiply(TINT.slow);
+
+      const motion = spriteMotion(sprite.motion, { speed: stunned ? 0 : g?.speed ?? 0, time: t + ph });
+      const lift = sprite.motion === 'fly' ? CROW_FLIGHT_HEIGHT * k : 0;
+      pool.push(composeSprite(m, orient, p.x, lift, p.z, size.width * k, size.height * k, g?.face ?? 1, motion), color);
+      const air = lift + motion.offsetY;
+      const sk = k * (1 - 0.35 * Math.min(1, air / 1.2));
+      blobs.push(place(p.x, 0.02, p.z, 0, size.width * BILLBOARD.shadowWidth * sk, 1, size.width * BILLBOARD.shadowDepth * sk));
+    }
+  }
+
   function drawEnemies(world, alpha, t) {
+    if (painted) { drawPaintedEnemies(world, alpha, t); return; }
     const hero = world.hero;
     for (const e of world.enemies) {
       const dx = e.x - hero.x, dz = e.z - hero.z;

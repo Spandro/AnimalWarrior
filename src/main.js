@@ -4,6 +4,7 @@
 // Nur mit ?debug=1 (window.__debug, window.__app): ?speed=N (timeScale), ?stress=1 (300 Ratten,
 // Bildrate oben links), ?autopick=1 (Level-up-Karten automatisch), Tasten K (alle Gegner besiegen), L (ein Level).
 import { isWebGLAvailable, createRenderer } from './render/renderer.js';
+import { loadSpriteSheets } from './render/sprites.js';
 import { startGame } from './game.js';
 import { createStore, addHero, deleteHero, recordRun, STORAGE_KEY } from './save/store.js';
 import { metaModifiers, hasRevive } from './save/meta.js';
@@ -39,13 +40,13 @@ if (!isWebGLAvailable()) {
 } else if (params.get('autostart') === '1' || stress) {
   const quality = params.get('quality') === 'low' ? 'low' : 'high';
   document.body.dataset.screen = 'game';
-  startGame({
-    canvas, uiLayer, seed: AUTOSTART_SEED, quality, timeScale, debug, stress, autopick,
+  loadSpriteSheets().then((sprites) => startGame({
+    canvas, uiLayer, seed: AUTOSTART_SEED, quality, timeScale, debug, stress, autopick, sprites,
     animalId: Object.hasOwn(ANIMALS, params.get('animal')) ? params.get('animal') : 'hase',
     classId: Object.hasOwn(CLASSES, params.get('class')) ? params.get('class') : 'krieger',
     // Ohne Menüs gibt es keinen Spielstand: nur melden, nichts speichern.
     onEnd: (summary) => showNotice(`${summary.won ? 'Gewonnen!' : 'Besiegt.'} Seite neu laden für einen neuen Versuch.`, { sticky: true }),
-  });
+  }));
 } else {
   startApp();
 }
@@ -65,6 +66,14 @@ function startApp() {
     run: null,
     /** Der eine WebGL-Renderer der App (Spiel und Figurenvorschau). */
     view: createRenderer(canvas, { quality }),
+    /**
+     * Gemalte Figuren, einmal beim Start geladen. Menüs erscheinen schon vorher; Vorschau und Durchgang
+     * warten darauf. Schlägt das Laden fehl, `ok: false` (3D-Figuren).
+     * @type {Promise<import('./render/sprites.js').SpriteSheets>}
+     */
+    sprites: loadSpriteSheets(),
+    /** Merkmal des zuletzt angeforderten Durchgangs, solange er auf die Figuren wartet. */
+    pendingRun: null,
     showNotice,
     screens: null,
 
@@ -114,11 +123,18 @@ function startApp() {
       app.endRunSilently();
       app.heroId = heroId;
       app.screens.show('game');
-      app.run = startGame({
-        canvas, uiLayer, view: app.view, animalId: hero.animal, classId: hero.class,
-        seed: Date.now(), quality, timeScale, debug, autopick,
-        modifiers: metaModifiers(app.save), revive: hasRevive(app.save),
-        onEnd: (summary) => app.finishRun(heroId, summary),
+      const token = {};
+      app.pendingRun = token;
+      app.sprites.then((sprites) => {
+        // Inzwischen abgebrochen oder durch einen neueren Start ersetzt.
+        if (app.pendingRun !== token) return;
+        app.pendingRun = null;
+        app.run = startGame({
+          canvas, uiLayer, view: app.view, animalId: hero.animal, classId: hero.class,
+          seed: Date.now(), quality, timeScale, debug, autopick, sprites,
+          modifiers: metaModifiers(app.save), revive: hasRevive(app.save),
+          onEnd: (summary) => app.finishRun(heroId, summary),
+        });
       });
     },
 
@@ -136,6 +152,7 @@ function startApp() {
     },
 
     endRunSilently() {
+      app.pendingRun = null;
       app.run?.stop();
       app.run = null;
     },

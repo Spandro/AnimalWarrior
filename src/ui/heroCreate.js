@@ -63,7 +63,7 @@ function statList(rows) {
  *   onBack(): void, onNext(id: string): void }} options
  */
 function renderChoice(c, app, { step, title, ids, selected, card, figure, onBack, onNext }) {
-  const preview = createFigurePreview(app.view);
+  const preview = createFigurePreview(app.view, { sprites: app.sprites });
   let current = selected;
   const buttons = new Map();
 
@@ -152,7 +152,7 @@ export function renderCreateClass(c, props, app) {
 
 export function renderCreateName(c, props, app) {
   const { animalId, classId } = props;
-  const preview = createFigurePreview(app.view, { width: 180, height: 200 });
+  const preview = createFigurePreview(app.view, { width: 180, height: 200, sprites: app.sprites });
   preview.setFigure(animalId, classId);
   const stats = computeStats(animalId, classId);
 
