@@ -7,3 +7,5 @@ import './world.test.js';
 import './abilities.test.js';
 import './progression.test.js';
 import './survivor.test.js';
+import './save.test.js';
+import './meta.test.js';
