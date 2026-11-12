@@ -5,6 +5,7 @@ import { createGrid } from './spatial.js';
 import { obstaclesNear } from './terrain.js';
 import { stepAbilities } from './abilities.js';
 import { CLASSES } from '../data/classes.js';
+import { bonusModifiers } from '../data/bonuses.js';
 import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, HERO_RADIUS, SEPARATION_CELL, MAX_ENEMIES,
   CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP } from '../data/enemies.js';
 
@@ -143,7 +144,7 @@ export function createWorld({ seed, animalId, classId, modifiers = [] }) {
  */
 export function recomputeHeroStats(world) {
   const hero = world.hero;
-  const extra = [...hero.modifiers];
+  const extra = [...hero.modifiers, ...bonusModifiers(world.run.bonuses)];
   for (const b of hero.buffs) extra.push(...b.modifiers);
   const oldMax = hero.stats.maxHp;
   hero.stats = computeStats(hero.animalId, hero.classId, extra);
