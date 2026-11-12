@@ -1,137 +1,149 @@
-// Vorläufiger Einstieg (bis Aufgabe 11): startet direkt einen Durchgang im Wellenmodus.
-// URL-Schalter: ?animal=hase|ente|waschbaer, ?class=krieger|magier|dieb, ?speed=N (timeScale),
-// ?quality=low, ?debug=1&stress=1 (300 Ratten, Bildrate in der Konsole und oben links).
+// Einstieg: Menüs, Heldenverwaltung und Start eines Durchgangs.
+// URL-Schalter: ?autostart=1 oder ?debug=1&stress=1 überspringen die Menüs und starten sofort
+// (dann gelten ?animal=hase|ente|waschbaer und ?class=krieger|magier|dieb); ?speed=N (timeScale),
+// ?quality=low, ?debug=1 (window.__debug), ?stress=1 (300 Ratten, Bildrate oben links).
 import { isWebGLAvailable, createRenderer } from './render/renderer.js';
-import { createTerrainView } from './render/terrain.js';
-import { createEnemyView } from './render/enemies.js';
-import { createHeroView } from './render/hero.js';
-import { createEffects } from './render/effects.js';
-import { createSurvivorRun, stepRun, chooseCard, setView } from './modes/survivor.js';
-import { spawnEnemy } from './core/world.js';
-import { createRng } from './core/rng.js';
+import { startGame } from './game.js';
+import { createStore, addHero, deleteHero, STORAGE_KEY } from './save/store.js';
+import { createScreens, createNoticeBar } from './ui/screens.js';
+import { renderNoWebGL } from './ui/menus.js';
 import { ANIMALS } from './data/animals.js';
 import { CLASSES } from './data/classes.js';
 
-const SEED = 20261112;
-const STEP = 1 / 60;
-const MAX_STEPS_PER_FRAME = 5;
-const STRESS_ENEMIES = 300;
-const FPS_WINDOW = 5;
+const AUTOSTART_SEED = 20261112;
+const UNSAVED_TEXT = 'Fortschritt kann nicht gespeichert werden';
 
-const canvas = document.getElementById('game');
-const ui = document.getElementById('ui');
+const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('game'));
+const uiLayer = document.getElementById('ui');
+const menuRoot = document.getElementById('menu');
+const showNotice = createNoticeBar(document.getElementById('notice'));
+
+const params = new URLSearchParams(location.search);
+const debug = params.get('debug') === '1';
+const stress = debug && params.get('stress') === '1';
+const timeScale = Number(params.get('speed')) > 0 ? Number(params.get('speed')) : 1;
+
+/** Speicherzugriff, der auch dann nicht abstürzt, wenn schon der Zugriff auf localStorage wirft. */
+const safeStorage = {
+  getItem: (key) => window.localStorage.getItem(key),
+  setItem: (key, value) => window.localStorage.setItem(key, value),
+  removeItem: (key) => window.localStorage.removeItem(key),
+};
 
 if (!isWebGLAvailable()) {
-  ui.textContent = 'Dein Browser unterstützt kein WebGL 2.';
-} else {
-  const params = new URLSearchParams(location.search);
+  document.body.dataset.screen = 'nowebgl';
+  renderNoWebGL(menuRoot);
+} else if (params.get('autostart') === '1' || stress) {
   const quality = params.get('quality') === 'low' ? 'low' : 'high';
-  const animalId = params.get('animal') in ANIMALS ? params.get('animal') : 'hase';
-  const classId = params.get('class') in CLASSES ? params.get('class') : 'krieger';
-  const timeScale = Number(params.get('speed')) > 0 ? Number(params.get('speed')) : 1;
-  const debug = params.get('debug') === '1';
-  const stress = debug && params.get('stress') === '1';
+  document.body.dataset.screen = 'game';
+  startGame({
+    canvas, uiLayer, seed: AUTOSTART_SEED, quality, timeScale, debug, stress,
+    animalId: Object.hasOwn(ANIMALS, params.get('animal')) ? params.get('animal') : 'hase',
+    classId: Object.hasOwn(CLASSES, params.get('class')) ? params.get('class') : 'krieger',
+  });
+} else {
+  startApp();
+}
 
-  const view = createRenderer(canvas, { quality });
-  const run = createSurvivorRun({ seed: SEED, animalId, classId, timeScale });
-  const world = run.world;
-  const terrain = createTerrainView(view.scene, world.seed);
-  const enemyView = createEnemyView(view.scene);
-  const heroView = createHeroView(view.scene, animalId, classId);
-  const effects = createEffects(view.scene, ui, { quality, camera: view.camera });
+function startApp() {
+  const store = createStore(safeStorage);
+  const initial = store.load();
+  const quality = params.get('quality') === 'low' ? 'low' : initial.data.settings.quality;
 
-  function onResize() {
-    const { halfW, halfH } = view.resize();
-    setView(run, halfW, halfH);
-  }
-  window.addEventListener('resize', onResize);
-  onResize();
+  const app = {
+    store,
+    /** Aktueller Spielstand; fällt beim Speichern etwas aus, wird nur im Speicher weitergeführt. */
+    save: initial.data,
+    /** Id des gewählten Helden. */
+    heroId: null,
+    /** Laufender Durchgang (Rückgabe von startGame) oder null. */
+    run: null,
+    /** Der eine WebGL-Renderer der App (Spiel und Figurenvorschau). */
+    view: createRenderer(canvas, { quality }),
+    showNotice,
+    screens: null,
 
-  // Vorläufige Tastenabfrage: WASD und Pfeiltasten. Oben am Bildschirm ist -z.
-  const held = new Set();
-  const KEYS = {
-    KeyW: [0, -1], ArrowUp: [0, -1], KeyS: [0, 1], ArrowDown: [0, 1],
-    KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0],
-  };
-  window.addEventListener('keydown', (e) => { if (KEYS[e.code]) { held.add(e.code); e.preventDefault(); } });
-  window.addEventListener('keyup', (e) => held.delete(e.code));
-  window.addEventListener('blur', () => held.clear());
-  function readInput() {
-    let moveX = 0, moveZ = 0;
-    for (const code of held) { moveX += KEYS[code][0]; moveZ += KEYS[code][1]; }
-    return { moveX, moveZ };
-  }
+    /**
+     * Ändert den Spielstand und speichert. Klappt das Speichern nicht, gilt die Änderung nur
+     * im Speicher weiter, und eine dauerhafte Meldung erscheint.
+     * @param {(save: import('./save/schema.js').Save) => void} mutator
+     */
+    update(mutator) {
+      let result;
+      try {
+        result = store.update(mutator);
+      } catch (e) {
+        console.error(e);
+        result = { saved: false };
+      }
+      if (result.saved) {
+        app.save = result.data;
+      } else {
+        const copy = structuredClone(app.save);
+        mutator(copy);
+        app.save = copy;
+        showNotice(UNSAVED_TEXT, { sticky: true });
+      }
+    },
 
-  // Belastungstest: Welt mit Ratten auffüllen, Held am Leben halten.
-  const stressRng = createRng(7);
-  function fillRats() {
-    const h = world.hero;
-    while (world.enemies.length < STRESS_ENEMIES) {
-      const a = stressRng.range(0, Math.PI * 2), r = stressRng.range(3, 16);
-      if (!spawnEnemy(world, 'ratte', h.x + Math.cos(a) * r, h.z + Math.sin(a) * r)) break;
-    }
-    h.hp = h.stats.maxHp;
-  }
+    /** @returns {import('./save/schema.js').Hero | null} null, wenn alle Plätze belegt sind */
+    createHero(spec) {
+      const id = typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${performance.now().toString(36).replace('.', '')}`;
+      let created = null;
+      app.update((save) => { created = addHero(save, spec, { now: Date.now(), id }); });
+      if (!created) showNotice('Alle sechs Heldenplätze sind belegt.');
+      return created && app.save.heroes.find((h) => h.id === id) || null;
+    },
 
-  let status = null;
-  function showStatus(text) {
-    if (!status) {
-      status = document.createElement('div');
-      Object.assign(status.style, {
-        position: 'absolute', left: '12px', top: '10px', font: '600 14px system-ui, sans-serif',
-        color: '#fff', textShadow: '0 1px 2px #000', pointerEvents: 'none',
+    deleteHero(id) {
+      app.update((save) => { deleteHero(save, id); });
+      if (app.heroId === id) app.heroId = null;
+    },
+
+    /** Zeigt den Spielbildschirm und startet einen Durchgang mit dem Helden. */
+    startRun(heroId) {
+      const hero = app.save.heroes.find((h) => h.id === heroId);
+      if (!hero) { app.screens.show('heroes'); return; }
+      app.endRunSilently();
+      app.heroId = heroId;
+      app.screens.show('game');
+      app.run = startGame({
+        canvas, uiLayer, view: app.view, animalId: hero.animal, classId: hero.class,
+        seed: Date.now(), quality, timeScale, debug, onEscape: () => app.endRun(),
       });
-      ui.appendChild(status);
+    },
+
+    /** Beendet den Durchgang und kehrt zur Modusauswahl zurück. */
+    endRun() {
+      app.endRunSilently();
+      app.screens.show('mode', { heroId: app.heroId });
+    },
+
+    endRunSilently() {
+      app.run?.stop();
+      app.run = null;
+    },
+  };
+  app.screens = createScreens(menuRoot, app);
+
+  if (initial.status === 'corrupt') showNotice('Spielstand war beschädigt und wurde gesichert');
+  else if (initial.status === 'newer') showNotice('Spielstand stammt von einer neueren Version', { sticky: true });
+  else if (initial.status === 'unavailable') showNotice(UNSAVED_TEXT, { sticky: true });
+
+  // Ein anderer Tab hat den Spielstand geändert: Menüs mit dem neuen Stand neu aufbauen.
+  window.addEventListener('storage', (e) => {
+    if (e.key !== null && e.key !== STORAGE_KEY) return;
+    const { data, status } = store.load();
+    if (status !== 'ok' && status !== 'empty') return;
+    app.save = data;
+    const screen = app.screens.current();
+    if (screen === 'main' || screen === 'heroes' || screen === 'mode') {
+      app.screens.show(screen, app.screens.props());
     }
-    status.textContent = text;
-  }
+  });
 
-  let fpsFrames = 0, fpsStart = NaN;
-  function measureFps(now) {
-    if (Number.isNaN(fpsStart)) { fpsStart = now; fpsFrames = 0; return; }
-    fpsFrames++;
-    const elapsed = (now - fpsStart) / 1000;
-    if (elapsed < FPS_WINDOW) return;
-    const fps = fpsFrames / elapsed;
-    const text = `${fps.toFixed(1)} Bilder/s bei ${world.enemies.length} Gegnern (Qualität ${quality})`;
-    console.log('[stress] ' + text);
-    showStatus(text);
-    window.__fps = fps;
-    fpsStart = now; fpsFrames = 0;
-  }
-
-  let acc = 0, last = NaN;
-  function frame(now) {
-    const dt = Number.isNaN(last) ? 0 : Math.min(0.25, (now - last) / 1000);
-    last = now;
-    acc += dt;
-    let steps = 0;
-    while (acc >= STEP && steps < MAX_STEPS_PER_FRAME) {
-      if (stress) fillRats();
-      stepRun(run, STEP, readInput());
-      heroView.handle(run.events, world);
-      effects.handle(run.events, world);
-      if (run.state === 'levelup') chooseCard(run, 0);
-      acc -= STEP;
-      steps++;
-    }
-    if (steps === MAX_STEPS_PER_FRAME) acc = Math.min(acc, STEP);
-    const alpha = acc / STEP;
-
-    heroView.sync(world, alpha);
-    const p = heroView.position;
-    view.setTarget(p.x, p.z);
-    terrain.update(p.x, p.z);
-    enemyView.sync(world, alpha);
-    effects.update(dt);
-    view.render();
-
-    if (run.state === 'lost') showStatus('Besiegt – Seite neu laden für einen neuen Versuch.');
-    else if (run.state === 'won') showStatus('Gewonnen!');
-    if (stress) measureFps(now);
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-
-  if (debug) window.__debug = { run, view, enemyView, heroView, effects, terrain };
+  if (debug) window.__app = app;
+  app.screens.show('main');
 }

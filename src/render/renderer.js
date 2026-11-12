@@ -131,6 +131,8 @@ export function createRenderer(canvas, { quality = 'high' } = {}) {
   setTarget(0, 0);
 
   return {
+    /** Der eine WebGL-Renderer der App; auch die Figurenvorschau im Menü zeichnet damit. */
+    renderer,
     scene,
     camera,
     setTarget,
