@@ -119,7 +119,7 @@ function buildEnteHead(head, look) {
   add(head, SPHERE(), bill, [0, -0.02, 0.27], [0.065, 0.022, 0.06]);
   add(head, SPHERE(), bill, [0, -0.045, 0.2], [0.07, 0.018, 0.1]);     // Unterschnabel
   for (const s of [1, -1]) add(head, SPHERE(), EYE, [s * 0.11, 0.05, 0.09], [0.024, 0.028, 0.022]);
-  return undefined;
+  return undefined; // Ente: keine Ohren
 }
 
 function buildWaschbaerHead(head, look) {
@@ -218,11 +218,10 @@ function dagger(hand, name) {
 function dressKrieger(c, look) {
   const { body, armL, armR } = c.parts;
   const [tx, ty, tz] = look.torso;
-  const ty0 = ty;
-  add(body, SPHERE(), mat(0x6b3a2c), [0, ty0 - 0.03, 0], [tx * 1.05, ty * 0.75, tz * 1.06]);          // Waffenrock
-  add(body, SPHERE(), STEEL(), [0, ty0 + 0.07, 0.01], [tx * 1.1, ty * 0.68, tz * 1.12]);              // Brustplatte
-  add(body, CYL(), LEATHER(), [0, ty0 - 0.18, 0], [tx * 0.98, 0.06, tz * 0.98]);                      // Gürtel
-  add(body, BOX(), STEEL_DARK(), [0, ty0 - 0.18, tz * 0.97], [0.07, 0.06, 0.02]);
+  add(body, SPHERE(), mat(0x6b3a2c), [0, ty - 0.03, 0], [tx * 1.05, ty * 0.75, tz * 1.06]);          // Waffenrock
+  add(body, SPHERE(), STEEL(), [0, ty + 0.07, 0.01], [tx * 1.1, ty * 0.68, tz * 1.12]);              // Brustplatte
+  add(body, CYL(), LEATHER(), [0, ty - 0.18, 0], [tx * 0.98, 0.06, tz * 0.98]);                      // Gürtel
+  add(body, BOX(), STEEL_DARK(), [0, ty - 0.18, tz * 0.97], [0.07, 0.06, 0.02]);
   for (const arm of [armL, armR]) {
     add(arm, SPHERE(), STEEL(), [0, 0.0, 0], [0.13, 0.1, 0.14]);                                    // Schulterstück
     add(arm, SPHERE(), STEEL_DARK(), [0, -0.035, 0], [0.135, 0.06, 0.145]);
@@ -352,7 +351,7 @@ export function buildCharacter(animalId, classId) {
   const ears = animalId === 'hase' ? buildHaseHead(head, look)
     : animalId === 'ente' ? buildEnteHead(head, look)
       : buildWaschbaerHead(head, look);
-  const headAttach = group(head, [0, duck ? 0.15 : 0.15, 0], 'headAttach');
+  const headAttach = group(head, [0, 0.15, 0], 'headAttach');
 
   const tail = group(body, [0, 0, 0], 'tail');
   buildTail(animalId, tail, look);
