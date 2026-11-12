@@ -6,8 +6,8 @@
 import { isWebGLAvailable, createRenderer } from './render/renderer.js';
 import { loadSpriteSheets } from './render/sprites.js';
 import { startGame } from './game.js';
-import { createStore, addHero, deleteHero, recordRun, STORAGE_KEY } from './save/store.js';
-import { applyRunToStats, evaluateAchievements, unlock } from './core/achievements.js';
+import { createStore, addHero, deleteHero, settleRun, STORAGE_KEY } from './save/store.js';
+import { applyRunToStats, evaluateAchievements, evaluateStored, unlockStored, unlock } from './core/achievements.js';
 import { ACHIEVEMENTS } from './data/achievements.js';
 import { createToasts } from './ui/achievements.js';
 import { metaModifiers, hasRevive } from './save/meta.js';
@@ -79,6 +79,8 @@ function startApp() {
     store,
     /** Aktueller Spielstand; fällt beim Speichern etwas aus, wird nur im Speicher weitergeführt. */
     save: initial.data,
+    /** Status des letzten Ladens aus dem Speicher (bei 'newer' ist `save` nur der Standard). */
+    loadStatus: initial.status,
     /** Id des gewählten Helden. */
     heroId: null,
     /** Laufender Durchgang (Rückgabe von startGame) oder null. */
@@ -205,16 +207,28 @@ function startApp() {
         lateIds = evaluateAchievements({ run: facts, stats, save }, known);
       }
       const ids = [...earlyIds, ...lateIds];
-      if (app.save.heroes.some((h) => h.id === heroId)) {
-        app.update((save) => {
-          recordRun(save, heroId, summary);
-          if (facts) applyRunToStats(save.stats, facts);
-          unlock(save, ids, Date.now());
-        });
-      }
+      // Ist der Held inzwischen gelöscht (anderer Tab), bleiben Gold, Zähler und Erfolge trotzdem erhalten.
+      app.update((save) => {
+        settleRun(save, heroId, summary);
+        if (facts) applyRunToStats(save.stats, facts);
+        unlock(save, ids, Date.now());
+      });
+      const storedIds = app.unlockStoredAchievements();
       const after = app.save.heroes.find((h) => h.id === heroId)?.survivor.bestTime ?? 0;
       app.screens.show('result', { heroId, summary, newBest: after > before });
-      for (const id of lateIds) app.announceAchievement(id);
+      for (const id of [...lateIds, ...storedIds]) app.announceAchievement(id);
+    },
+
+    /**
+     * Schaltet Erfolge frei, die schon aus dem gespeicherten Stand folgen (höchstens drei Runden, damit z. B. das
+     * Gold eines Erfolgs Sparschwein auslösen kann). Gibt die neuen Ids zurück; die Einblendung macht der Aufrufer.
+     * @returns {string[]}
+     */
+    unlockStoredAchievements() {
+      if (evaluateStored(app.save).length === 0) return [];
+      let ids = [];
+      app.update((save) => { ids = unlockStored(save, Date.now()); });
+      return ids;
     },
 
     endRunSilently() {
@@ -241,6 +255,7 @@ function startApp() {
     const { data, status } = store.load();
     if (status !== 'ok' && status !== 'empty') return;
     app.save = data;
+    app.loadStatus = status;
     const screen = app.screens.current();
     if (screen === 'main' || screen === 'heroes' || screen === 'mode' || screen === 'metaShop' || screen === 'achievements') {
       app.screens.show(screen, app.screens.props());
@@ -249,4 +264,5 @@ function startApp() {
 
   if (debug) window.__app = app;
   app.screens.show('main');
+  for (const id of app.unlockStoredAchievements()) app.announceAchievement(id);
 }

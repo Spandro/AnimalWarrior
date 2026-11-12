@@ -131,6 +131,17 @@ export function createStore(storage) {
 }
 
 /**
+ * Text einer Exportdatei: der Spielstand im Speicher. `null`, wenn der gespeicherte Stand von einer neueren
+ * Version stammt (dann ist `save` nur der Standard und darf nicht als Spielstand ausgegeben werden).
+ * @param {Save} save
+ * @param {LoadStatus} [status]
+ * @returns {string | null}
+ */
+export function exportText(save, status = 'ok') {
+  return status === 'newer' ? null : JSON.stringify(save, null, 2);
+}
+
+/**
  * Trimmt den Namen, kürzt auf 16 Zeichen; leer → "Held n".
  * @param {string} raw
  * @param {number} index
@@ -190,4 +201,16 @@ export function recordRun(save, heroId, summary) {
   hero.survivor.runs++;
   if (summary.won) hero.survivor.wins++;
   hero.survivor.bestTime = Math.max(hero.survivor.bestTime, Math.min(summary.time, RUN_DURATION));
+}
+
+/**
+ * Wie `recordRun`, aber auch für einen Helden, den es nicht mehr gibt (z. B. in einem anderen Tab gelöscht):
+ * dann bleibt nur das Gold des Durchgangs.
+ * @param {Save} save
+ * @param {string} heroId
+ * @param {{ won: boolean, time: number, gold: number }} summary
+ */
+export function settleRun(save, heroId, summary) {
+  if (save.heroes.some((h) => h.id === heroId)) recordRun(save, heroId, summary);
+  else save.gold += Math.floor(summary.gold);
 }

@@ -46,7 +46,7 @@ export function createSurvivorRun({ seed, animalId, classId, modifiers = [], rev
     world, state: 'playing', cards: null, view: { ...DEFAULT_VIEW }, timeScale, events: [],
     spawn: { acc: 0, backlog: 0, strongPending: 0, nextEliteAt: ELITE_INTERVAL, bossIndex: 0, finalBoss: null, shadowIndex: 0 },
     facts: {
-      ended: false, won: false, time: 0, level: 1, kills: 0, killsByType: {}, dodges: 0, goldEarned: 0, bossesKilled: 0,
+      ended: false, won: false, time: 0, level: 1, kills: 0, killsByType: {}, dodges: 0, goldEarned: 0, level10At: null,
       shadowsRouted: 0, revived: 0, hpFractionAtEnd: 1, longestNoKillStreak: 0, maxedAbilities: 0, animalId, classId,
     },
     streakFrom: 0,
@@ -56,7 +56,6 @@ export function createSurvivorRun({ seed, animalId, classId, modifiers = [], rev
 /**
  * Schreibt die Zahlen für die Erfolge fort: zählt die Ereignisse eines Teilschritts und frischt Zeit, Level,
  * Gold und Fähigkeitsstufen auf. Die Serie ohne Tötung läuft nur mit der Spielzeit, also nie in Pause oder Kartenwahl.
- * Bären gibt es nur als Bosse; jede Bärentötung zählt deshalb als besiegter Boss.
  * @param {Run} run
  * @param {object[]} events
  */
@@ -67,7 +66,6 @@ export function recordFacts(run, events) {
     if (e.type === 'kill') {
       killed = true;
       f.killsByType[e.enemyType] = (f.killsByType[e.enemyType] || 0) + 1;
-      if (e.enemyType === 'baer') f.bossesKilled++;
     } else if (e.type === 'dodge') f.dodges++;
     else if (e.type === 'shadowFlee') f.shadowsRouted++;
     else if (e.type === 'revive') f.revived++;
@@ -75,6 +73,7 @@ export function recordFacts(run, events) {
   f.kills = world.run.kills;
   f.time = world.time;
   f.level = world.run.level;
+  if (f.level10At === null && f.level >= 10) f.level10At = world.time;
   f.goldEarned = world.run.gold;
   f.maxedAbilities = world.hero.abilities.filter((a) => a.level >= MAX_LEVEL).length;
   f.longestNoKillStreak = Math.max(f.longestNoKillStreak, world.time - run.streakFrom);
@@ -285,6 +284,7 @@ export function chooseCard(run, index) {
   applyCard(run.world, run.cards[index]);
   run.cards = null;
   run.state = 'playing';
+  recordFacts(run, []); // das neue Level gilt zur eingefrorenen Spielzeit, nicht erst beim nächsten Schritt
 }
 
 /**

@@ -1,8 +1,9 @@
 import { test, assertEqual, assertClose, assertTrue } from './runner.js';
 import { ACHIEVEMENTS } from '../src/data/achievements.js';
-import { evaluateAchievements, applyRunToStats, liveStats, unlock } from '../src/core/achievements.js';
-import { createSurvivorRun, stepRun, setPaused, abandonRun, getFacts, recordFacts } from '../src/modes/survivor.js';
+import { evaluateAchievements, evaluateStored, unlockStored, applyRunToStats, liveStats, unlock } from '../src/core/achievements.js';
+import { createSurvivorRun, stepRun, setPaused, abandonRun, chooseCard, getFacts, recordFacts } from '../src/modes/survivor.js';
 import { spawnEnemy } from '../src/core/world.js';
+import { xpToNext } from '../src/core/progression.js';
 import { obstaclesNear } from '../src/core/terrain.js';
 import { defaultSave, validate } from '../src/save/store.js';
 import { SFX } from '../src/data/sfx.js';
@@ -10,7 +11,7 @@ import { SFX } from '../src/data/sfx.js';
 // ------------------------------------------------------------------ Hilfen
 
 const facts = (o = {}) => ({
-  ended: false, won: false, time: 0, level: 1, kills: 0, killsByType: {}, dodges: 0, goldEarned: 0, bossesKilled: 0,
+  ended: false, won: false, time: 0, level: 1, kills: 0, killsByType: {}, dodges: 0, goldEarned: 0, level10At: null,
   shadowsRouted: 0, revived: 0, hpFractionAtEnd: 1, longestNoKillStreak: 0, maxedAbilities: 0,
   animalId: 'hase', classId: 'krieger', ...o,
 });
@@ -64,7 +65,7 @@ const CASES = [
     { run: { ended: true, won: true, hpFractionAtEnd: 0.05 } },
     { run: { ended: true, won: true, hpFractionAtEnd: 0.049 } }],
   ['stehaufmaennchen', { run: { ended: true, won: true, revived: 0 } }, { run: { ended: true, won: true, revived: 1 } }],
-  ['schnellstarter', { run: { level: 10, time: 181 } }, { run: { level: 10, time: 180 } }],
+  ['schnellstarter', { run: { level10At: 180.01 } }, { run: { level10At: 180 } }],
   ['massenabfertigung', { run: { kills: 999 } }, { run: { kills: 1000 } }],
   ['stammgast', { stats: { runs: 24 } }, { stats: { runs: 25 } }],
   ['fruehes-ende', { run: { ended: true, won: false, time: 30 } }, { run: { ended: true, won: false, time: 29.9 } }],
@@ -83,8 +84,9 @@ for (const [id, no, yes] of CASES) {
 }
 
 test('achievements: Randfälle der Bedingungen', () => {
-  // Level 10 knapp zu spät, Level 9 rechtzeitig reicht nicht.
-  assertEqual(byId('schnellstarter').check(ctx({ run: { level: 9, time: 100 } })), false);
+  // Level 10 nie erreicht (null) zählt nicht, auch nicht bei früher Zeit.
+  assertEqual(byId('schnellstarter').check(ctx({ run: { level10At: null, level: 9, time: 100 } })), false);
+  assertEqual(byId('schnellstarter').check(ctx({ run: { level10At: 0 } })), true);
   // Wiederbelebung und knapper Sieg zählen nur bei einem Sieg.
   assertEqual(byId('knapp-daneben').check(ctx({ run: { ended: true, won: false, hpFractionAtEnd: 0 } })), false);
   assertEqual(byId('stehaufmaennchen').check(ctx({ run: { ended: true, won: false, revived: 1 } })), false);
@@ -179,7 +181,7 @@ test('facts: getFacts liefert eine Kopie ohne Verweise in die Welt', () => {
   assertEqual(run.facts.kills, 0);
 });
 
-test('facts: Tötungen je Art, Schatten, Bosse und Ausweichen aus den Ereignissen', () => {
+test('facts: Tötungen je Art, Schatten und Ausweichen aus den Ereignissen', () => {
   const run = newRun();
   recordFacts(run, [
     { type: 'kill', enemyType: 'ratte' }, { type: 'kill', enemyType: 'ratte' }, { type: 'kill', enemyType: 'wolf' },
@@ -188,7 +190,7 @@ test('facts: Tötungen je Art, Schatten, Bosse und Ausweichen aus den Ereignisse
   ]);
   const f = run.facts;
   assertEqual(f.killsByType, { ratte: 2, wolf: 1, baer: 1 });
-  assertEqual([f.dodges, f.shadowsRouted, f.revived, f.bossesKilled], [3, 1, 1, 1]);
+  assertEqual([f.dodges, f.shadowsRouted, f.revived], [3, 1, 1]);
 });
 
 test('facts: echter Durchgang – Tötungen stimmen mit der Welt, Zeit, Level und Gold sind aktuell', () => {
@@ -293,7 +295,69 @@ test('facts: nur Zahlen und Zeichenketten, keine Verweise in die Welt', () => {
   const run = immortal(newRun());
   stepRun(run, 1, NONE);
   for (const [k, v] of Object.entries(run.facts)) {
+    if (k === 'level10At') { assertTrue(v === null || typeof v === 'number', k); continue; }
     if (k === 'killsByType') { assertTrue(Object.values(v).every((n) => typeof n === 'number'), k); continue; }
     assertTrue(['number', 'boolean', 'string'].includes(typeof v), `${k}: ${typeof v}`);
   }
+});
+
+test('facts: level10At ist null, bis eine Karte das Level auf 10 bringt, und merkt sich dann die Spielzeit', () => {
+  const run = immortal(newRun());
+  const w = run.world;
+  w.run.level = 9;
+  stepRun(run, 0.05, NONE);
+  assertEqual(run.facts.level10At, null);
+  w.run.xp = xpToNext(9);
+  stepRun(run, 0.05, NONE);
+  assertEqual(run.state, 'levelup');
+  assertEqual(run.facts.level10At, null);
+  const frozen = w.time;
+  chooseCard(run, 0);
+  assertEqual(w.run.level, 10);
+  assertEqual(run.facts.level10At, frozen);
+  stepRun(run, 1, NONE);
+  assertEqual(run.facts.level10At, frozen, 'bleibt bei späteren Schritten');
+  assertTrue(byId('schnellstarter').check(ctx({ run: getFacts(run) })));
+});
+
+// ------------------------------------------------------------------ evaluateStored
+
+const saveWith = (o = {}) => ({ ...defaultSave(), ...o });
+
+test('achievements: evaluateStored findet Erfolge, die schon aus den gespeicherten Zahlen folgen', () => {
+  const s = saveWith({ stats: stats({ runs: 1 }) });
+  assertEqual(evaluateStored(s), ['erste-schritte']);
+  s.achievements['erste-schritte'] = 1;
+  assertEqual(evaluateStored(s), []);
+  assertEqual(evaluateStored(saveWith({ stats: stats({ runs: 25, kills: { ratte: 500 } }) })),
+    ['erste-schritte', 'kammerjaeger', 'stammgast']);
+});
+
+test('achievements: evaluateStored lässt Erfolge, die einen Durchgang brauchen, nie auslösen', () => {
+  const s = saveWith({
+    gold: 5, stats: stats({ runs: 3, wins: 2, winsByAnimal: { hase: 1 } }),
+  });
+  const ids = evaluateStored(s);
+  for (const id of ['knapp-daneben', 'ueberlebenskuenstler', 'stehaufmaennchen', 'fruehes-ende', 'schnellstarter',
+    'pazifist', 'glueckspilz', 'vollausstattung', 'massenabfertigung', 'baerenhunger', 'schattenboxen']) {
+    assertTrue(!ids.includes(id), id);
+  }
+  assertEqual(ids, ['erste-schritte']);
+});
+
+test('achievements: unlockStored schaltet in Runden frei, Sparschwein folgt dem Gold der ersten Runde', () => {
+  const s = saveWith({ gold: 990, stats: stats({ runs: 1 }) });
+  assertEqual(evaluateStored(s), ['erste-schritte']);
+  const ids = unlockStored(s, 42);
+  assertEqual(ids, ['erste-schritte', 'sparschwein']);
+  assertEqual(s.gold, 990 + 25 + 50);
+  assertEqual(s.achievements, { 'erste-schritte': 42, sparschwein: 42 });
+  assertEqual(unlockStored(s, 43), []);
+  assertTrue(validate(s).ok);
+});
+
+test('achievements: unlockStored hört nach höchstens drei Runden auf', () => {
+  const s = saveWith({ gold: 0, stats: stats({ runs: 1 }) });
+  const ids = unlockStored(s, 1, 1);
+  assertEqual(ids, ['erste-schritte']);
 });

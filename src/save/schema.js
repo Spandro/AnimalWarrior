@@ -37,17 +37,24 @@ const countOf = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? 
 
 /**
  * Migrationsschritte: Version n → n + 1; sie ändern ihre Eingabe nicht.
- * 1 → 2: Erfolge und lebenslange Zähler; Durchgänge und Siege stammen aus den Helden, der Rest beginnt bei null.
+ * 1 → 2: Erfolge und lebenslange Zähler; Durchgänge, Siege und Siege je Tier stammen aus den Helden, der Rest beginnt bei null.
  */
 const MIGRATIONS = {
   1: (data) => {
     const heroes = Array.isArray(data.heroes) ? data.heroes : [];
     const total = (key) => heroes.reduce((sum, h) => sum + countOf(h?.survivor?.[key]), 0);
+    const winsByAnimal = {};
+    for (const h of heroes) {
+      const wins = h?.survivor?.wins;
+      if (Object.hasOwn(ANIMALS, h?.animal) && Number.isInteger(wins) && wins > 0) {
+        winsByAnimal[h.animal] = (winsByAnimal[h.animal] || 0) + wins;
+      }
+    }
     return {
       ...data,
       version: 2,
       achievements: {},
-      stats: { kills: {}, runs: total('runs'), wins: total('wins'), winsByAnimal: {}, shadowsRouted: 0 },
+      stats: { kills: {}, runs: total('runs'), wins: total('wins'), winsByAnimal, shadowsRouted: 0 },
     };
   },
 };

@@ -33,11 +33,11 @@ test('sfx: shouldPlay spielt unbekannte Typen nie', () => {
   }
 });
 
-test('sfx: Daten haben alle Klänge des Spiels, hit ist als einziger gedrosselt', () => {
+test('sfx: Daten haben alle Klänge des Spiels, hit, pickup und heroHit sind gedrosselt', () => {
   for (const type of ['hit', 'pickup', 'levelup', 'bossSpawn', 'heroHit', 'death', 'victory', 'chest']) {
     assertTrue(Array.isArray(SFX[type]) && SFX[type].length > 0, type);
   }
-  assertEqual(SFX_LIMITS, { hit: 12 });
+  assertEqual(SFX_LIMITS, { hit: 12, pickup: 15, heroHit: 8 });
 });
 
 test('sfx: Lautstärke 0 ist stumm, 100 ist am lautesten, dazwischen steigt es', () => {
@@ -105,4 +105,22 @@ test('sfx: Lautstärke 0 plant nichts und setzt die Verstärkung auf 0', async (
   const before = log.gains;
   sfx.handle([{ type: 'death' }]);
   assertEqual(log.gains, before);
+});
+
+test('sfx: pickup und heroHit sind auf 15 und 8 je Sekunde gedrosselt', () => {
+  for (const [type, perSecond] of [['pickup', 15], ['heroHit', 8]]) {
+    let last = null, played = 0;
+    for (let t = 0; t < 1000; t++) if (shouldPlay(type, t, last)) { last = t; played++; }
+    assertEqual(played, perSecond, type);
+  }
+});
+
+test('sfx: 50 pickup-Ereignisse in einem Aufruf starten höchstens eine Stimmengruppe', async () => {
+  const { FakeContext, log } = fakeAudio();
+  const sfx = createSfx({ AudioContextClass: FakeContext, now: () => 5000 });
+  sfx.resume();
+  await Promise.resolve();
+  const before = log.oscillators;
+  sfx.handle(Array.from({ length: 50 }, () => ({ type: 'pickup' })));
+  assertEqual(log.oscillators - before, SFX.pickup.filter((v) => v.kind === 'tone').length);
 });

@@ -1,7 +1,7 @@
 import { test, assertEqual, assertTrue, assertThrows } from './runner.js';
 import {
   SAVE_VERSION, STORAGE_KEY, BACKUP_KEY, defaultSave, validate, migrate, createStore,
-  normalizeHeroName, addHero, deleteHero, recordRun,
+  normalizeHeroName, addHero, deleteHero, recordRun, settleRun, exportText,
 } from '../src/save/store.js';
 
 function memoryStorage(initial = {}) {
@@ -230,12 +230,26 @@ test('save: migrate hebt Version 1 auf 2 mit leeren Erfolgen und Zählern aus de
   assertEqual(old, copy, 'Eingabe bleibt unverändert');
   assertEqual(s.version, 2);
   assertEqual(s.achievements, {});
-  assertEqual(s.stats, { kills: {}, runs: 12, wins: 3, winsByAnimal: {}, shadowsRouted: 0 });
+  assertEqual(s.stats, { kills: {}, runs: 12, wins: 3, winsByAnimal: { hase: 1, ente: 2 }, shadowsRouted: 0 });
   assertEqual(s.gold, 340);
   assertEqual(s.heroes, old.heroes);
   assertEqual(s.metaUpgrades, { leben: 2 });
   assertEqual(s.settings, { volume: 40, quality: 'low' });
   assertTrue(validate(s).ok);
+});
+
+test('save: migrate leitet Siege je Tier aus den Helden ab, nur positive Zahlen bekannter Tiere', () => {
+  const old = {
+    version: 1, gold: 0, metaUpgrades: {}, settings: { volume: 70, quality: 'high' },
+    heroes: [v1Hero(1, 'hase', 3, 2), v1Hero(2, 'hase', 2, 1), v1Hero(3, 'ente', 4, 0), v1Hero(4, 'waschbaer', 6, 4)],
+  };
+  const s = migrate(old);
+  assertEqual(s.stats.winsByAnimal, { hase: 3, waschbaer: 4 });
+  assertEqual(s.stats.wins, 7);
+  assertTrue(validate(s).ok);
+  // Unbekanntes Tier und Bruchzahlen landen nicht in der Statistik.
+  const odd = migrate({ ...old, heroes: [v1Hero(1, 'drache', 1, 5), v1Hero(2, 'hase', 1, 1.5)] });
+  assertEqual(odd.stats.winsByAnimal, {});
 });
 
 test('save: migrate einer Version 1 ohne Helden ergibt Nullzähler', () => {
@@ -357,4 +371,33 @@ test('save: recordRun addiert Gold, zählt Läufe und hält die beste Zeit', () 
   assertEqual(rec.bestTime, 900);
   assertThrows(() => recordRun(s, 'nope', { won: false, time: 1, gold: 1 }));
   assertTrue(validate(s).ok);
+});
+
+test('save: exportText enthält den Spielstand im Speicher und lässt sich wieder importieren', () => {
+  const save = defaultSave();
+  save.gold = 777;
+  addHero(save, spec, ctx(1));
+  addHero(save, { name: 'Quak', animal: 'ente', class: 'magier' }, ctx(2));
+  save.achievements['erste-schritte'] = 5;
+  save.stats = { kills: { ratte: 12 }, runs: 3, wins: 1, winsByAnimal: { hase: 1 }, shadowsRouted: 2 };
+  const text = exportText(save);
+  assertEqual(JSON.parse(text), save);
+  const back = createStore(memoryStorage()).importJson(text);
+  assertTrue(back.ok);
+  assertEqual(back.data.heroes.map((h) => h.name), ['Hoppel', 'Quak']);
+  assertEqual([back.data.gold, back.data.achievements, back.data.stats], [777, save.achievements, save.stats]);
+});
+
+test('save: exportText gibt bei einem Spielstand einer neueren Version nichts aus', () => {
+  assertEqual(exportText(defaultSave(), 'newer'), null);
+  assertTrue(typeof exportText(defaultSave(), 'empty') === 'string');
+});
+
+test('save: settleRun verbucht den Durchgang beim Helden, ohne Held bleibt nur das Gold', () => {
+  const s = defaultSave();
+  addHero(s, spec, ctx(1));
+  settleRun(s, 'h1', { won: true, time: 100, gold: 12.9 });
+  assertEqual([s.gold, s.heroes[0].survivor], [12, { bestTime: 100, wins: 1, runs: 1 }]);
+  settleRun(s, 'weg', { won: true, time: 100, gold: 8.5 });
+  assertEqual([s.gold, s.heroes[0].survivor], [20, { bestTime: 100, wins: 1, runs: 1 }]);
 });

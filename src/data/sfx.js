@@ -24,7 +24,7 @@ export function volumeToGain(volume) {
  * Höchstzahl je Sekunde für Typen, die in Massen auftreten. Typen ohne Eintrag sind nicht gedrosselt.
  * @type {Record<string, number>}
  */
-export const SFX_LIMITS = { hit: 12 };
+export const SFX_LIMITS = { hit: 12, pickup: 15, heroHit: 8 };
 
 /** Tonfolge als Stimmen: je Note ein Ton, `step` Sekunden Abstand. */
 const arpeggio = (wave, notes, step, dur, gain) =>

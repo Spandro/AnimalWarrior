@@ -4,6 +4,7 @@ import { ANIMALS } from '../data/animals.js';
 import { CLASSES } from '../data/classes.js';
 import { RUN_DURATION } from '../data/waves.js';
 import { MAX_HEROES } from '../save/schema.js';
+import { exportText } from '../save/store.js';
 
 /** Kopfzeile eines Bildschirms mit Titel und optionaler Unterzeile. */
 export function screenHeader(title, subtitle) {
@@ -26,9 +27,11 @@ export const EXPORT_FILENAME = 'animalwarrior-spielstand.json';
 /** Größer als das darf eine Importdatei nicht sein (ein Spielstand ist wenige KB groß). */
 const MAX_IMPORT_BYTES = 1024 * 1024;
 
-/** Lädt den Spielstand als JSON-Datei herunter (Blob-Link, danach wieder freigegeben). */
+/** Lädt den Spielstand im Speicher als JSON-Datei herunter (Blob-Link, danach wieder freigegeben). */
 export function exportSave(app) {
-  const url = URL.createObjectURL(new Blob([app.store.exportJson()], { type: 'application/json' }));
+  const text = exportText(app.save, app.loadStatus);
+  if (text === null) return;
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
   const link = el('a', { href: url, download: EXPORT_FILENAME, hidden: true });
   document.body.append(link);
   link.click();
@@ -61,6 +64,7 @@ export async function importSave(app, file) {
   const result = app.store.importJson(text);
   if (!result.ok) { app.showNotice(`Import fehlgeschlagen: ${result.error}`); return; }
   app.save = result.data;
+  app.loadStatus = 'ok';
   app.heroId = null;
   app.applySettings();
   app.showNotice('Spielstand importiert.');
@@ -88,7 +92,11 @@ export function renderMain(c, props, app) {
       el('button', { class: 'btn', type: 'button', onclick: () => app.screens.show('achievements') }, 'Erfolge'),
       el('button', { class: 'btn', type: 'button', onclick: () => app.screens.show('settings') }, 'Einstellungen'),
       el('div', { class: 'menu-row' },
-        el('button', { class: 'btn', type: 'button', onclick: () => exportSave(app) }, 'Spielstand exportieren'),
+        el('button', {
+          class: 'btn', type: 'button', disabled: app.loadStatus === 'newer',
+          title: app.loadStatus === 'newer' ? 'Spielstand stammt von einer neueren Version' : null,
+          onclick: () => exportSave(app),
+        }, 'Spielstand exportieren'),
         el('button', { class: 'btn', type: 'button', onclick: () => fileInput.click() }, 'Spielstand importieren')),
       fileInput),
     el('p', { class: 'gold-line' }, 'Gold: ', el('strong', { text: formatNumber(save.gold) })),

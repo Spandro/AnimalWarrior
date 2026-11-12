@@ -6,9 +6,10 @@ import { ANIMALS } from './animals.js';
  *   shadowsRouted: number }} LifetimeStats
  *
  * Zahlen eines Durchgangs (`run.facts` aus modes/survivor.js), nur einfache Werte.
- * `ended`/`won`/`hpFractionAtEnd` gelten erst, wenn der Durchgang vorbei ist.
+ * `ended`/`won`/`hpFractionAtEnd` gelten erst, wenn der Durchgang vorbei ist; `level10At`: Spielzeit, zu der Level 10
+ * zuerst erreicht wurde (null davor).
  * @typedef {{ ended: boolean, won: boolean, time: number, level: number, kills: number, killsByType: Record<string, number>,
- *   dodges: number, goldEarned: number, bossesKilled: number, shadowsRouted: number, revived: number,
+ *   dodges: number, goldEarned: number, level10At: number | null, shadowsRouted: number, revived: number,
  *   hpFractionAtEnd: number, longestNoKillStreak: number, maxedAbilities: number, animalId: string, classId: string }} RunFacts
  *
  * Eingabe jeder Bedingung. `stats` enthält die Zahlen des laufenden Durchgangs schon (mitten im Durchgang nur
@@ -96,7 +97,7 @@ export const ACHIEVEMENTS = [
   },
   {
     id: 'schnellstarter', title: 'Schnellstarter', condition: 'Erreiche Level 10 in den ersten drei Minuten',
-    line: 'Andere sind da noch beim Aufwärmen.', gold: 75, check: (c) => c.run.level >= 10 && c.run.time <= 180,
+    line: 'Andere sind da noch beim Aufwärmen.', gold: 75, check: (c) => c.run.level10At !== null && c.run.level10At <= 180,
   },
   {
     id: 'massenabfertigung', title: 'Massenabfertigung', condition: 'Besiege 1000 Gegner in einem Durchgang',
