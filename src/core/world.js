@@ -7,7 +7,7 @@ import { stepAbilities } from './abilities.js';
 import { CLASSES } from '../data/classes.js';
 import { bonusModifiers } from '../data/bonuses.js';
 import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, HERO_RADIUS, SEPARATION_CELL, MAX_ENEMIES,
-  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP } from '../data/enemies.js';
+  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS } from '../data/enemies.js';
 
 /**
  * @typedef {import('./stats.js').Stats} Stats
@@ -22,25 +22,146 @@ import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, HERO_RADIUS, SEPARATION_CELL, 
  *   wander?: { x: number, z: number, rerollAt: number } }} Enemy
  * @typedef {{ kind: 'xp'|'gold'|'potion'|'chest', x: number, z: number, value: number }} Pickup
  * @typedef {{ level: number, xp: number, kills: number, gold: number, bonuses: object, damageByAbility: Record<string, number>, revivesLeft: number }} Run
+ * @typedef {{ x: number, z: number, dirX: number, dirZ: number, speed: number, damage: number, radius: number, timeLeft: number }} EnemyProjectile
+ *   Gegnergeschoss: trifft nur den Held, wird von Hindernissen aufgehalten.
  * @typedef {{ time: number, seed: number, rng: import('./rng.js').Rng, hero: Hero, enemies: Enemy[], projectiles: object[],
- *   zones: object[], orbitals: object[], summons: object[], pickups: Pickup[], events: object[], run: Run, nextId: number }} World
+ *   enemyProjectiles: EnemyProjectile[], zones: object[], orbitals: object[], summons: object[], pickups: Pickup[],
+ *   events: object[], run: Run, nextId: number }} World
  */
 
+/** Einheitsrichtung und Abstand von a nach b; bei Deckung die Richtung `fallback`. */
+function towards(a, b, fallback = { x: 1, z: 0 }) {
+  const dx = b.x - a.x, dz = b.z - a.z;
+  const d = Math.hypot(dx, dz);
+  return d < 1e-9 ? { x: fallback.x, z: fallback.z, d: 0 } : { x: dx / d, z: dz / d, d };
+}
+
+function moveDir(enemy, dirX, dirZ, distance) {
+  enemy.x += dirX * distance;
+  enemy.z += dirZ * distance;
+}
+
 /**
- * Bewegungsfunktionen je behavior; unbekannte fallen auf chase zurück. Weitere kommen in Aufgabe 7.
- * Sie nutzen enemyTarget und enemySpeed, damit Klon und Verlangsamung wirken.
+ * Bewegungsfunktionen je behavior; unbekannte fallen auf chase zurück.
+ * Sie nutzen enemyTarget und enemySpeed, damit Klon und Verlangsamung wirken; ihr Zustand liegt in enemy.ai.
+ * Betäubung und Verwirrung greifen vorher in stepWorld.
  */
 const BEHAVIORS = {
   chase(world, enemy, dt) {
-    const target = enemyTarget(world, enemy);
-    const dx = target.x - enemy.x, dz = target.z - enemy.z;
-    const d = Math.hypot(dx, dz);
-    if (d < 1e-9) return;
-    const step = Math.min(d, enemySpeed(world, enemy) * dt);
-    enemy.x += (dx / d) * step;
-    enemy.z += (dz / d) * step;
+    const to = towards(enemy, enemyTarget(world, enemy));
+    if (to.d === 0) return;
+    moveDir(enemy, to.x, to.z, Math.min(to.d, enemySpeed(world, enemy) * dt));
+  },
+
+  /** Laufen → Stillstand (windup) → Ansturm geradeaus → Laufen … */
+  charge(world, enemy, dt) {
+    const ai = enemy.ai, t = world.time;
+    if (!ai.phase) { ai.phase = 'walk'; ai.until = t + CHARGE.interval; }
+    if (ai.phase === 'walk' && t >= ai.until) { ai.phase = 'windup'; ai.until = t + CHARGE.windup; }
+    if (ai.phase === 'windup') {
+      if (t < ai.until) return;
+      const to = towards(enemy, enemyTarget(world, enemy));
+      ai.phase = 'dash'; ai.until = t + CHARGE.duration; ai.dirX = to.x; ai.dirZ = to.z;
+    }
+    if (ai.phase === 'dash') {
+      if (t < ai.until) { moveDir(enemy, ai.dirX, ai.dirZ, enemySpeed(world, enemy) * CHARGE.speedMul * dt); return; }
+      ai.phase = 'walk'; ai.until = t + CHARGE.interval;
+    }
+    BEHAVIORS.chase(world, enemy, dt);
+  },
+
+  /** Nähert sich mit seitlichem Versatz, der regelmäßig die Seite wechselt. */
+  strafe(world, enemy, dt) {
+    const ai = enemy.ai, t = world.time;
+    if (!ai.side) { ai.side = enemy.id % 2 ? 1 : -1; ai.switchAt = t + STRAFE.switchInterval; }
+    if (t >= ai.switchAt) { ai.side = -ai.side; ai.switchAt = t + STRAFE.switchInterval; }
+    const to = towards(enemy, enemyTarget(world, enemy));
+    if (to.d === 0) return;
+    const step = enemySpeed(world, enemy) * dt;
+    if (to.d <= step) { moveDir(enemy, to.x, to.z, to.d); return; }
+    const lx = -to.z * ai.side * STRAFE.lateral, lz = to.x * ai.side * STRAFE.lateral;
+    const len = Math.hypot(to.x + lx, to.z + lz);
+    moveDir(enemy, (to.x + lx) / len, (to.z + lz) / len, step);
+  },
+
+  /** Hält Abstand und schießt auf den Helden. */
+  ranged(world, enemy, dt) {
+    const ai = enemy.ai, t = world.time;
+    if (ai.fireAt === undefined) ai.fireAt = t + RANGED.fireInterval;
+    const to = towards(enemy, enemyTarget(world, enemy));
+    const step = enemySpeed(world, enemy) * dt;
+    if (to.d > RANGED.maxRange) moveDir(enemy, to.x, to.z, Math.min(step, to.d - RANGED.maxRange));
+    else if (to.d < RANGED.minRange) moveDir(enemy, -to.x, -to.z, Math.min(step, RANGED.minRange - to.d));
+    if (t < ai.fireAt) return;
+    const aim = towards(enemy, world.hero);
+    if (aim.d > RANGED.fireRange) return;
+    ai.fireAt = t + RANGED.fireInterval;
+    world.enemyProjectiles.push({
+      x: enemy.x, z: enemy.z, dirX: aim.x, dirZ: aim.z, speed: RANGED.projectileSpeed,
+      damage: enemy.damage, radius: RANGED.projectileRadius, timeLeft: RANGED.projectileLife,
+    });
+  },
+
+  /** Verfolgt, umkreist dann in festem Abstand und stößt regelmäßig vor. */
+  circle(world, enemy, dt) {
+    const ai = enemy.ai, t = world.time;
+    if (!ai.side) { ai.side = enemy.id % 2 ? 1 : -1; ai.lungeAt = t + CIRCLE.lungeInterval; }
+    const speed = enemySpeed(world, enemy);
+    if (ai.lungeUntil > t) { moveDir(enemy, ai.dirX, ai.dirZ, speed * CIRCLE.lungeSpeedMul * dt); return; }
+    const to = towards(enemy, enemyTarget(world, enemy));
+    if (to.d > CIRCLE.engageRange) { BEHAVIORS.chase(world, enemy, dt); return; }
+    if (t >= ai.lungeAt) {
+      ai.lungeUntil = t + CIRCLE.lungeDuration; ai.lungeAt = ai.lungeUntil + CIRCLE.lungeInterval;
+      ai.dirX = to.x; ai.dirZ = to.z;
+      return;
+    }
+    const radial = Math.max(-1, Math.min(1, (to.d - CIRCLE.radius) / 2));
+    const vx = to.x * radial - to.z * ai.side, vz = to.z * radial + to.x * ai.side;
+    const len = Math.hypot(vx, vz);
+    moveDir(enemy, vx / len, vz / len, speed * dt);
+  },
+
+  /** Verfolgen, dann Prankenhieb (nah) oder Sprung (fern) mit Vorwarnung, dann kurze Pause. */
+  boss(world, enemy, dt) {
+    const ai = enemy.ai, t = world.time;
+    if (!ai.phase) { ai.phase = 'chase'; ai.until = t + BOSS.chaseTime; }
+    if (ai.phase === 'chase') {
+      if (t < ai.until) { BEHAVIORS.chase(world, enemy, dt); return; }
+      startBossAttack(world, enemy);
+      return;
+    }
+    if (ai.phase === 'swipe' || ai.phase === 'leap') {
+      if (t >= ai.until) resolveBossAttack(world, enemy);
+      return;
+    }
+    if (ai.phase === 'recover' && t >= ai.until) { ai.phase = 'chase'; ai.until = t + BOSS.chaseTime; }
   },
 };
+
+function startBossAttack(world, enemy) {
+  const ai = enemy.ai, hero = world.hero;
+  const to = towards(enemy, hero, hero.facing);
+  const swipe = to.d <= enemy.radius + BOSS.swipe.triggerRange;
+  const a = swipe
+    ? { kind: 'swipe', x: enemy.x, z: enemy.z, radius: enemy.radius + BOSS.swipe.reach, delay: BOSS.swipe.windup }
+    : { kind: 'leap', x: hero.x, z: hero.z, radius: BOSS.leap.radius, delay: BOSS.leap.windup };
+  ai.phase = a.kind; ai.until = world.time + a.delay;
+  ai.attack = { ...a, dirX: to.x, dirZ: to.z };
+  world.events.push({ type: 'bossTelegraph', ...ai.attack });
+}
+
+function resolveBossAttack(world, enemy) {
+  const ai = enemy.ai, a = ai.attack, hero = world.hero;
+  if (a.kind === 'leap') { enemy.x = a.x; enemy.z = a.z; }
+  const dx = hero.x - a.x, dz = hero.z - a.z;
+  const d = Math.hypot(dx, dz);
+  let inside = d <= a.radius;
+  if (inside && a.kind === 'swipe' && d > enemy.radius) {
+    inside = (dx * a.dirX + dz * a.dirZ) / d >= Math.cos(BOSS.swipe.halfAngle);
+  }
+  if (inside) damageHero(world, enemy.damage * BOSS[a.kind].damageMul);
+  ai.phase = 'recover'; ai.until = world.time + BOSS.recover; ai.attack = null;
+}
 
 /**
  * Ziel, das ein Gegner ansteuert: die nächste Beschwörung, in deren Lockradius er steht, sonst der Held.
@@ -133,7 +254,7 @@ export function createWorld({ seed, animalId, classId, modifiers = [] }) {
       abilities: [{ id: CLASSES[classId].startAbility, level: 1, cooldownLeft: 0 }],
       buffs: [], radius: HERO_RADIUS, invulnerableUntil: 0, animalId, classId,
     },
-    enemies: [], projectiles: [], zones: [], orbitals: [], summons: [], pickups: [], events: [],
+    enemies: [], projectiles: [], enemyProjectiles: [], zones: [], orbitals: [], summons: [], pickups: [], events: [],
     run: { level: 1, xp: 0, kills: 0, gold: 0, bonuses: {}, damageByAbility: {}, revivesLeft: 0 },
   };
 }
@@ -251,6 +372,20 @@ function separateEnemies(world) {
   }
 }
 
+function stepEnemyProjectiles(world, dt) {
+  const hero = world.hero;
+  world.enemyProjectiles = world.enemyProjectiles.filter((p) => {
+    p.x += p.dirX * p.speed * dt;
+    p.z += p.dirZ * p.speed * dt;
+    p.timeLeft -= dt;
+    if (p.timeLeft <= 0 || obstaclesNear(world.seed, p.x, p.z, p.radius).length > 0) return false;
+    const min = p.radius + hero.radius;
+    if ((p.x - hero.x) ** 2 + (p.z - hero.z) ** 2 >= min * min) return true;
+    damageHero(world, p.damage);
+    return false;
+  });
+}
+
 function collectPickups(world) {
   const hero = world.hero;
   const r = hero.stats.pickupRadius;
@@ -309,6 +444,7 @@ export function stepWorld(world, dt, input) {
   }
   separateEnemies(world);
   for (const e of world.enemies) if (!e.flying) pushOutOfObstacles(world, e);
+  stepEnemyProjectiles(world, dt);
 
   // Berührungsschaden
   for (const e of world.enemies) {
