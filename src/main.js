@@ -1,10 +1,12 @@
-// Einstieg: Menüs, Heldenverwaltung und Start eines Durchgangs.
+// Einstieg: Menüs, Heldenverwaltung, Start eines Durchgangs und was danach passiert (Speichern, Ergebnis).
 // URL-Schalter: ?autostart=1 oder ?debug=1&stress=1 überspringen die Menüs und starten sofort
-// (dann gelten ?animal=hase|ente|waschbaer und ?class=krieger|magier|dieb); ?speed=N (timeScale),
-// ?quality=low, ?debug=1 (window.__debug), ?stress=1 (300 Ratten, Bildrate oben links).
+// (dann gelten ?animal=hase|ente|waschbaer und ?class=krieger|magier|dieb); ?quality=low.
+// Nur mit ?debug=1 (window.__debug, window.__app): ?speed=N (timeScale), ?stress=1 (300 Ratten,
+// Bildrate oben links), ?autopick=1 (Level-up-Karten automatisch), Tasten K (alle Gegner besiegen), L (ein Level).
 import { isWebGLAvailable, createRenderer } from './render/renderer.js';
 import { startGame } from './game.js';
-import { createStore, addHero, deleteHero, STORAGE_KEY } from './save/store.js';
+import { createStore, addHero, deleteHero, recordRun, STORAGE_KEY } from './save/store.js';
+import { metaModifiers, hasRevive } from './save/meta.js';
 import { createScreens, createNoticeBar } from './ui/screens.js';
 import { renderNoWebGL } from './ui/menus.js';
 import { ANIMALS } from './data/animals.js';
@@ -21,7 +23,8 @@ const showNotice = createNoticeBar(document.getElementById('notice'));
 const params = new URLSearchParams(location.search);
 const debug = params.get('debug') === '1';
 const stress = debug && params.get('stress') === '1';
-const timeScale = Number(params.get('speed')) > 0 ? Number(params.get('speed')) : 1;
+const timeScale = debug && Number(params.get('speed')) > 0 ? Number(params.get('speed')) : 1;
+const autopick = debug && params.get('autopick') === '1';
 
 /** Speicherzugriff, der auch dann nicht abstürzt, wenn schon der Zugriff auf localStorage wirft. */
 const safeStorage = {
@@ -37,9 +40,11 @@ if (!isWebGLAvailable()) {
   const quality = params.get('quality') === 'low' ? 'low' : 'high';
   document.body.dataset.screen = 'game';
   startGame({
-    canvas, uiLayer, seed: AUTOSTART_SEED, quality, timeScale, debug, stress,
+    canvas, uiLayer, seed: AUTOSTART_SEED, quality, timeScale, debug, stress, autopick,
     animalId: Object.hasOwn(ANIMALS, params.get('animal')) ? params.get('animal') : 'hase',
     classId: Object.hasOwn(CLASSES, params.get('class')) ? params.get('class') : 'krieger',
+    // Ohne Menüs gibt es keinen Spielstand: nur melden, nichts speichern.
+    onEnd: (summary) => showNotice(`${summary.won ? 'Gewonnen!' : 'Besiegt.'} Seite neu laden für einen neuen Versuch.`, { sticky: true }),
   });
 } else {
   startApp();
@@ -111,14 +116,23 @@ function startApp() {
       app.screens.show('game');
       app.run = startGame({
         canvas, uiLayer, view: app.view, animalId: hero.animal, classId: hero.class,
-        seed: Date.now(), quality, timeScale, debug, onEscape: () => app.endRun(),
+        seed: Date.now(), quality, timeScale, debug, autopick,
+        modifiers: metaModifiers(app.save), revive: hasRevive(app.save),
+        onEnd: (summary) => app.finishRun(heroId, summary),
       });
     },
 
-    /** Beendet den Durchgang und kehrt zur Modusauswahl zurück. */
-    endRun() {
+    /**
+     * Nach Sieg, Tod oder Aufgeben: Durchgang verbuchen (Gold, Statistik, beste Zeit) und Ergebnis zeigen.
+     * @param {string} heroId
+     * @param {ReturnType<typeof import('./modes/survivor.js').getSummary>} summary
+     */
+    finishRun(heroId, summary) {
       app.endRunSilently();
-      app.screens.show('mode', { heroId: app.heroId });
+      const before = app.save.heroes.find((h) => h.id === heroId)?.survivor.bestTime ?? 0;
+      if (app.save.heroes.some((h) => h.id === heroId)) app.update((save) => recordRun(save, heroId, summary));
+      const after = app.save.heroes.find((h) => h.id === heroId)?.survivor.bestTime ?? 0;
+      app.screens.show('result', { heroId, summary, newBest: after > before });
     },
 
     endRunSilently() {

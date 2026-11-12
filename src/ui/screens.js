@@ -2,6 +2,7 @@
 import { el } from './dom.js';
 import { renderMain, renderHeroes, renderMode, renderPlaceholder } from './menus.js';
 import { renderCreateAnimal, renderCreateClass, renderCreateName } from './heroCreate.js';
+import { renderResult } from './result.js';
 
 /**
  * @typedef {'main'|'heroes'|'createAnimal'|'createClass'|'createName'|'mode'|'game'|'result'|'metaShop'|'settings'} ScreenName
@@ -17,9 +18,9 @@ const BUILDERS = {
   createClass: renderCreateClass,
   createName: renderCreateName,
   mode: renderMode,
-  // Im Spiel ist die Menüebene ausgeblendet; Anzeige und Dialoge baut Aufgabe 12.
+  // Im Spiel ist die Menüebene ausgeblendet; Anzeige und Dialoge baut game.js im UI-Layer.
   game: () => {},
-  result: (c, props, app) => renderPlaceholder(c, app, { title: 'Ergebnis', back: 'mode', backProps: props }),
+  result: renderResult,
   metaShop: (c, props, app) => renderPlaceholder(c, app, { title: 'Dauerboni', back: 'main' }),
   settings: (c, props, app) => renderPlaceholder(c, app, { title: 'Einstellungen', back: 'main' }),
 };

@@ -239,3 +239,175 @@ p { margin: 0; }
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 #notice[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- Anzeige im Spiel */
+
+#ui > .hud { pointer-events: none; }
+.hud {
+  position: absolute; inset: 0;
+  font-family: var(--sans); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  --hud-top: calc(var(--notice-h, 0px) + 10px);
+}
+.hud-top {
+  position: absolute; top: var(--hud-top); left: 12px; right: 12px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: 10px;
+}
+.hud-vitals { display: flex; flex-direction: column; gap: 5px; width: 100%; max-width: 300px; }
+.hud-xp-row { display: flex; align-items: center; gap: 6px; }
+.hud-level {
+  flex: none; min-width: 2.6em; padding: 1px 6px; border-radius: 6px; text-align: center;
+  font-weight: 800; font-size: 0.85rem; color: #2a1c0a; text-shadow: none;
+  background: linear-gradient(180deg, var(--accent-hi), var(--accent));
+}
+.hud-bar {
+  position: relative; flex: 1; min-width: 0; height: 18px; overflow: hidden;
+  border-radius: 9px; border: 1px solid rgba(0, 0, 0, 0.6);
+  background: rgba(15, 18, 14, 0.72); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+.hud-bar-fill {
+  position: absolute; inset: 0; transform-origin: left center; transform: scaleX(0);
+  transition: transform 0.12s linear;
+}
+.hud-bar-text {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700; line-height: 1; white-space: nowrap;
+}
+.hud-hp { height: 20px; flex: none; }
+.hud-hp .hud-bar-fill { background: linear-gradient(180deg, #e0644c, #a8321f); }
+.hud-xp { height: 12px; }
+.hud-xp .hud-bar-fill { background: linear-gradient(180deg, #7fdcff, #3a8fc0); }
+.hud-xp .hud-bar-text { font-size: 0.65rem; }
+.hud-timer {
+  justify-self: center; padding: 2px 12px; border-radius: 10px;
+  font-family: var(--serif); font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums;
+  background: rgba(15, 18, 14, 0.5);
+}
+.hud-counters {
+  justify-self: end; display: flex; gap: 6px 10px; flex-wrap: wrap; justify-content: flex-end;
+  font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.hud-counters > span { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 8px; background: rgba(15, 18, 14, 0.5); }
+.hud-gold .hud-icon { color: #ffd040; }
+.hud-kills .hud-icon { color: #e8b8a8; }
+.hud-boss {
+  position: absolute; top: calc(var(--hud-top) + 58px); left: 50%; transform: translateX(-50%);
+  width: min(520px, calc(100% - 24px)); display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.hud-boss[hidden] { display: none; }
+.hud-boss-name { font-family: var(--serif); font-weight: 600; font-size: 1.05rem; letter-spacing: 0.04em; }
+.hud-boss-bar { width: 100%; flex: none; height: 16px; border-color: #3a0d08; }
+.hud-boss-bar .hud-bar-fill { background: linear-gradient(180deg, #c8402c, #6e1a10); }
+.hud-abilities {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  margin: 0; padding: 0; list-style: none; display: flex; gap: 8px;
+}
+.hud-ability {
+  position: relative; width: 40px; height: 40px; border-radius: 9px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--ability-color, #fff) 35%, #1a1f18);
+  border: 2px solid var(--ability-color, #fff); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.hud-ability[hidden] { display: none; }
+.hud-ability-initials { font-weight: 800; font-size: 0.9rem; letter-spacing: 0.02em; }
+.hud-ability-level {
+  position: absolute; right: -6px; bottom: -6px; min-width: 16px; height: 16px; padding: 0 3px; box-sizing: border-box;
+  border-radius: 8px; font-size: 0.7rem; font-weight: 800; line-height: 16px; text-align: center;
+  color: #2a1c0a; text-shadow: none; background: var(--accent-hi);
+}
+@media (max-width: 520px) {
+  /* Schmal: Leben/Erfahrung links und Zähler rechts in der ersten Zeile, Timer darunter in der Mitte. */
+  .hud-top { left: 8px; right: 8px; gap: 4px 8px; grid-template-columns: minmax(0, 1fr) auto; }
+  .hud-vitals { max-width: none; }
+  .hud-timer { grid-column: 1 / -1; grid-row: 2; font-size: 1.15rem; padding: 1px 8px; }
+  .hud-counters { flex-direction: column; align-items: flex-end; gap: 4px; font-size: 0.85rem; }
+  .hud-boss { top: calc(var(--hud-top) + 92px); }
+  .hud-ability { width: 34px; height: 34px; }
+}
+.fps-readout {
+  position: absolute; left: 12px; bottom: 60px; pointer-events: none;
+  font: 600 14px var(--sans); color: #fff; text-shadow: 0 1px 2px #000;
+}
+
+/* ---------------------------------------------------------------- Pause und Level-up */
+
+.overlay {
+  position: absolute; inset: 0; z-index: 5; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  padding: calc(var(--notice-h, 0px) + 16px) 16px 16px;
+  background: rgba(8, 10, 8, 0.55); overflow-y: auto;
+}
+.overlay[hidden] { display: none; }
+.pause-box, .levelup-box {
+  box-sizing: border-box; width: 100%; margin: auto; padding: 20px;
+  border-radius: 16px; border: 2px solid var(--line);
+  background: linear-gradient(180deg, rgba(51, 64, 42, 0.97), rgba(39, 51, 31, 0.97));
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.pause-box:focus, .levelup-box:focus { outline: none; }
+.pause-box { max-width: 320px; display: flex; flex-direction: column; gap: 12px; text-align: center; }
+.pause-box h2 { font-size: 1.8rem; margin: 0; }
+.levelup-box { max-width: 920px; display: flex; flex-direction: column; gap: 6px; }
+.levelup-box h2 { margin: 0; font-size: 1.6rem; color: var(--accent-hi); text-align: center; }
+.levelup-hint { color: var(--muted); text-align: center; margin-bottom: 8px; }
+.levelup-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.levelup-card {
+  position: relative; appearance: none; font: inherit; color: var(--text); text-align: left; cursor: pointer;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px;
+  border-radius: 14px; border: 2px solid var(--line);
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  transition: border-color 0.15s, transform 0.15s;
+}
+.levelup-card:hover, .levelup-card:focus-visible { border-color: var(--accent-hi); transform: translateY(-2px); }
+.levelup-key {
+  position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 0.85rem; color: var(--muted); border: 1px solid var(--line);
+}
+.levelup-icon {
+  flex: none; width: 46px; height: 46px; border-radius: 10px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 1.05rem; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  background: color-mix(in srgb, var(--ability-color, #8a9a70) 40%, #1a1f18);
+  border: 2px solid var(--ability-color, #8a9a70);
+}
+.levelup-icon-bonus { --ability-color: var(--leaf); }
+.levelup-icon-gold { --ability-color: #ffd040; color: #ffd040; }
+.levelup-icon-heal { --ability-color: #86e07a; color: #86e07a; }
+.levelup-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow-wrap: break-word; }
+.levelup-card { min-width: 0; }
+.levelup-name { font-family: var(--serif); font-size: 1.3rem; font-weight: 600; padding-right: 26px; }
+.levelup-kind { color: var(--leaf); font-size: 0.9rem; font-weight: 600; }
+.levelup-newAbility .levelup-kind { color: var(--accent-hi); }
+.levelup-text { font-size: 0.95rem; }
+@media (max-width: 700px) {
+  .levelup-cards { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .levelup-card { flex-direction: row; align-items: center; gap: 10px; padding: 10px 34px 10px 10px; }
+  .levelup-key { top: 8px; right: 8px; width: 20px; height: 20px; font-size: 0.75rem; }
+  .levelup-icon { width: 36px; height: 36px; font-size: 0.9rem; }
+  .levelup-name { font-size: 1.1rem; padding-right: 0; }
+  .levelup-text { font-size: 0.9rem; }
+  .levelup-box { padding: 14px 10px; }
+  .overlay { padding-left: 8px; padding-right: 8px; }
+}
+
+/* ---------------------------------------------------------------- Ergebnis */
+
+.result-stats { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 10px; }
+.result-stat { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-soft); background: rgba(0, 0, 0, 0.2); }
+.result-stat dt { color: var(--muted); font-size: 0.9rem; }
+.result-stat dd {
+  margin: 2px 0 0; font-family: var(--serif); font-size: 1.6rem; font-weight: 600;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+}
+.badge-best { font-family: var(--sans); font-size: 0.8rem; color: var(--accent-hi); border-color: var(--accent); }
+.damage-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.damage-row { display: grid; grid-template-columns: minmax(7em, auto) 1fr auto; align-items: center; gap: 10px; }
+.damage-name { font-weight: 600; }
+.damage-track { height: 14px; border-radius: 7px; background: rgba(0, 0, 0, 0.3); overflow: hidden; }
+.damage-fill { display: block; height: 100%; border-radius: 7px; background: var(--ability-color, var(--accent)); }
+.damage-value { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+@media (max-width: 520px) {
+  .damage-row { grid-template-columns: 1fr auto; gap: 2px 10px; }
+  .damage-track { grid-column: 1 / -1; grid-row: 2; }
+}

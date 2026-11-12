@@ -195,6 +195,19 @@ export function chooseCard(run, index) {
 }
 
 /**
+ * Aufgeben: beendet einen laufenden Durchgang (auch pausiert oder in der Kartenwahl) als Niederlage,
+ * ohne Wiederbelebung. Gesammeltes Gold bleibt. `run.events` enthält danach nur das Ereignis `death`.
+ * Nach Sieg oder Niederlage ohne Wirkung.
+ * @param {Run} run
+ */
+export function abandonRun(run) {
+  if (run.state === 'won' || run.state === 'lost') return;
+  run.state = 'lost';
+  run.cards = null;
+  run.events = [{ type: 'death' }];
+}
+
+/**
  * Pausiert nur aus playing und setzt nur aus paused fort; offene Karten bleiben unberührt.
  * @param {Run} run
  * @param {boolean} paused

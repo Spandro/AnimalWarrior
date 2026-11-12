@@ -1,0 +1,140 @@
+// Anzeige im Spiel: Leben, Erfahrung mit Level, Timer, Gold, besiegte Gegner, Fähigkeiten, Lebensbalken des Bosses.
+// Die Elemente entstehen einmal; je Bild ändern sich nur Text und Stil, und nur, wenn sich der Wert geändert hat.
+import { el, formatNumber } from './dom.js';
+import { displayTime } from '../modes/survivor.js';
+import { xpToNext } from '../core/progression.js';
+import { ABILITIES } from '../data/abilities.js';
+import { ABILITY_COLOR } from '../render/effects.js';
+
+const MAX_ABILITIES = 5;
+const BOSS_NAME = 'Bär';
+
+/** Sekunden als mm:ss, auch für 0. */
+const clock = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+/** Kürzel, wo die ersten zwei Buchstaben innerhalb einer Klasse doppelt wären (Schwerthieb/Schildstoß, Schattenklon). */
+const INITIALS = { schwerthieb: 'SW', schattenklon: 'SK' };
+
+/** Kürzel einer Fähigkeit für das Symbol: zwei Buchstaben. */
+export function abilityInitials(id) {
+  return INITIALS[id] ?? (ABILITIES[id]?.name ?? id).slice(0, 2).toUpperCase();
+}
+
+/** CSS-Farbe einer Fähigkeit. */
+export function abilityColor(id) {
+  return '#' + (ABILITY_COLOR[id] ?? 0xffffff).toString(16).padStart(6, '0');
+}
+
+/**
+ * Balken mit Füllung und Text. `set` ändert nur, was sich geändert hat.
+ * @param {string} className
+ * @param {string} label zugänglicher Name
+ */
+function bar(className, label) {
+  const fill = el('span', { class: 'hud-bar-fill' });
+  const text = el('span', { class: 'hud-bar-text' });
+  const root = el('div', { class: `hud-bar ${className}`, role: 'meter', 'aria-label': label, 'aria-valuemin': '0' }, fill, text);
+  let lastFrac = -1, lastText = null;
+  return {
+    root,
+    /** @param {number} frac 0…1 @param {string} t */
+    set(frac, t, max) {
+      const f = Math.max(0, Math.min(1, frac));
+      const rounded = Math.round(f * 1000) / 1000;
+      if (rounded !== lastFrac) { fill.style.transform = `scaleX(${rounded})`; lastFrac = rounded; }
+      if (t !== lastText) {
+        text.textContent = t; lastText = t;
+        root.setAttribute('aria-valuetext', t);
+        if (max !== undefined) root.setAttribute('aria-valuemax', String(max));
+      }
+    },
+  };
+}
+
+/** Textfeld, das nur bei Änderung schreibt. */
+function textCell(node) {
+  let last = null;
+  return (t) => { if (t !== last) { node.textContent = t; last = t; } };
+}
+
+/**
+ * @param {HTMLElement} uiLayer
+ * @returns {{ update(run: import('../modes/survivor.js').Run): void, dispose(): void }}
+ */
+export function createHud(uiLayer) {
+  const hp = bar('hud-hp', 'Leben');
+  const xp = bar('hud-xp', 'Erfahrung');
+  const levelNode = el('span', { class: 'hud-level' });
+  const timerNode = el('div', { class: 'hud-timer', 'aria-label': 'Zeit' });
+  const goldNode = el('strong');
+  const killsNode = el('strong');
+  const bossName = el('span', { class: 'hud-boss-name', text: BOSS_NAME });
+  const bossBar = bar('hud-boss-bar', 'Leben des Bosses');
+  const boss = el('div', { class: 'hud-boss', hidden: true }, bossName, bossBar.root);
+
+  const slots = [];
+  const abilityRow = el('ul', { class: 'hud-abilities', 'aria-label': 'Fähigkeiten' });
+  for (let i = 0; i < MAX_ABILITIES; i++) {
+    const initials = el('span', { class: 'hud-ability-initials' });
+    const level = el('span', { class: 'hud-ability-level' });
+    const li = el('li', { class: 'hud-ability', hidden: true }, initials, level);
+    abilityRow.append(li);
+    slots.push({ li, initials, level, id: null, lv: -1 });
+  }
+
+  const root = el('div', { class: 'hud', 'aria-live': 'off' },
+    el('div', { class: 'hud-top' },
+      el('div', { class: 'hud-vitals' },
+        hp.root,
+        el('div', { class: 'hud-xp-row' }, levelNode, xp.root)),
+      timerNode,
+      el('div', { class: 'hud-counters' },
+        el('span', { class: 'hud-gold', title: 'Gold' }, el('span', { class: 'hud-icon', 'aria-hidden': 'true', text: '●' }), goldNode),
+        el('span', { class: 'hud-kills', title: 'Besiegte Gegner' }, el('span', { class: 'hud-icon', 'aria-hidden': 'true', text: '✕' }), killsNode))),
+    boss,
+    abilityRow);
+  uiLayer.append(root);
+
+  const setLevel = textCell(levelNode);
+  const setTimer = textCell(timerNode);
+  const setGold = textCell(goldNode);
+  const setKills = textCell(killsNode);
+  let bossShown = false;
+
+  return {
+    update(run) {
+      const { hero, run: r, enemies } = run.world;
+      const maxHp = hero.stats.maxHp;
+      const curHp = Math.max(0, Math.ceil(hero.hp));
+      hp.set(hero.hp / maxHp, `${curHp} / ${Math.round(maxHp)}`, Math.round(maxHp));
+
+      const need = xpToNext(r.level);
+      xp.set(r.xp / need, `${Math.floor(Math.min(r.xp, need))} / ${need}`, need);
+      setLevel(`Lv ${r.level}`);
+      setTimer(clock(displayTime(run)));
+      setGold(formatNumber(Math.floor(r.gold)));
+      setKills(formatNumber(r.kills));
+
+      for (let i = 0; i < MAX_ABILITIES; i++) {
+        const a = hero.abilities[i], s = slots[i];
+        const id = a ? a.id : null, lv = a ? a.level : -1;
+        if (id === s.id && lv === s.lv) continue;
+        s.id = id; s.lv = lv;
+        s.li.hidden = !a;
+        if (!a) continue;
+        const name = ABILITIES[id].name;
+        s.initials.textContent = abilityInitials(id);
+        s.level.textContent = String(lv);
+        s.li.style.setProperty('--ability-color', abilityColor(id));
+        s.li.title = `${name} – Stufe ${lv}`;
+        s.li.setAttribute('aria-label', `${name}, Stufe ${lv}`);
+      }
+
+      let b = null;
+      for (const e of enemies) if (e.boss) { b = e; break; }
+      if (!!b !== bossShown) { boss.hidden = !b; bossShown = !!b; }
+      if (b) bossBar.set(b.hp / b.maxHp, `${Math.max(0, Math.ceil(b.hp))} / ${Math.round(b.maxHp)}`, Math.round(b.maxHp));
+    },
+    dispose() { root.remove(); },
+  };
+}

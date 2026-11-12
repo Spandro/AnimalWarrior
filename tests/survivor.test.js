@@ -1,5 +1,5 @@
 import { test, assertEqual, assertClose, assertTrue } from './runner.js';
-import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary, displayTime } from '../src/modes/survivor.js';
+import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary, displayTime, abandonRun } from '../src/modes/survivor.js';
 import { spawnRadius, hpMul, BOSS_HP_MUL, MAX_ENEMIES, DEFAULT_VIEW } from '../src/data/waves.js';
 import { createWorld, stepWorld, spawnEnemy, damageEnemy } from '../src/core/world.js';
 import { obstaclesNear, obstaclesInCell } from '../src/core/terrain.js';
@@ -438,4 +438,35 @@ test('survivor: Prankenhieb trifft nur, wenn der Held nach der Vorwarnung noch i
     simulate(w, 0.8, 0.05, () => { hits += ofType(w.events, 'heroHit').length; });
     assertEqual(hits, stay ? 1 : 0);
   }
+});
+
+test('survivor: abandonRun beendet als Niederlage ohne Wiederbelebung, Gold bleibt', () => {
+  const run = immortal(newRun({ revive: true }));
+  play(run, 5);
+  run.world.run.gold = 17;
+  setPaused(run, true);
+  abandonRun(run);
+  assertEqual(run.state, 'lost');
+  assertEqual(run.cards, null);
+  assertEqual(ofType(run.events, 'death'), [{ type: 'death' }]);
+  assertEqual(ofType(run.events, 'revive'), []);
+  assertEqual(run.world.run.revivesLeft, 1);
+  const summary = getSummary(run);
+  assertEqual(summary.won, false);
+  assertEqual(summary.gold, 17);
+  stepRun(run, 1, NONE);
+  assertEqual(run.state, 'lost');
+});
+
+test('survivor: abandonRun während der Kartenwahl verwirft die Karten; nach Ende ohne Wirkung', () => {
+  const run = immortal(newRun());
+  run.world.run.xp = 1000;
+  stepRun(run, 1 / 60, NONE);
+  assertEqual(run.state, 'levelup');
+  abandonRun(run);
+  assertEqual(run.state, 'lost');
+  assertEqual(run.cards, null);
+  abandonRun(run);
+  assertEqual(run.state, 'lost');
+  assertEqual(run.events, [{ type: 'death' }], 'zweiter Aufruf fügt nichts hinzu');
 });

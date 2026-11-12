@@ -23,8 +23,8 @@ const NUMBER_LIFE = 0.8;
 const NUMBER_RISE = 1.2;
 const VIGNETTE_DECAY = 2.5;
 
-/** Farben je Fähigkeit (Fallback: weiß). */
-const ABILITY_COLOR = {
+/** Farben je Fähigkeit (Fallback: weiß); auch für die Symbole in der Anzeige. */
+export const ABILITY_COLOR = {
   schwerthieb: 0xfff2d0, schildstoss: 0xa8c8ff, wirbelschlag: 0xffe2a8, kriegsschrei: 0xff8a3a,
   erdspalter: 0xb8743a, feuerball: 0xff8a30, frostring: 0x9fe4ff, kettenblitz: 0xc4e4ff, meteor: 0xff7a2a,
   arkankugeln: 0xa880ff, wurfdolche: 0xdfe8ff, giftflaeche: 0x8ccf3c, schattenklon: 0x7a5ad0,
@@ -179,7 +179,7 @@ function createDecals(parent, size) {
       d.follow = o.follow ?? null;
       d.tick = tick;
       d.mesh.geometry = geometry;
-      d.mesh.position.set(o.x, o.y ?? 0.06, o.z);
+      d.mesh.position.set(d.follow ? d.follow.x : o.x, o.y ?? 0.06, d.follow ? d.follow.z : o.z);
       d.mesh.rotation.set(0, o.yaw ?? 0, 0);
       d.mesh.scale.setScalar(1);
       d.mesh.renderOrder = o.renderOrder ?? 1;
@@ -296,10 +296,11 @@ function createVignette(uiLayer) {
  * @param {THREE.Scene} scene
  * @param {HTMLElement} uiLayer Element über dem Canvas (#ui)
  * @param {{ quality?: Quality, camera: THREE.Camera }} options Kamera zum Projizieren der Schadenszahlen
- * @returns {{ handle(events: object[], world: import('../core/world.js').World): void, update(dt: number): void,
+ * @returns {{ handle(events: object[], world: import('../core/world.js').World): void, update(dt: number, heroPosition?: { x: number, z: number }): void,
  *   setQuality(q: Quality): void, dispose(): void }}
  */
-export function createEffects(scene, uiLayer, { quality = 'high', camera }) {
+export function createEffects(scene, uiLayer, { quality = 'high', camera } = {}) {
+  if (!camera) throw new Error('createEffects braucht options.camera (zum Projizieren der Schadenszahlen).');
   const root = new THREE.Group();
   root.name = 'effects';
   scene.add(root);
@@ -307,6 +308,8 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera }) {
   let high = quality !== 'low';
   /** @type {import('../core/world.js').World|null} */
   let world = null;
+  /** Gezeichnete Heldenposition; Effekte, die dem Helden folgen, hängen hieran (nicht an der Logikposition). */
+  const heroAnchor = { x: 0, z: 0 };
 
   const glow = createParticles(root, PARTICLE_CAPACITY.glow, true);
   const dust = createParticles(root, PARTICLE_CAPACITY.dust, false);
@@ -336,14 +339,14 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera }) {
 
   // ------------------------------------------------ Fähigkeiten
 
-  function castArc(e, hero) {
+  function castArc(e) {
     const p = e.params, color = colorOf(e.abilityId);
     const swings = Math.max(1, Math.round(p.swings || 1));
     const base = Math.atan2(e.dirZ, e.dirX);
     for (let i = 0; i < swings; i++) {
       const a = base + (i * 2 * Math.PI) / swings;
       const dirX = Math.cos(a), dirZ = Math.sin(a);
-      decals.add(shapes.sector(p.angle, 0.35), { color, additive: true, life: 0.26, x: e.x, z: e.z, y: 0.5, yaw: yawToward(dirX, dirZ), follow: hero },
+      decals.add(shapes.sector(p.angle, 0.35), { color, additive: true, life: 0.26, x: e.x, z: e.z, y: 0.5, yaw: yawToward(dirX, dirZ), follow: heroAnchor },
         (k, d) => {
           d.mesh.scale.set(p.radius * (0.7 + 0.3 * Math.min(1, k * 3)), 1, p.radius * (0.7 + 0.3 * Math.min(1, k * 3)));
           d.material.opacity = 0.7 * (1 - k) ** 1.5;
@@ -357,11 +360,11 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera }) {
     }
   }
 
-  function castRing(e, hero) {
+  function castRing(e) {
     const p = e.params, color = colorOf(e.abilityId);
-    decals.add(shapes.ring, { color, additive: true, life: 0.4, x: e.x, z: e.z, y: 0.08, follow: hero },
+    decals.add(shapes.ring, { color, additive: true, life: 0.4, x: e.x, z: e.z, y: 0.08, follow: heroAnchor },
       grow(p.radius, 0.15, 1, 0.9));
-    decals.add(shapes.disc, { color, additive: true, life: 0.3, x: e.x, z: e.z, y: 0.06, follow: hero },
+    decals.add(shapes.disc, { color, additive: true, life: 0.3, x: e.x, z: e.z, y: 0.06, follow: heroAnchor },
       grow(p.radius, 0.3, 1, 0.22));
     for (let j = 0, n = count(16); j < n; j++) {
       const a = (j / n) * Math.PI * 2 + rand(-0.1, 0.1);
@@ -421,9 +424,9 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera }) {
     }
   }
 
-  function castBuff(e, hero) {
+  function castBuff(e) {
     const color = colorOf(e.abilityId);
-    decals.add(shapes.ring, { color, additive: true, life: 0.55, x: e.x, z: e.z, y: 0.08, follow: hero }, grow(3, 0.2, 1, 0.9));
+    decals.add(shapes.ring, { color, additive: true, life: 0.55, x: e.x, z: e.z, y: 0.08, follow: heroAnchor }, grow(3, 0.2, 1, 0.9));
     for (let j = 0, n = count(20); j < n; j++) {
       const a = Math.random() * Math.PI * 2;
       glow.spawn(e.x + Math.cos(a) * 0.6, 0.3, e.z + Math.sin(a) * 0.6, Math.cos(a) * 0.6, rand(2, 4), Math.sin(a) * 0.6,
@@ -487,11 +490,11 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera }) {
   }
 
   function levelup(hero) {
-    decals.add(shapes.pillar, { color: 0xffd77a, additive: true, life: 1.3, x: hero.x, z: hero.z, y: 0, follow: hero }, (k, d) => {
+    decals.add(shapes.pillar, { color: 0xffd77a, additive: true, life: 1.3, x: hero.x, z: hero.z, y: 0, follow: heroAnchor }, (k, d) => {
       d.mesh.scale.set(0.65 + 0.2 * k, 5, 0.65 + 0.2 * k);
       d.material.opacity = 0.32 * Math.min(1, k * 6) * (1 - k);
     });
-    decals.add(shapes.ring, { color: 0xffd77a, additive: true, life: 0.8, x: hero.x, z: hero.z, y: 0.08, follow: hero }, grow(3, 0.2, 1, 0.9));
+    decals.add(shapes.ring, { color: 0xffd77a, additive: true, life: 0.8, x: hero.x, z: hero.z, y: 0.08, follow: heroAnchor }, grow(3, 0.2, 1, 0.9));
     for (let j = 0, n = count(30); j < n; j++) {
       const a = Math.random() * Math.PI * 2, r = rand(0.2, 1);
       glow.spawn(hero.x + Math.cos(a) * r, rand(0, 1), hero.z + Math.sin(a) * r, 0, rand(2, 5), 0,
@@ -513,7 +516,7 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera }) {
     const hero = w.hero;
     for (const e of events) {
       switch (e.type) {
-        case 'cast': CAST[e.shape]?.(e, hero); break;
+        case 'cast': CAST[e.shape]?.(e); break;
         case 'explosion': explosion(e); break;
         case 'hit': hit(e); break;
         case 'kill': kill(e); break;
@@ -539,8 +542,14 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera }) {
     }
   }
 
-  /** @param {number} dt reale Sekunden seit dem letzten Bild */
-  function update(dt) {
+  /**
+   * @param {number} dt reale Sekunden seit dem letzten Bild (0 friert die Effekte ein)
+   * @param {{ x: number, z: number }} [heroPosition] gezeichnete (überblendete) Heldenposition; ohne sie folgen
+   *   Effekte der Logikposition
+   */
+  function update(dt, heroPosition) {
+    const follow = heroPosition ?? world?.hero;
+    if (follow) { heroAnchor.x = follow.x; heroAnchor.z = follow.z; }
     glow.update(dt);
     dust.update(dt);
     decals.update(dt, world ? world.time : 0);

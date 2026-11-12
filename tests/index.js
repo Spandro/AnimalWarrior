@@ -9,3 +9,5 @@ import './progression.test.js';
 import './survivor.test.js';
 import './save.test.js';
 import './meta.test.js';
+import './keyboard.test.js';
+import './cardText.test.js';
