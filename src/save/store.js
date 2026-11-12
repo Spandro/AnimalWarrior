@@ -48,12 +48,24 @@ export function createStore(storage) {
     }
   }
 
-  /** Sichert den kaputten Rohinhalt einmal unter BACKUP_KEY; Fehler dabei sind unkritisch. */
+  /**
+   * Sichert den kaputten Rohinhalt einmal unter BACKUP_KEY. Schlägt das fehl, wird
+   * backupFailed gesetzt: dann darf der kaputte Inhalt nicht überschrieben werden.
+   */
   function corrupt(raw) {
+    let backupFailed = false;
     try {
       if (storage.getItem(BACKUP_KEY) !== raw) storage.setItem(BACKUP_KEY, raw);
-    } catch (e) { /* Sicherung ist best effort */ }
-    return { data: defaultSave(), status: 'corrupt' };
+    } catch (e) {
+      backupFailed = true;
+    }
+    return { data: defaultSave(), status: 'corrupt', backupFailed };
+  }
+
+  /** @returns {{ data: Save, status: LoadStatus }} */
+  function load() {
+    const { data, status } = read();
+    return { data, status };
   }
 
   function write(data) {
@@ -66,7 +78,7 @@ export function createStore(storage) {
   }
 
   return {
-    load: read,
+    load,
 
     /**
      * Lädt frisch, wendet den Mutator an, prüft und schreibt.
@@ -75,7 +87,7 @@ export function createStore(storage) {
      */
     update(mutator) {
       const current = read();
-      if (current.status === 'newer' || current.status === 'unavailable') {
+      if (current.status === 'newer' || current.status === 'unavailable' || current.backupFailed) {
         return { data: current.data, saved: false };
       }
       const data = current.data;
@@ -109,6 +121,9 @@ export function createStore(storage) {
       }
       const check = validate(data);
       if (!check.ok) return { ok: false, error: `Der Spielstand ist ungültig: ${check.error}.` };
+      if (read().backupFailed) {
+        return { ok: false, error: 'Der vorhandene beschädigte Spielstand konnte nicht gesichert werden und bleibt deshalb erhalten.' };
+      }
       if (!write(data)) return { ok: false, error: 'Der Spielstand konnte nicht gespeichert werden.' };
       return { ok: true, data };
     },

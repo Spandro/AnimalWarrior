@@ -68,6 +68,30 @@ test('save: Sicherung schlägt fehl, load liefert trotzdem corrupt', () => {
   assertEqual(createStore(storage).load().status, 'corrupt');
 });
 
+function storageWithFailingBackup() {
+  const storage = memoryStorage({ [STORAGE_KEY]: '{kaputt' });
+  const set = storage.setItem;
+  storage.setItem = (k, v) => { if (k === BACKUP_KEY) throw new Error('voll'); set(k, v); };
+  return storage;
+}
+
+test('save: update überschreibt kaputten Spielstand nicht, wenn die Sicherung fehlschlug', () => {
+  const storage = storageWithFailingBackup();
+  let called = false;
+  const r = createStore(storage).update(() => { called = true; });
+  assertEqual(r.saved, false);
+  assertEqual(called, false);
+  assertEqual(storage.getItem(STORAGE_KEY), '{kaputt');
+});
+
+test('save: importJson überschreibt kaputten Spielstand nicht, wenn die Sicherung fehlschlug', () => {
+  const storage = storageWithFailingBackup();
+  const r = createStore(storage).importJson(JSON.stringify(defaultSave()));
+  assertEqual(r.ok, false);
+  assertTrue(typeof r.error === 'string' && r.error.length > 0);
+  assertEqual(storage.getItem(STORAGE_KEY), '{kaputt');
+});
+
 test('save: update nach corrupt startet vom Standard', () => {
   const storage = memoryStorage({ [STORAGE_KEY]: '{kaputt' });
   const r = createStore(storage).update((s) => { s.gold = 7; });
