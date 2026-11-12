@@ -12,3 +12,4 @@ import './meta.test.js';
 import './keyboard.test.js';
 import './cardText.test.js';
 import './sprites.test.js';
+import './sfx.test.js';

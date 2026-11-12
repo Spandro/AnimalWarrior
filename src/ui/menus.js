@@ -1,4 +1,4 @@
-// Hauptmenü, Heldenauswahl, Modusauswahl, Platzhalter späterer Bildschirme und Rückfragen.
+// Hauptmenü mit Export und Import, Heldenauswahl, Modusauswahl und Rückfragen.
 import { el, formatTime, formatNumber } from './dom.js';
 import { ANIMALS } from '../data/animals.js';
 import { CLASSES } from '../data/classes.js';
@@ -21,9 +21,62 @@ export function screenFooter(onBack, ...right) {
 
 // ---------------------------------------------------------------- Hauptmenü
 
+/** Dateiname des Spielstand-Exports. */
+export const EXPORT_FILENAME = 'animalwarrior-spielstand.json';
+/** Größer als das darf eine Importdatei nicht sein (ein Spielstand ist wenige KB groß). */
+const MAX_IMPORT_BYTES = 1024 * 1024;
+
+/** Lädt den Spielstand als JSON-Datei herunter (Blob-Link, danach wieder freigegeben). */
+export function exportSave(app) {
+  const url = URL.createObjectURL(new Blob([app.store.exportJson()], { type: 'application/json' }));
+  const link = el('a', { href: url, download: EXPORT_FILENAME, hidden: true });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  app.showNotice('Spielstand exportiert.');
+}
+
+/**
+ * Liest die gewählte Datei, fragt nach und ersetzt den Spielstand; Fehler erscheinen als Meldung,
+ * der vorhandene Stand bleibt dann unverändert.
+ * @param {File | undefined} file
+ */
+export async function importSave(app, file) {
+  if (!file) return;
+  if (file.size > MAX_IMPORT_BYTES) { app.showNotice('Die Datei ist zu groß für einen Spielstand.'); return; }
+  let text;
+  try {
+    text = await file.text();
+  } catch (e) {
+    app.showNotice('Die Datei konnte nicht gelesen werden.');
+    return;
+  }
+  const ok = await confirmDialog({
+    title: 'Vorhandenen Spielstand ersetzen?',
+    message: 'Alle Helden, Gold und Dauerboni werden durch den Inhalt der Datei ersetzt. Das lässt sich nicht rückgängig machen.',
+    confirmLabel: 'Ersetzen',
+  });
+  if (!ok) return;
+  const result = app.store.importJson(text);
+  if (!result.ok) { app.showNotice(`Import fehlgeschlagen: ${result.error}`); return; }
+  app.save = result.data;
+  app.heroId = null;
+  app.applySettings();
+  app.showNotice('Spielstand importiert.');
+  app.screens.show('main');
+}
+
 export function renderMain(c, props, app) {
   const save = app.save;
-  const soon = { disabled: true, title: 'kommt in Kürze' };
+  const fileInput = el('input', {
+    type: 'file', accept: '.json,application/json', hidden: true, tabindex: '-1', 'aria-hidden': 'true', id: 'import-file',
+    onchange: () => {
+      const file = fileInput.files[0];
+      fileInput.value = '';
+      importSave(app, file);
+    },
+  });
   c.append(
     el('div', { class: 'title-block' },
       el('p', { class: 'kicker', text: 'Ein Abenteuer im Wald' }),
@@ -34,8 +87,9 @@ export function renderMain(c, props, app) {
       el('button', { class: 'btn', type: 'button', onclick: () => app.screens.show('metaShop') }, 'Dauerboni'),
       el('button', { class: 'btn', type: 'button', onclick: () => app.screens.show('settings') }, 'Einstellungen'),
       el('div', { class: 'menu-row' },
-        el('button', { class: 'btn', type: 'button', ...soon }, 'Spielstand exportieren'),
-        el('button', { class: 'btn', type: 'button', ...soon }, 'Spielstand importieren'))),
+        el('button', { class: 'btn', type: 'button', onclick: () => exportSave(app) }, 'Spielstand exportieren'),
+        el('button', { class: 'btn', type: 'button', onclick: () => fileInput.click() }, 'Spielstand importieren')),
+      fileInput),
     el('p', { class: 'gold-line' }, 'Gold: ', el('strong', { text: formatNumber(save.gold) })),
   );
 }
@@ -117,17 +171,6 @@ export function renderMode(c, props, app) {
         el('span', { class: 'card-text', text: 'Eine Reise durch Wald und Dorf mit Aufgaben und Ausrüstung.' }),
         el('span', { class: 'badge', id: 'adventure-soon', text: 'kommt später' }))),
     screenFooter(() => app.screens.show('heroes')),
-  );
-}
-
-// ---------------------------------------------------------------- Platzhalter
-
-/** Bildschirm späterer Aufgaben: Titel und „Zurück“. */
-export function renderPlaceholder(c, app, { title, back, backProps = {} }) {
-  c.append(
-    screenHeader(title),
-    el('p', { class: 'placeholder-text', text: 'Dieser Bereich kommt in einer späteren Version.' }),
-    screenFooter(() => app.screens.show(back, backProps)),
   );
 }
 

@@ -14,13 +14,13 @@ export const FILLER = { gold: 25, heal: 0.3 };
  * @type {Record<string, BonusDef>}
  */
 export const BONUSES = {
-  leben: { id: 'leben', name: 'Leben', description: '+10 % maximales Leben', modifier: { stat: 'maxHp', pct: 0.10 }, maxLevel: MAX_LEVEL },
-  tempo: { id: 'tempo', name: 'Tempo', description: '+6 % Lauftempo', modifier: { stat: 'moveSpeed', pct: 0.06 }, maxLevel: MAX_LEVEL },
-  schaden: { id: 'schaden', name: 'Schaden', description: '+10 % Schaden', modifier: { stat: 'damage', pct: 0.10 }, maxLevel: MAX_LEVEL },
-  abklingzeit: { id: 'abklingzeit', name: 'Abklingzeit', description: '-6 % Abklingzeit', modifier: { stat: 'cooldown', pct: -0.06 }, maxLevel: MAX_LEVEL },
-  sammelradius: { id: 'sammelradius', name: 'Sammelradius', description: '+20 % Sammelradius', modifier: { stat: 'pickupRadius', pct: 0.20 }, maxLevel: MAX_LEVEL },
-  ruestung: { id: 'ruestung', name: 'Rüstung', description: '+1 Rüstung', modifier: { stat: 'armor', flat: 1 }, maxLevel: MAX_LEVEL },
-  regeneration: { id: 'regeneration', name: 'Regeneration', description: '+0,5 Leben pro Sekunde', modifier: { stat: 'hpRegen', flat: 0.5 }, maxLevel: MAX_LEVEL },
+  leben: { id: 'leben', name: 'Lebenswille', description: '+10 % maximales Leben. Pflaster inklusive.', modifier: { stat: 'maxHp', pct: 0.10 }, maxLevel: MAX_LEVEL },
+  tempo: { id: 'tempo', name: 'Turnschuhe', description: '+6 % Lauftempo. Wegrennen ist auch eine Strategie.', modifier: { stat: 'moveSpeed', pct: 0.06 }, maxLevel: MAX_LEVEL },
+  schaden: { id: 'schaden', name: 'Mehr Wumms', description: '+10 % Schaden. Wumms ist keine Einheit, wirkt aber.', modifier: { stat: 'damage', pct: 0.10 }, maxLevel: MAX_LEVEL },
+  abklingzeit: { id: 'abklingzeit', name: 'Ungeduld', description: '-6 % Abklingzeit. Gut Ding will Weile haben, du nicht.', modifier: { stat: 'cooldown', pct: -0.06 }, maxLevel: MAX_LEVEL },
+  sammelradius: { id: 'sammelradius', name: 'Lange Arme', description: '+20 % Sammelradius. Das Zeug kommt fast von allein.', modifier: { stat: 'pickupRadius', pct: 0.20 }, maxLevel: MAX_LEVEL },
+  ruestung: { id: 'ruestung', name: 'Dickes Fell', description: '+1 Rüstung. Kratzer sind nur Dekoration.', modifier: { stat: 'armor', flat: 1 }, maxLevel: MAX_LEVEL },
+  regeneration: { id: 'regeneration', name: 'Spucke drauf', description: '+0,5 Leben pro Sekunde. Wird schon wieder.', modifier: { stat: 'hpRegen', flat: 0.5 }, maxLevel: MAX_LEVEL },
 };
 
 /**

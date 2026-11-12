@@ -1,6 +1,8 @@
 // Bildschirmwechsel und Meldungsleiste. Menüs sind HTML über der 3D-Fläche.
 import { el } from './dom.js';
-import { renderMain, renderHeroes, renderMode, renderPlaceholder } from './menus.js';
+import { renderMain, renderHeroes, renderMode } from './menus.js';
+import { renderMetaShop } from './metaShop.js';
+import { renderSettings } from './settings.js';
 import { renderCreateAnimal, renderCreateClass, renderCreateName } from './heroCreate.js';
 import { renderResult } from './result.js';
 
@@ -21,8 +23,8 @@ const BUILDERS = {
   // Im Spiel ist die Menüebene ausgeblendet; Anzeige und Dialoge baut game.js im UI-Layer.
   game: () => {},
   result: renderResult,
-  metaShop: (c, props, app) => renderPlaceholder(c, app, { title: 'Dauerboni', back: 'main' }),
-  settings: (c, props, app) => renderPlaceholder(c, app, { title: 'Einstellungen', back: 'main' }),
+  metaShop: renderMetaShop,
+  settings: renderSettings,
 };
 
 /**

@@ -9,25 +9,6 @@ import { formatNumber } from './dom.js';
  * @typedef {{ title: string, kind: string, text: string }} CardText
  */
 
-/** Kurzbeschreibung je Fähigkeit (Wirkung aus der Spezifikation). */
-const SUMMARY = {
-  schwerthieb: 'Hieb in Blickrichtung.',
-  wirbelschlag: 'Schaden rundum.',
-  schildstoss: 'Wenig Schaden, starker Rückstoß.',
-  kriegsschrei: 'Einige Sekunden mehr Schaden.',
-  erdspalter: 'Langer Riss in Blickrichtung.',
-  feuerball: 'Fliegt zum nächsten Gegner, kleine Explosion.',
-  frostring: 'Schaden und Verlangsamung rundum.',
-  kettenblitz: 'Springt auf mehrere Gegner.',
-  meteor: 'Schlägt in die dichteste Gruppe ein.',
-  arkankugeln: 'Kreisen und treffen bei Berührung.',
-  wurfdolche: 'Durchschlagende Dolche in Blickrichtung.',
-  giftflaeche: 'Schaden über Zeit unter dem Helden.',
-  schattenklon: 'Ein Klon lenkt die Gegner ab.',
-  klingenfaecher: 'Mehrere Dolche im Fächer.',
-  rauchbombe: 'Gegner in der Fläche verlieren kurz das Ziel.',
-};
-
 const num = (v) => formatNumber(v, Number.isInteger(Math.round(v * 10) / 10) ? 0 : 1);
 const pct = (v) => `${formatNumber(Math.round(v * 100))} %`;
 const sec = (v) => `${num(v)} s`;
@@ -82,7 +63,7 @@ export function describeCard(card, world) {
       if (p.cooldown > 0) parts.push(`alle ${sec(p.cooldown)}`);
       const values = parts.join(', ');
       const sentence = values && values[0].toUpperCase() + values.slice(1) + '.';
-      return { title: def.name, kind: 'Neue Fähigkeit', text: [SUMMARY[card.id], sentence].filter(Boolean).join(' ') };
+      return { title: def.name, kind: 'Neue Fähigkeit', text: [def.description, sentence].filter(Boolean).join(' ') };
     }
     case 'abilityLevel': {
       const def = ABILITIES[card.id];
@@ -91,16 +72,7 @@ export function describeCard(card, world) {
         const p = abilityParams(card.id, level, s);
         return [...new Set(def.levels[level - 2].map((c) => c.key))].map((k) => valueText(k, p[k])).join(', ');
       };
-      let text = changes(card.toLevel);
-      // Manche Stufen ändern keine Werte (Fähigkeiten ohne Schaden): dann die nächste Wirkung nennen.
-      if (text === '') {
-        let next = card.toLevel + 1;
-        while (next <= def.levels.length + 1 && changes(next) === '') next++;
-        text = next <= def.levels.length + 1
-          ? `Noch ohne neue Werte; Stufe ${next} bringt ${changes(next)}.`
-          : 'Keine weiteren Werte.';
-      }
-      return { title: def.name, kind: `Fähigkeit · Stufe ${card.toLevel}`, text };
+      return { title: def.name, kind: `Fähigkeit · Stufe ${card.toLevel}`, text: changes(card.toLevel) || 'Keine neuen Werte.' };
     }
     case 'bonus': {
       const def = BONUSES[card.id];

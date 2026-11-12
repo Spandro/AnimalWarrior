@@ -32,18 +32,19 @@ const FPS_WINDOW = 5;
  * Startet einen Durchgang und zeichnet ihn in den gemeinsamen Renderer.
  * @param {{ canvas: HTMLCanvasElement, uiLayer: HTMLElement, view?: ReturnType<typeof createRenderer>,
  *   animalId: string, classId: string, seed: number, quality?: 'high'|'low', timeScale?: number,
- *   modifiers?: import('./data/animals.js').Modifier[], revive?: boolean,
+ *   modifiers?: import('./data/animals.js').Modifier[], revive?: boolean, sfx?: { handle(events: object[]): void },
  *   debug?: boolean, stress?: boolean, autopick?: boolean, sprites?: import('./render/sprites.js').SpriteSheets,
  *   onEnd?: (summary: Summary) => void }} options
  *   `view` ist der gemeinsame Renderer der App (sonst wird einer für `canvas` angelegt). `sprites` sind die
  *   geladenen Bildbögen (`loadSpriteSheets`); fehlen sie oder sind sie nicht `ok`, erscheinen die 3D-Figuren.
  *   Nur mit `debug`: `stress` füllt die Welt mit Ratten, `autopick` wählt Karten selbst, Taste K besiegt
- *   alle Gegner, L gibt ein Level. `onEnd` kommt einmal nach Sieg, Tod oder Aufgeben.
- * @returns {{ stop(): void }}
+ *   alle Gegner, L gibt ein Level. `onEnd` kommt einmal nach Sieg, Tod oder Aufgeben. `sfx` bekommt dieselben
+ *   Ereignisse wie die Effekte und spielt die Klänge dazu.
+ * @returns {{ stop(): void, setQuality(q: 'high'|'low'): void }}
  */
 export function startGame({
   canvas, uiLayer, view, animalId, classId, seed, quality = 'high', timeScale = 1, modifiers = [], revive = false,
-  debug = false, stress = false, autopick = false, sprites, onEnd,
+  debug = false, stress = false, autopick = false, sprites, sfx, onEnd,
 }) {
   if (!view) view = createRenderer(canvas, { quality });
   else view.setQuality(quality);
@@ -148,6 +149,7 @@ export function startGame({
   function handleEvents() {
     heroView.handle(run.events, world);
     effects.handle(run.events, world);
+    sfx?.handle(run.events);
   }
 
   let endTimer = 0, ended = false;
@@ -203,6 +205,12 @@ export function startGame({
 
   let stopped = false;
   return {
+    /** Stellt die Qualität sofort um (Renderer und Effekte), auch mitten im Durchgang. */
+    setQuality(q) {
+      quality = q === 'low' ? 'low' : 'high';
+      view.setQuality(quality);
+      effects.setQuality(quality);
+    },
     /** Hält die Schleife an, löst Tasten und Ereignisse und entfernt alle Teile des Durchgangs aus Szene und Anzeige. */
     stop() {
       if (stopped) return;

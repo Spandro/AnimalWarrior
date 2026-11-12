@@ -9,6 +9,7 @@ import { startGame } from './game.js';
 import { createStore, addHero, deleteHero, recordRun, STORAGE_KEY } from './save/store.js';
 import { metaModifiers, hasRevive } from './save/meta.js';
 import { createScreens, createNoticeBar } from './ui/screens.js';
+import { createSfx } from './audio/sfx.js';
 import { renderNoWebGL } from './ui/menus.js';
 import { ANIMALS } from './data/animals.js';
 import { CLASSES } from './data/classes.js';
@@ -41,7 +42,7 @@ if (!isWebGLAvailable()) {
   const quality = params.get('quality') === 'low' ? 'low' : 'high';
   document.body.dataset.screen = 'game';
   loadSpriteSheets().then((sprites) => startGame({
-    canvas, uiLayer, seed: AUTOSTART_SEED, quality, timeScale, debug, stress, autopick, sprites,
+    canvas, uiLayer, seed: AUTOSTART_SEED, quality, timeScale, debug, stress, autopick, sprites, sfx: createUnlockedSfx(70),
     animalId: Object.hasOwn(ANIMALS, params.get('animal')) ? params.get('animal') : 'hase',
     classId: Object.hasOwn(CLASSES, params.get('class')) ? params.get('class') : 'krieger',
     // Ohne Menüs gibt es keinen Spielstand: nur melden, nichts speichern.
@@ -51,9 +52,24 @@ if (!isWebGLAvailable()) {
   startApp();
 }
 
+/**
+ * Klangeffekte, die beim ersten Klick oder Tastendruck irgendwo in der Seite freigeschaltet werden
+ * (Browser erlauben Ton erst nach einer Nutzeraktion); jede weitere Aktion weckt einen eingeschlafenen Kontext.
+ * @param {number} volume 0…100
+ */
+function createUnlockedSfx(volume) {
+  const sfx = createSfx();
+  sfx.setVolume(volume);
+  const unlock = () => sfx.resume();
+  window.addEventListener('pointerdown', unlock, true);
+  window.addEventListener('keydown', unlock, true);
+  return sfx;
+}
+
 function startApp() {
   const store = createStore(safeStorage);
   const initial = store.load();
+  // ?quality=low gilt, bis die Einstellungen etwas anderes sagen (Qualität dort wählen oder Spielstand importieren).
   const quality = params.get('quality') === 'low' ? 'low' : initial.data.settings.quality;
 
   const app = {
@@ -66,6 +82,10 @@ function startApp() {
     run: null,
     /** Der eine WebGL-Renderer der App (Spiel und Figurenvorschau). */
     view: createRenderer(canvas, { quality }),
+    /** Gerade gültige Qualität (URL-Schalter oder Einstellung). */
+    quality,
+    /** Klangeffekte; Lautstärke aus den Einstellungen. */
+    sfx: createUnlockedSfx(initial.data.settings.volume),
     /**
      * Gemalte Figuren, einmal beim Start geladen. Menüs erscheinen schon vorher; Vorschau und Durchgang
      * warten darauf. Schlägt das Laden fehl, `ok: false` (3D-Figuren).
@@ -100,6 +120,15 @@ function startApp() {
       }
     },
 
+    /** Überträgt die gespeicherten Einstellungen auf Renderer, laufenden Durchgang und Ton (sofort, ohne Neuladen). */
+    applySettings() {
+      const { volume, quality: q } = app.save.settings;
+      app.quality = q;
+      app.view.setQuality(q);
+      app.run?.setQuality(q);
+      app.sfx.setVolume(volume);
+    },
+
     /** @returns {import('./save/schema.js').Hero | null} null, wenn alle Plätze belegt sind */
     createHero(spec) {
       const id = typeof crypto.randomUUID === 'function'
@@ -131,7 +160,7 @@ function startApp() {
         app.pendingRun = null;
         app.run = startGame({
           canvas, uiLayer, view: app.view, animalId: hero.animal, classId: hero.class,
-          seed: Date.now(), quality, timeScale, debug, autopick, sprites,
+          seed: Date.now(), quality: app.quality, timeScale, debug, autopick, sprites, sfx: app.sfx,
           modifiers: metaModifiers(app.save), revive: hasRevive(app.save),
           onEnd: (summary) => app.finishRun(heroId, summary),
         });
@@ -159,6 +188,12 @@ function startApp() {
   };
   app.screens = createScreens(menuRoot, app);
 
+  // Kleines Klicken für Knöpfe in Menüs und Dialogen.
+  document.addEventListener('click', (e) => {
+    const button = e.target instanceof Element ? e.target.closest('button') : null;
+    if (button && !button.disabled) app.sfx.play('click');
+  });
+
   if (initial.status === 'corrupt') showNotice('Spielstand war beschädigt und wurde gesichert');
   else if (initial.status === 'newer') showNotice('Spielstand stammt von einer neueren Version', { sticky: true });
   else if (initial.status === 'unavailable') showNotice(UNSAVED_TEXT, { sticky: true });
@@ -170,7 +205,7 @@ function startApp() {
     if (status !== 'ok' && status !== 'empty') return;
     app.save = data;
     const screen = app.screens.current();
-    if (screen === 'main' || screen === 'heroes' || screen === 'mode') {
+    if (screen === 'main' || screen === 'heroes' || screen === 'mode' || screen === 'metaShop') {
       app.screens.show(screen, app.screens.props());
     }
   });

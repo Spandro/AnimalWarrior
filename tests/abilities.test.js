@@ -269,3 +269,32 @@ test('abilities: Daten sind vollständig und abilityPool je Klasse gefüllt', ()
     for (const id of [cls.startAbility, ...cls.abilityPool]) assertEqual(ABILITIES[id].classId, cls.id, id);
   }
 });
+
+test('abilities: Fähigkeiten ohne Schaden verkürzen auf Stufe 2 und 4 die Abklingzeit um 12 %', () => {
+  const stats = { cooldown: 1, area: 1 };
+  const cooldowns = (id) => [1, 2, 3, 4, 5].map((l) => abilityParams(id, l, stats).cooldown);
+  const expected = (base) => [base, base * 0.88, base * 0.88, base * 0.88 * 0.88, base * 0.88 * 0.88];
+  for (const [id, base] of [['kriegsschrei', 14], ['schattenklon', 12], ['rauchbombe', 9]]) {
+    cooldowns(id).forEach((c, i) => assertClose(c, expected(base)[i], 1e-9));
+  }
+  assertClose(abilityParams('kriegsschrei', 2, stats).cooldown, 12.32);
+  assertClose(abilityParams('kriegsschrei', 4, stats).cooldown, 10.8416);
+  // Stufe 3 und 5 behalten ihre eigenen Extras
+  assertEqual(abilityParams('kriegsschrei', 3, stats).duration, 7);
+  assertClose(abilityParams('kriegsschrei', 5, stats).damagePct, 0.5);
+  // der Heldenwert wirkt danach
+  assertClose(abilityParams('kriegsschrei', 2, { cooldown: 0.9, area: 1 }).cooldown, 12.32 * 0.9);
+});
+
+test('abilities: keine Stufe einer Fähigkeit ist leer', () => {
+  for (const def of Object.values(ABILITIES)) {
+    def.levels.forEach((changes, i) => assertTrue(changes.length > 0, `${def.id} Stufe ${i + 2}`));
+  }
+});
+
+test('abilities: jede Fähigkeit hat einen Namen und eine Beschreibung', () => {
+  for (const def of Object.values(ABILITIES)) {
+    assertTrue(typeof def.name === 'string' && def.name.trim() !== '', def.id);
+    assertTrue(typeof def.description === 'string' && def.description.trim() !== '', def.id);
+  }
+});

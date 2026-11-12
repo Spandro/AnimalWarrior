@@ -3,6 +3,7 @@ import { defaultSave } from '../src/save/schema.js';
 import { metaPrice, buyMeta, metaModifiers, hasRevive } from '../src/save/meta.js';
 import { META } from '../src/data/meta.js';
 import { computeStats } from '../src/core/stats.js';
+import { effectText } from '../src/ui/metaShop.js';
 
 test('meta: Preise', () => {
   assertEqual(metaPrice('leben', 0), 50);
@@ -68,4 +69,14 @@ test('meta: hasRevive', () => {
   assertEqual(hasRevive(s), false);
   s.metaUpgrades.wiederbelebung = 1;
   assertTrue(hasRevive(s));
+});
+
+test('meta: Laden beschreibt die Wirkung einer Stufe in Worten', () => {
+  assertEqual(effectText(META.leben, 0), 'keine');
+  assertEqual(effectText(META.leben, 1), '+5 %');
+  assertEqual(effectText(META.leben, 3), '+15 %');
+  assertEqual(effectText(META.tempo, 1), '+3 %');
+  assertEqual(effectText(META.ruestung, 2), '+2');
+  assertEqual(effectText(META.wiederbelebung, 0), 'nicht erworben');
+  assertEqual(effectText(META.wiederbelebung, 1), 'aktiv');
 });

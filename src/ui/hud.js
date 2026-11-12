@@ -12,12 +12,14 @@ const BOSS_NAME = 'Bär';
 /** Sekunden als mm:ss, auch für 0. */
 const clock = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-/** Kürzel, wo die ersten zwei Buchstaben innerhalb einer Klasse doppelt wären (Schwerthieb/Schildstoß, Schattenklon). */
-const INITIALS = { schwerthieb: 'SW', schattenklon: 'SK' };
-
-/** Kürzel einer Fähigkeit für das Symbol: zwei Buchstaben. */
+/**
+ * Kürzel einer Fähigkeit für das Symbol: Anfangsbuchstaben der ersten zwei Wörter des Namens
+ * („Heiße Angelegenheit“ → HA), bei einem Wort die ersten zwei Buchstaben („Besteckschublade“ → BE).
+ */
 export function abilityInitials(id) {
-  return INITIALS[id] ?? (ABILITIES[id]?.name ?? id).slice(0, 2).toUpperCase();
+  const words = (ABILITIES[id]?.name ?? id).split(/[\s-]+/).map((w) => w.replace(/[^\p{L}\p{N}]/gu, '')).filter(Boolean);
+  const text = words.length >= 2 ? words[0][0] + words[1][0] : (words[0] ?? '').slice(0, 2);
+  return text.toUpperCase();
 }
 
 /** CSS-Farbe einer Fähigkeit. */
