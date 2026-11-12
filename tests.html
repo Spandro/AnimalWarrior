@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>AnimalWarrior Tests</title>
+<link rel="icon" href="data:,">
+<style>
+  body { font-family: monospace; background: #111; color: #ddd; padding: 1rem; }
+  .ok { color: #6c6; } .fail { color: #e66; }
+</style>
+</head>
+<body>
+<h1>AnimalWarrior Tests</h1>
+<pre id="out">läuft …</pre>
+<script type="module">
+  import { run } from './tests/runner.js';
+  const filter = new URLSearchParams(location.search).get('filter') || '';
+  const out = document.getElementById('out');
+  try {
+    await import('./tests/index.js');
+    const result = await run(filter);
+    window.__testResults = result;
+    out.textContent = '';
+    const head = document.createElement('div');
+    head.className = result.failed === 0 ? 'ok' : 'fail';
+    head.textContent = `${result.passed} bestanden, ${result.failed} fehlgeschlagen`;
+    out.appendChild(head);
+    for (const f of result.failures) {
+      const d = document.createElement('div');
+      d.className = 'fail';
+      d.textContent = `FAIL ${f.name}: ${f.error}`;
+      out.appendChild(d);
+    }
+  } catch (e) {
+    window.__testResults = { passed: 0, failed: 1, failures: [{ name: 'Laden', error: String(e && e.message || e) }] };
+    out.textContent = 'Fehler beim Laden: ' + e;
+  }
+</script>
+</body>
+</html>
