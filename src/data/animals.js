@@ -1,7 +1,9 @@
 /**
  * @typedef {'maxHp'|'hpRegen'|'moveSpeed'|'damage'|'cooldown'|'area'|'armor'|'critChance'|'critDamage'|'dodge'|'pickupRadius'|'xpGain'|'goldGain'} StatKey
  * @typedef {{ stat: StatKey, flat?: number, pct?: number }} Modifier
- * @typedef {{ id: string, name: string, description: string, base: { maxHp: number, moveSpeed: number }, modifiers: Modifier[] }} AnimalDef
+ * @typedef {{ id: string, name: string, description: string, base: { maxHp: number, moveSpeed: number }, modifiers: Modifier[],
+ *   fixedClass?: string, unlock?: string }} AnimalDef
+ * `fixedClass`: das Tier gibt es nur mit dieser Klasse; `unlock`: Freischaltung im Spielstand (`unlocks`), die es braucht.
  */
 
 /** Grundwerte, die alle Helden teilen (maxHp und moveSpeed kommen vom Tier). */
@@ -19,7 +21,7 @@ export const BASE_STATS = {
   goldGain: 1,
 };
 
-/** @type {Record<'hase'|'ente'|'waschbaer', AnimalDef>} */
+/** @type {Record<'hase'|'ente'|'waschbaer'|'giraffe', AnimalDef>} */
 export const ANIMALS = {
   hase: {
     id: 'hase',
@@ -45,5 +47,17 @@ export const ANIMALS = {
       { stat: 'goldGain', pct: 0.2 },
       { stat: 'critChance', flat: 0.10 },
     ],
+  },
+  giraffe: {
+    id: 'giraffe',
+    name: 'Giraffe & Erdmännchen',
+    description: 'Das Erdmännchen sieht alles zuerst.',
+    base: { maxHp: 115, moveSpeed: 5.0 },
+    modifiers: [
+      { stat: 'pickupRadius', pct: 0.3 },
+      { stat: 'xpGain', pct: 0.1 },
+    ],
+    fixedClass: 'hochstapler',
+    unlock: 'duo',
   },
 };

@@ -1,7 +1,8 @@
-import { test, assertClose, assertTrue, assertThrows } from './runner.js';
+import { test, assertClose, assertEqual, assertTrue, assertThrows } from './runner.js';
 import { computeStats } from '../src/core/stats.js';
 import { ANIMALS } from '../src/data/animals.js';
 import { CLASSES } from '../src/data/classes.js';
+import { isValidPair } from '../src/core/roster.js';
 
 test('stats: Hase Krieger', () => {
   const s = computeStats('hase', 'krieger');
@@ -24,11 +25,21 @@ test('stats: Deckelungen', () => {
   const s = computeStats('hase', 'magier', [{ stat: 'dodge', flat: 0.9 }, { stat: 'cooldown', pct: -0.9 }]);
   assertClose(s.dodge, 0.6); assertClose(s.cooldown, 0.4);
 });
-test('stats: alle neun Kombinationen ergeben endliche positive Werte', () => {
+test('stats: Giraffe & Erdmännchen als Hochstapler', () => {
+  const s = computeStats('giraffe', 'hochstapler');
+  assertClose(s.maxHp, 115 * 1.15);
+  assertClose(s.armor, 1);
+  assertClose(s.pickupRadius, 2.5 * 1.3);
+  assertClose(s.xpGain, 1.1);
+  assertClose(s.area, 1.1);
+  assertClose(s.moveSpeed, 5.0);
+});
+test('stats: alle gültigen Kombinationen ergeben endliche positive Werte', () => {
   const positive = ['maxHp', 'moveSpeed', 'damage', 'cooldown', 'area', 'critDamage', 'pickupRadius', 'xpGain', 'goldGain'];
   let combos = 0;
   for (const a of Object.keys(ANIMALS)) {
     for (const c of Object.keys(CLASSES)) {
+      if (!isValidPair(a, c)) continue;
       combos++;
       const s = computeStats(a, c);
       for (const [key, value] of Object.entries(s)) {
@@ -37,7 +48,7 @@ test('stats: alle neun Kombinationen ergeben endliche positive Werte', () => {
       for (const key of positive) assertTrue(s[key] > 0, `${a}/${c}: ${key} nicht positiv`);
     }
   }
-  assertTrue(combos === 9, 'erwartet 9 Kombinationen');
+  assertEqual(combos, 10, 'neun Grundkombinationen plus das Duo');
 });
 test('stats: unbekannte Ids werfen', () => {
   assertThrows(() => computeStats('drache', 'krieger'));

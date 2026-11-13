@@ -5,6 +5,7 @@ import { HERO_SPRITES, ENEMY_SPRITES, MOTION, IDLE, SHEETS, SHEET_HOLES } from '
 import { ENEMIES } from '../src/data/enemies.js';
 import { ANIMALS } from '../src/data/animals.js';
 import { CLASSES } from '../src/data/classes.js';
+import { isValidPair } from '../src/core/roster.js';
 
 const OPTS = { threshold: 28, feather: 60 };
 
@@ -155,7 +156,13 @@ test('sprites: jede Heldenkombination und jeder Gegnertyp hat ein Bild', () => {
     assertTrue(s.footOffset >= 0 && s.footOffset < s.heightM * 0.2, `${key}: footOffset ${s.footOffset}`);
     assertTrue(Object.hasOwn(MOTION, s.motion), `${key}: Gangart ${s.motion}`);
   };
-  for (const a of Object.keys(ANIMALS)) for (const c of Object.keys(CLASSES)) check(`${a}-${c}`, HERO_SPRITES[`${a}-${c}`]);
+  for (const a of Object.keys(ANIMALS)) {
+    for (const c of Object.keys(CLASSES)) {
+      if (!isValidPair(a, c)) continue;
+      if (a === 'giraffe' && !HERO_SPRITES[`${a}-${c}`]) continue; // Bild des Duos: erst, wenn es einen Eintrag gibt (Aufgabe 5)
+      check(`${a}-${c}`, HERO_SPRITES[`${a}-${c}`]);
+    }
+  }
   for (const type of Object.keys(ENEMIES)) check(type, ENEMY_SPRITES[type]);
 });
 

@@ -64,6 +64,26 @@ test('progression: Fähigkeiten anderer Klassen kommen nie', () => {
   }
 });
 
+test('progression: der Kartenvorrat eines Duo-Helden enthält nur Fähigkeiten des Hochstaplers und allgemeine Boni', () => {
+  const own = new Set([CLASSES.hochstapler.startAbility, ...CLASSES.hochstapler.abilityPool]);
+  let newAbilities = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const w = createWorld({ seed, animalId: 'giraffe', classId: 'hochstapler' });
+    assertEqual(w.hero.abilities.map((a) => a.id), ['halsschwinger']);
+    for (const c of rollCards(w, 10)) {
+      if (c.kind === 'newAbility' || c.kind === 'abilityLevel') {
+        assertTrue(own.has(c.id), c.id);
+        if (c.kind === 'newAbility') newAbilities++;
+      } else if (c.kind === 'bonus') {
+        assertTrue(Object.hasOwn(BONUSES, c.id), c.id);
+      } else {
+        assertTrue(c.kind === 'gold' || c.kind === 'heal', c.kind);
+      }
+    }
+  }
+  assertTrue(newAbilities > 0, 'neue Fähigkeiten kommen aus dem Vorrat des Duos');
+});
+
 test('progression: abilityLevel nur für vorhandene Fähigkeiten unter Stufe 5, mit toLevel', () => {
   const w = newWorld();
   const levels = rollCards(w, 20).filter((c) => c.kind === 'abilityLevel');

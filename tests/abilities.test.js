@@ -257,7 +257,7 @@ test('abilities: damageByAbility zählt unter der richtigen Kennung', () => {
 });
 
 test('abilities: Daten sind vollständig und abilityPool je Klasse gefüllt', () => {
-  assertEqual(Object.keys(ABILITIES).length, 15);
+  assertEqual(Object.keys(ABILITIES).length, 20);
   for (const def of Object.values(ABILITIES)) {
     assertEqual(def.levels.length, 4, def.id);
     assertEqual(def.trigger, 'auto');
@@ -265,6 +265,8 @@ test('abilities: Daten sind vollständig und abilityPool je Klasse gefüllt', ()
   assertEqual(CLASSES.krieger.abilityPool, ['wirbelschlag', 'schildstoss', 'kriegsschrei', 'erdspalter']);
   assertEqual(CLASSES.magier.abilityPool, ['frostring', 'kettenblitz', 'meteor', 'arkankugeln']);
   assertEqual(CLASSES.dieb.abilityPool, ['giftflaeche', 'schattenklon', 'klingenfaecher', 'rauchbombe']);
+  assertEqual(CLASSES.hochstapler.startAbility, 'halsschwinger');
+  assertEqual(CLASSES.hochstapler.abilityPool, ['nussregen', 'stampede', 'buddelfalle', 'grossfamilie']);
   for (const cls of Object.values(CLASSES)) {
     for (const id of [cls.startAbility, ...cls.abilityPool]) assertEqual(ABILITIES[id].classId, cls.id, id);
   }
@@ -296,6 +298,130 @@ test('abilities: jede Fähigkeit hat einen Namen und eine Beschreibung', () => {
   for (const def of Object.values(ABILITIES)) {
     assertTrue(typeof def.name === 'string' && def.name.trim() !== '', def.id);
     assertTrue(typeof def.description === 'string' && def.description.trim() !== '', def.id);
+  }
+});
+
+// ---------------------------------------------------------------- Das Duo (Hochstapler)
+
+test('abilities: Halsschwinger trifft vorn in Reichweite 3,2, nicht weiter und nicht hinten', () => {
+  const w = newWorld();
+  const front = dummy(w, 3, 0), tooFar = dummy(w, 3.6, 0.3), back = dummy(w, -4, 0);
+  castAbility(w, 'halsschwinger', 1);
+  assertEqual(front.hp, 1000 - 13);
+  assertTrue(!damaged(tooFar) && !damaged(back));
+  assertEqual(w.events.find((e) => e.type === 'cast').shape, 'arc');
+});
+
+test('abilities: Halsschwinger – Stufe 3 weitet den Winkel auf 170°, Stufe 5 schwingt zweimal', () => {
+  const stats = { cooldown: 1, area: 1 };
+  assertEqual(abilityParams('halsschwinger', 1, stats).angle, 130);
+  assertEqual(abilityParams('halsschwinger', 3, stats).angle, 170);
+  assertEqual(abilityParams('halsschwinger', 4, stats).swings, 1);
+  assertEqual(abilityParams('halsschwinger', 5, stats).swings, 2);
+  const w = newWorld();
+  const front = dummy(w, 2, 0), back = dummy(w, -2, 0);
+  castAbility(w, 'halsschwinger', 5);
+  assertTrue(damaged(front) && damaged(back));
+});
+
+test('abilities: Nussregen wirft zwei Nüsse auf den nächsten Gegner, Stufe 3 drei', () => {
+  const w = newWorld([['nussregen']]);
+  const near = dummy(w, 3, 0), far = dummy(w, -8, 0); // nah genug, dass beide Nüsse (Fächer von 15°) treffen
+  stepWorld(w, 0.05, NONE);
+  assertEqual(w.projectiles.length, 2);
+  assertTrue(w.projectiles.every((p) => p.dirX > 0.9), 'beide Nüsse fliegen zum näheren Gegner');
+  run(w, 0.6);
+  assertEqual(near.hp, 1000 - 10); // zwei Nüsse à 5, jede durchschlägt einen Gegner
+  assertTrue(!damaged(far));
+  const w3 = newWorld();
+  dummy(w3, 3, 0);
+  castAbility(w3, 'nussregen', 3);
+  assertEqual(w3.projectiles.length, 3);
+});
+
+test('abilities: Nussregen Stufe 5 durchschlägt zwei Gegner, Stufe 1 nur einen', () => {
+  const row = (level) => {
+    const w = newWorld();
+    const enemies = [dummy(w, 3, 0), dummy(w, 4.5, 0)];
+    w.hero.facing = { x: 1, z: 0 };
+    castAbility(w, 'nussregen', level);
+    run(w, 1);
+    return enemies.map((e) => 1000 - e.hp);
+  };
+  const one = row(1), five = row(5);
+  assertTrue(one[1] === 0 && one[0] > 0, `Stufe 1: ${one}`);
+  assertTrue(five[1] > 0 && five[0] > 0, `Stufe 5: ${five}`);
+});
+
+test('abilities: Stampede wirkt als Ring, schadet rundum und bremst um 30 %', () => {
+  const w = newWorld();
+  const inside = dummy(w, 0, 2.8), outside = dummy(w, 0, 5);
+  castAbility(w, 'stampede', 1);
+  assertEqual(inside.hp, 1000 - 11);
+  assertTrue(!damaged(outside));
+  assertClose(inside.slowFactor, 0.3); // wie beim Frostring: der Wert ist der verlorene Anteil (30 % langsamer)
+  assertClose(inside.slowUntil, 1.5);
+  const stats = { cooldown: 1, area: 1 };
+  assertClose(abilityParams('stampede', 3, stats).radius, 3.2 * 1.25);
+  assertClose(abilityParams('stampede', 5, stats).cooldown, 3.5 * 0.75);
+});
+
+test('abilities: Buddelfalle landet in der dichtesten Gruppe, schadet nach 0,6 s und verwirrt', () => {
+  const w = newWorld([['buddelfalle']]);
+  const single = dummy(w, -5, 0);
+  const group = [dummy(w, 8, 0), dummy(w, 9, 0), dummy(w, 8, 1)];
+  stepWorld(w, 0.05, NONE);
+  assertEqual(w.zones.length, 1);
+  assertTrue(Math.hypot(w.zones[0].x - 8.3, w.zones[0].z - 0.3) < 1);
+  run(w, 0.5);
+  assertTrue(!group.some(damaged));
+  run(w, 0.1);
+  assertEqual(group.map((e) => 1000 - e.hp), [20, 20, 20]);
+  assertTrue(group.every((e) => e.confusedUntil > w.time), 'Gegner sind verwirrt');
+  assertTrue(!damaged(single));
+  const stats = { cooldown: 1, area: 1 };
+  assertClose(abilityParams('buddelfalle', 3, stats).radius, 3.5);
+  assertClose(abilityParams('buddelfalle', 5, stats).confuse, 3);
+});
+
+test('abilities: Großfamilie lenkt Gegner im Lockradius ab, Stufe 3 verlängert, Stufe 5 explodiert am Ende', () => {
+  const w = newWorld();
+  const lured = dummy(w, 0, 5), farAway = dummy(w, 0, 12);
+  castAbility(w, 'grossfamilie', 1);
+  w.hero.x = 20;
+  assertEqual(w.summons.length, 1);
+  assertTrue(enemyTarget(w, lured) === w.summons[0]);
+  assertTrue(enemyTarget(w, farAway) === w.hero);
+  run(w, 5.05);
+  assertEqual(w.summons.length, 0);
+  assertTrue(enemyTarget(w, lured) === w.hero);
+  const stats = { cooldown: 1, area: 1 };
+  assertEqual(abilityParams('grossfamilie', 3, stats).duration, 7);
+  assertEqual(abilityParams('grossfamilie', 5, stats).explodeDamage, 25);
+  assertEqual(abilityParams('grossfamilie', 1, stats).explodeDamage, 0);
+});
+
+test('abilities: Großfamilie Stufe 5 explodiert zum Ende mit 25 Schaden', () => {
+  const w = newWorld();
+  const rat = dummy(w, 0, 2);
+  w.hero.x = 20;
+  castAbility(w, 'grossfamilie', 5);
+  const x = w.summons[0].x, z = w.summons[0].z;
+  rat.x = x + 1; rat.z = z;
+  run(w, 7.1);
+  assertEqual(w.summons.length, 0);
+  assertEqual(1000 - rat.hp, 25);
+});
+
+test('abilities: Fähigkeiten des Duos tragen Namen und Beschreibung, die Stufenwerte folgen dem Muster', () => {
+  const stats = { cooldown: 1, area: 1 };
+  assertClose(abilityParams('halsschwinger', 5, stats).damage, 13 * 1.8);
+  assertClose(abilityParams('nussregen', 2, stats).damage, 6);
+  assertClose(abilityParams('stampede', 2, stats).damage, 13.2);
+  assertClose(abilityParams('buddelfalle', 4, stats).damage, 32);
+  assertClose(abilityParams('grossfamilie', 2, stats).cooldown, 12 * 0.88);
+  for (const id of ['halsschwinger', 'nussregen', 'stampede', 'buddelfalle', 'grossfamilie']) {
+    assertEqual(ABILITIES[id].classId, 'hochstapler', id);
   }
 });
 
@@ -407,9 +533,10 @@ test('abilities: Klingenfächer Stufe 5 deckt 360° ab und zentriert sich auf da
   assertTrue(w.projectiles.some((p) => Math.abs(p.dirX) < 1e-9 && Math.abs(p.dirZ - 1) < 1e-9));
 });
 
-test('abilities: nur die fünf facing-Fähigkeiten haben ein aim-Feld', () => {
+test('abilities: nur die sechs facing-Fähigkeiten haben ein aim-Feld', () => {
   const withAim = Object.values(ABILITIES).filter((d) => d.aim).map((d) => d.id).sort();
-  assertEqual(withAim, ['erdspalter', 'klingenfaecher', 'schildstoss', 'schwerthieb', 'wurfdolche']);
+  assertEqual(withAim, ['erdspalter', 'halsschwinger', 'klingenfaecher', 'schildstoss', 'schwerthieb', 'wurfdolche']);
+  assertEqual(ABILITIES.halsschwinger.aim, { key: 'radius', extra: 1.5 });
   for (const d of Object.values(ABILITIES)) assertEqual(!!d.aim, d.target === 'facing', d.id);
   assertEqual(ABILITIES.wurfdolche.aim, { key: 'range', extra: 0 });
   assertEqual(ABILITIES.erdspalter.aim, { key: 'length', extra: 1.5 });

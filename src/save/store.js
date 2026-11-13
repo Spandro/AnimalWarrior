@@ -1,6 +1,7 @@
 import { ANIMALS } from '../data/animals.js';
 import { CLASSES } from '../data/classes.js';
 import { RUN_DURATION } from '../data/waves.js';
+import { isValidPair, animalUnlocked } from '../core/roster.js';
 import {
   SAVE_VERSION, STORAGE_KEY, BACKUP_KEY, MAX_HEROES, MAX_NAME_LENGTH,
   defaultSave, migrate, validate,
@@ -161,6 +162,8 @@ export function normalizeHeroName(raw, index) {
 export function addHero(save, spec, { now, id }) {
   if (!Object.hasOwn(ANIMALS, spec.animal)) throw new Error(`Unbekanntes Tier: ${spec.animal}`);
   if (!Object.hasOwn(CLASSES, spec.class)) throw new Error(`Unbekannte Klasse: ${spec.class}`);
+  if (!isValidPair(spec.animal, spec.class)) throw new Error(`Ungültiges Paar: ${spec.animal} als ${spec.class}`);
+  if (!animalUnlocked(save, spec.animal)) throw new Error(`Tier nicht freigeschaltet: ${spec.animal}`);
   if (save.heroes.length >= MAX_HEROES) return null;
   if (typeof id !== 'string' || id === '' || save.heroes.some((h) => h.id === id)) throw new Error('Ungültige Helden-Id');
   /** @type {Hero} */

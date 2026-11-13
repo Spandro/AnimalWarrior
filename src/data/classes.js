@@ -1,9 +1,11 @@
 /**
  * @typedef {import('./animals.js').Modifier} Modifier
- * @typedef {{ id: string, name: string, description: string, modifiers: Modifier[], startAbility: string, abilityPool: string[] }} ClassDef
+ * @typedef {{ id: string, name: string, description: string, modifiers: Modifier[], startAbility: string, abilityPool: string[],
+ *   animalOnly?: string }} ClassDef
+ * `animalOnly`: die Klasse gibt es nur für dieses Tier.
  */
 
-/** @type {Record<'krieger'|'magier'|'dieb', ClassDef>} */
+/** @type {Record<'krieger'|'magier'|'dieb'|'hochstapler', ClassDef>} */
 export const CLASSES = {
   krieger: {
     id: 'krieger',
@@ -39,5 +41,18 @@ export const CLASSES = {
     ],
     startAbility: 'wurfdolche',
     abilityPool: ['giftflaeche', 'schattenklon', 'klingenfaecher', 'rauchbombe'],
+  },
+  hochstapler: {
+    id: 'hochstapler',
+    name: 'Hochstapler',
+    description: 'Groß, laut und zu zweit.',
+    modifiers: [
+      { stat: 'maxHp', pct: 0.15 },
+      { stat: 'armor', flat: 1 },
+      { stat: 'area', pct: 0.1 },
+    ],
+    startAbility: 'halsschwinger',
+    abilityPool: ['nussregen', 'stampede', 'buddelfalle', 'grossfamilie'],
+    animalOnly: 'giraffe',
   },
 };

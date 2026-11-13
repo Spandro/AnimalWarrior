@@ -1,6 +1,7 @@
 // Einstieg: Menüs, Heldenverwaltung, Start eines Durchgangs und was danach passiert (Speichern, Ergebnis).
 // URL-Schalter: ?autostart=1 oder ?debug=1&stress=1 überspringen die Menüs und starten sofort
-// (dann gelten ?animal=hase|ente|waschbaer und ?class=krieger|magier|dieb); ?quality=low.
+// (dann gelten ?animal=hase|ente|waschbaer|giraffe und ?class=krieger|magier|dieb|hochstapler, aber nur gültige Paare:
+// das Duo `giraffe` nur mit `hochstapler`, die anderen Tiere nur mit den drei Grundklassen); ?quality=low.
 // Nur mit ?debug=1 (window.__debug, window.__app): ?speed=N (timeScale), ?stress=1 (300 Ratten,
 // Bildrate oben links), ?autopick=1 (Level-up-Karten automatisch), Tasten K (alle Gegner besiegen), L (ein Level).
 import { isWebGLAvailable, createRenderer } from './render/renderer.js';
@@ -17,7 +18,7 @@ import { createScreens, createNoticeBar } from './ui/screens.js';
 import { createSfx } from './audio/sfx.js';
 import { renderNoWebGL } from './ui/menus.js';
 import { ANIMALS } from './data/animals.js';
-import { CLASSES } from './data/classes.js';
+import { classesFor, isValidPair } from './core/roster.js';
 
 const AUTOSTART_SEED = 20261112;
 const UNSAVED_TEXT = 'Fortschritt kann nicht gespeichert werden';
@@ -48,13 +49,25 @@ if (!isWebGLAvailable()) {
   document.body.dataset.screen = 'game';
   Promise.all([loadSpriteSheets(), loadEnvironment()]).then(([sprites, env]) => startGame({
     canvas, uiLayer, seed: AUTOSTART_SEED, quality, timeScale, debug, stress, autopick, sprites, env, sfx: createUnlockedSfx(70),
-    animalId: Object.hasOwn(ANIMALS, params.get('animal')) ? params.get('animal') : 'hase',
-    classId: Object.hasOwn(CLASSES, params.get('class')) ? params.get('class') : 'krieger',
+    ...autostartHero(params.get('animal'), params.get('class')),
     // Ohne Menüs gibt es keinen Spielstand: nur melden, nichts speichern.
     onEnd: (summary) => showNotice(`${summary.won ? 'Gewonnen!' : 'Besiegt.'} Seite neu laden für einen neuen Versuch.`, { sticky: true }),
   }));
 } else {
   startApp();
+}
+
+/**
+ * Tier und Klasse für ?animal= und ?class=: nur ein gültiges Paar zählt (das Duo gehört fest zu Hochstapler).
+ * Ohne Angabe oder bei einem ungültigen Paar fehlende Teile ergänzen: unbekanntes Tier → Hase; unbekannte
+ * Klasse oder ungültiges Paar → die erste passende Klasse des Tiers (Krieger, beim Duo Hochstapler).
+ * @param {string|null} animal
+ * @param {string|null} cls
+ */
+function autostartHero(animal, cls) {
+  const animalId = Object.hasOwn(ANIMALS, animal) ? animal : 'hase';
+  const classId = isValidPair(animalId, cls) ? cls : classesFor(animalId)[0];
+  return { animalId, classId };
 }
 
 /** Wird das Gerät hauptsächlich mit dem Finger bedient? Ohne matchMedia: nein. */

@@ -37,7 +37,7 @@ const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
  * @param {{ sprites?: import('./sprites.js').SpriteSheets, camera?: THREE.Camera }} [options]
  */
 export function createHeroView(scene, animalId, classId, { sprites, camera } = {}) {
-  const body = sprites?.ok ? createSpriteBody(scene, animalId, classId, sprites, camera) : createFigureBody(scene, animalId, classId);
+  const body = sprites?.ok && HERO_SPRITES[`${animalId}-${classId}`] ? createSpriteBody(scene, animalId, classId, sprites, camera) : createFigureBody(scene, animalId, classId);
 
   // Heller Bodenring unter dem Helden, damit er im Gewühl auffindbar bleibt.
   const ringGeo = new THREE.RingGeometry(0.62, 0.74, 40).rotateX(-Math.PI / 2);

@@ -154,6 +154,37 @@ export const ABILITIES = {
     perk3: [{ key: 'radius', add: 1.5 }],
     perk5: [{ key: 'confuse', add: 2 }],
   }),
+  halsschwinger: ability({
+    id: 'halsschwinger', name: 'Langer Hals, kurzer Prozess', description: 'Ein weiter Schwung mit dem Hals nach vorn. Von oben sieht man eben, wo es sich lohnt.', classId: 'hochstapler', shape: 'arc', target: 'facing',
+    aim: { key: 'radius', extra: AIM_MELEE_EXTRA },
+    base: { damage: 13, cooldown: 1.2, radius: 3.2, angle: 130, swings: 1, knockback: 0, stun: 0 },
+    perk3: [{ key: 'angle', add: 40 }],
+    perk5: [{ key: 'swings', add: 1 }],
+  }),
+  nussregen: ability({
+    id: 'nussregen', name: 'Nüsse von oben', description: 'Das Erdmännchen wirft Nüsse auf den nächsten Gegner. Für die Beute gibt es keine Quittung.', classId: 'hochstapler', shape: 'projectile', target: 'nearest',
+    base: { damage: 5, cooldown: 0.9, speed: 14, explosion: 0, range: 12, count: 2, spread: 15, pierce: 1, size: 0.25 },
+    perk3: [{ key: 'count', add: 1 }],
+    perk5: [{ key: 'pierce', add: 1 }],
+  }),
+  stampede: ability({
+    id: 'stampede', name: 'Stampede für Arme', description: 'Ein kräftiger Stampfer schadet rundum und bremst. Die Herde besteht aus einer Giraffe.', classId: 'hochstapler', shape: 'ring', target: 'self',
+    base: { damage: 11, cooldown: 3.5, radius: 3.2, slow: 0.3, slowDuration: 1.5 },
+    perk3: [{ key: 'radius', mul: 1.25 }],
+    perk5: [{ key: 'cooldown', mul: 0.75 }],
+  }),
+  buddelfalle: ability({
+    id: 'buddelfalle', name: 'Hier wurde gebuddelt', description: 'Ein Loch tut sich in der dichtesten Gruppe auf, die Gegner stolpern und verlieren kurz die Orientierung. Das Erdmännchen war es nicht.', classId: 'hochstapler', shape: 'zone', target: 'densest',
+    base: { damage: 20, cooldown: 6, radius: 2.5, delay: 0.6, range: 12, duration: 0, tickDamage: 0, tickInterval: 0.5, confuse: 1.5 },
+    perk3: [{ key: 'radius', add: 1.0 }],
+    perk5: [{ key: 'confuse', add: 1.5 }],
+  }),
+  grossfamilie: ability({
+    id: 'grossfamilie', name: 'Großfamilie', description: 'Die Verwandtschaft taucht auf und lenkt Gegner ab. Sie kommen unangemeldet und gehen erst nach dem Kaffee.', classId: 'hochstapler', shape: 'summon', target: 'self', damageKey: null,
+    base: { cooldown: 12, duration: 5, lureRadius: 8, explodeDamage: 0, explodeRadius: 3 },
+    perk3: [{ key: 'duration', add: 2 }],
+    perk5: [{ key: 'explodeDamage', add: 25 }],
+  }),
 };
 
 /** Größte Strecke, die ein Geschoss pro Teilschritt fliegt (verhindert Durchtunneln). */

@@ -1,4 +1,6 @@
 import * as THREE from '../../vendor/three.module.min.js';
+import { ANIMALS } from '../data/animals.js';
+import { CLASSES } from '../data/classes.js';
 
 /**
  * Heldenfiguren aus Grundkörpern. Lokale Achsen: y oben, Blickrichtung (vorn) ist +z,
@@ -290,6 +292,10 @@ const DRESS = { krieger: dressKrieger, magier: dressMagier, dieb: dressDieb };
  * @returns {THREE.Group} mit `userData.parts` ({@link CharacterParts}) und `userData.attach` ({@link AttachPoints})
  */
 export function buildCharacter(animalId, classId) {
+  // Tier oder Klasse der Daten ohne eigene Figur (das Duo bis zur Ersatzfigur) werden als Hase im Kriegergewand gebaut,
+  // statt zu werfen.
+  if (!Object.hasOwn(ANIMAL_LOOK, animalId) && Object.hasOwn(ANIMALS, animalId)) animalId = 'hase';
+  if (!Object.hasOwn(DRESS, classId) && Object.hasOwn(CLASSES, classId)) classId = 'krieger';
   const look = ANIMAL_LOOK[animalId];
   if (!look) throw new Error('Unbekanntes Tier: ' + animalId);
   if (!DRESS[classId]) throw new Error('Unbekannte Klasse: ' + classId);

@@ -360,8 +360,8 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
   let shadowFigure = null;
   function ensureShadowFigure(hero) {
     if (shadowFigure) return shadowFigure;
-    if (painted) {
-      const def = HERO_SPRITES[`${hero.animalId}-${hero.classId}`];
+    const def = painted ? HERO_SPRITES[`${hero.animalId}-${hero.classId}`] : null;
+    if (def) {
       const material = mat(new THREE.MeshBasicMaterial({
         map: sprites.textures[def.sheet], color: SHADOW_LOOK.color, transparent: true, opacity: SHADOW_LOOK.opacity,
         alphaTest: BILLBOARD.alphaTest, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
@@ -528,7 +528,7 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
     const a = e.ai.attack;
     const attackT = e.ai.phase === 'swipe' && a ? clamp01(1 - (e.ai.until - t) / a.delay) * 0.5 : undefined;
     const ph = e.id * 1.7;
-    if (painted) {
+    if (fig.def) {
       const g = gait.get(e.id);
       const motion = spriteMotion(fig.def.motion, { speed: g?.speed ?? 0, time: t + ph, attackT });
       composeSprite(fig.object.matrix, orient, p.x, 0, p.z, fig.width, fig.def.heightM, g?.face ?? 1, motion, fig.def.footOffset);

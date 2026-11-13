@@ -206,6 +206,16 @@ test('save: validate prüft Stufen, Einstellungen und Namen', () => {
   assertEqual(validate({ ...s, heroes: [h] }).ok, false);
 });
 
+test('save: validate lehnt ungültige Paare und Duo-Helden ohne Freischaltung ab', () => {
+  const hero = (animal, cls) => ({ id: 'a', name: 'Duo', animal, class: cls, createdAt: 1, survivor: { bestTime: 0, wins: 0, runs: 0 } });
+  const s = defaultSave();
+  assertEqual(validate({ ...s, heroes: [hero('giraffe', 'hochstapler')] }).ok, false); // ohne Freischaltung
+  assertTrue(validate({ ...s, unlocks: ['duo'], heroes: [hero('giraffe', 'hochstapler')] }).ok); // mit Freischaltung
+  assertEqual(validate({ ...s, unlocks: ['duo'], heroes: [hero('giraffe', 'krieger')] }).ok, false);
+  assertEqual(validate({ ...s, unlocks: ['duo'], heroes: [hero('hase', 'hochstapler')] }).ok, false);
+  assertTrue(validate({ ...s, heroes: [hero('hase', 'krieger')] }).ok);
+});
+
 test('save: migrate lässt die aktuelle Version unverändert und wirft sonst', () => {
   const s = defaultSave();
   assertEqual(migrate(s), s);
@@ -350,6 +360,25 @@ test('save: addHero lehnt unbekannte Ids und doppelte Helden-Ids ab', () => {
   assertThrows(() => addHero(s, { ...spec, class: 'barde' }, ctx(1)));
   addHero(s, spec, ctx(1));
   assertThrows(() => addHero(s, spec, ctx(1)));
+});
+
+test('save: addHero lehnt das Duo ohne Freischaltung ab und legt es mit Freischaltung an', () => {
+  const duo = { name: 'Hochhinaus', animal: 'giraffe', class: 'hochstapler' };
+  const s = defaultSave();
+  assertThrows(() => addHero(s, duo, ctx(1)));
+  assertEqual(s.heroes.length, 0);
+  s.unlocks.push('duo');
+  const h = addHero(s, duo, ctx(1));
+  assertEqual([h.animal, h.class, s.heroes.length], ['giraffe', 'hochstapler', 1]);
+  assertTrue(validate(s).ok);
+});
+
+test('save: addHero lehnt ungültige Paare ab, auch mit Freischaltung', () => {
+  const s = defaultSave();
+  s.unlocks.push('duo');
+  assertThrows(() => addHero(s, { name: 'x', animal: 'giraffe', class: 'krieger' }, ctx(1)));
+  assertThrows(() => addHero(s, { name: 'x', animal: 'hase', class: 'hochstapler' }, ctx(1)));
+  assertEqual(s.heroes.length, 0);
 });
 
 test('save: deleteHero entfernt nur den passenden Helden', () => {
