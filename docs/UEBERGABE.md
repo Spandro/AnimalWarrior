@@ -2,7 +2,7 @@
 
 Diese Datei ist für die nächste Sitzung gedacht, falls die laufende abbricht. Sie wird an jedem Pausenpunkt aktualisiert.
 
-Zuletzt aktualisiert: 2026-11-13, Pausenpunkt nach Aufgabe 7 von Paket 1. Nächster Schritt: Befunde der Gesamtprüfung abarbeiten, dann Paket 2 entwerfen.
+Zuletzt aktualisiert: 2026-11-13, Pausenpunkt nach Abschluss von Paket 1 samt Gesamtprüfung und Korrekturrunde. Nächster Schritt: Paket 2 entwerfen (am besten in einer frischen Sitzung mit Verweis auf diese Datei).
 
 ## 1. Was fertig ist
 
@@ -31,9 +31,19 @@ Zuletzt aktualisiert: 2026-11-13, Pausenpunkt nach Aufgabe 7 von Paket 1. Nächs
 | 5 | Handy-Oberfläche: Anzeige hochkant, Pause-Knopf, Kamera, große Knöpfe | fertig, geprüft, Commit `9ca9220` |
 | 6 | Gemalte Umgebung (`assets/umgebung/`), gemalte Kisten und Aufsammelbares, Menü-Hintergründe | fertig, geprüft, Commit `6509808` |
 | 7 | Abschlussprüfung, README | fertig, Commit `b0597e9` |
-| danach | Gesamtprüfung über Paket 1, eine Korrekturrunde | läuft/offen |
+| danach | Gesamtprüfung über Paket 1, eine Korrekturrunde | fertig, Commit `3a277b0` |
 
-Teststand nach Aufgabe 7: 339 Tests grün (`tests.html`).
+**Paket 1 ist damit gebaut und geprüft.** Teststand: 341 Tests grün (`tests.html`).
+
+Die Gesamtprüfung (frischer Prüfer über alle zehn Commits ab `1e7ebd1`) fand zwei wichtige
+Fehler, beide behoben und gegengeprüft:
+
+1. Der Kistenpfeil rechnete mit der konservativen Hüllbox statt mit der wirklich sichtbaren
+   Fläche. Hochkant blieb er aus, obwohl die Kiste hinter dem Helden schon außerhalb des
+   Bildes lag (Unterkante bei 9,2 m, Hüllbox sagte 16,75 m).
+2. Die 3D-Ersatzfigur (wenn die gemalten Bilder fehlen) drehte sich nicht zum Ziel.
+
+Die kleinen Befunde stehen unten in Abschnitt 8.
 
 **Was in Aufgabe 5 bis 7 dazugekommen ist**
 
@@ -113,10 +123,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/serve.ps1 -Port 8080
 - `git log` – jede Aufgabe ist ein eigener Commit mit sprechendem Betreff
 - Auf diesem Rechner zusätzlich das Arbeitsprotokoll der Subagenten-Ausführung (nicht im Repo, weil von Git ignoriert): `.superpowers/sdd/2026-11-13-spielgefuehl-und-handy/progress.md` mit Prüfbefunden, zurückgestellten Kleinigkeiten und Entscheidungen; dort liegen auch die Aufträge je Aufgabe (`task-N-brief.md`) und die Berichte (`task-N-report.md`)
 
-## 7. Fortsetzen von Paket 1
+## 7. Paket 1 ist abgeschlossen
 
-1. Alle sieben Aufgaben sind gebaut. Offen ist nur noch die Korrekturrunde nach der Gesamtprüfung
-   ab Commit `1e7ebd1`; die Befunde stehen im Arbeitsprotokoll (Abschnitt 6).
+1. Alle sieben Aufgaben sind gebaut, die Gesamtprüfung ab `1e7ebd1` ist gelaufen und ihre
+   wichtigen Befunde sind behoben (`3a277b0`). Nichts ist gepusht – das entscheidet der Auftraggeber.
 2. Steht im `git log` ein Commit zu einer späteren Aufgabe, der hier nicht als geprüft vermerkt ist, fehlt dessen Prüfung.
 3. Entscheidungen, die im Plan nicht stehen (die vollständige Liste mit Begründung steht im
    Arbeitsprotokoll unter „Ruling:"):
@@ -130,6 +140,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/serve.ps1 -Port 8080
    - Die Deko einer Zelle liegt in einem zusammengefassten Netz statt in Instanzen je Art.
 
 ## 8. Zurückgestellte Kleinigkeiten (bekannt, nicht dringend)
+
+Aus der Gesamtprüfung von Paket 1 (bewusst zurückgestellt):
+
+- Die Ausblend-Materialien verdeckender Bäume werden beim Entfernen einer Zelle nicht freigegeben und wachsen innerhalb eines Durchgangs (wenige Dutzend, je wenige KB)
+- Bäume und Felsen sind je zwei eigene Meshes; Bodenschatten und Felstafeln einer Zelle ließen sich wie die Deko zusammenfassen (~66 Zeichenaufrufe weniger). Auf dem Entwicklungsrechner 60 Bilder/s, auf einem echten Handy ungemessen
+- In der Sterbephase laufen Welt und Effekte mit verschiedenen Uhren (nur Darstellung)
+- `src/render/terrain.js` schreibt die Kachelung in die der App gehörende Bodentextur; heute harmlos, aber eine Falle für später
+
+Ältere Punkte:
 
 - Die Bodenkachel (8 m) wiederholt sich im Bild etwa dreimal und ist als Muster erkennbar; harte Nähte gibt es keine
 - Der Bodenschatten unter Truhen und Felsen ist sehr dezent, die Deko eher sparsam gesät
