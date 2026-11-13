@@ -212,7 +212,7 @@ export function confirmDialog({ title, message, confirmLabel = 'OK', cancelLabel
       el('h2', { id: 'dialog-title', text: title }),
       el('p', { id: 'dialog-text' }, ...[message].flat()),
       el('div', { class: 'dialog-buttons' }, cancel, confirm));
-    const backdrop = el('div', { class: 'dialog-backdrop' }, box);
+    const backdrop = el('div', { class: 'dialog-backdrop', 'data-ui-control': true }, box);
 
     function close(result) {
       document.removeEventListener('keydown', onKey, true);

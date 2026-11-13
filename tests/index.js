@@ -10,6 +10,7 @@ import './survivor.test.js';
 import './save.test.js';
 import './meta.test.js';
 import './keyboard.test.js';
+import './pointer.test.js';
 import './cardText.test.js';
 import './sprites.test.js';
 import './sfx.test.js';

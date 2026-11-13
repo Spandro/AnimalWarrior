@@ -27,7 +27,7 @@ function cardIcon(card) {
 export function createLevelUpDialog(uiLayer, { onChoose }) {
   const title = el('h2', { id: 'levelup-title' });
   const list = el('div', { class: 'levelup-cards' });
-  const root = el('div', { class: 'overlay levelup', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'levelup-title', hidden: true },
+  const root = el('div', { class: 'overlay levelup', 'data-ui-control': true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'levelup-title', hidden: true },
     el('div', { class: 'levelup-box', tabindex: '-1' },
       title,
       el('p', { class: 'levelup-hint', text: 'Wähle eine Verbesserung – Klick oder Taste 1–3.' }),

@@ -11,6 +11,8 @@ import { spawnEnemy, damageEnemy } from './core/world.js';
 import { xpToNext } from './core/progression.js';
 import { createRng } from './core/rng.js';
 import { createKeyState, attachKeyboard } from './input/keyboard.js';
+import { createPointerState, attachPointer, combineMove } from './input/pointer.js';
+import { createStick } from './ui/stick.js';
 import { createHud } from './ui/hud.js';
 import { createLevelUpDialog } from './ui/levelup.js';
 import { el } from './ui/dom.js';
@@ -83,8 +85,13 @@ export function startGame({
     onCardKey(index) { if (levelUp.open) levelUp.choose(index); },
   });
 
+  const pointer = createPointerState();
+  const stick = createStick(uiLayer);
+  const detachPointer = attachPointer(canvas, pointer, { isBlocked: () => run.state !== 'playing' });
+
   function pause() {
     keys.clear();
+    pointer.reset();
     setPaused(run, true);
     if (run.state === 'paused') pauseMenu.show();
   }
@@ -104,6 +111,7 @@ export function startGame({
   // Der Belastungstest misst weiter, auch ohne Fokus.
   function onFocusLost() {
     keys.clear();
+    pointer.reset();
     if (run.state === 'playing' && !stress) pause();
   }
   const onVisibility = () => { if (document.hidden) onFocusLost(); };
@@ -163,6 +171,7 @@ export function startGame({
     if (ended) return;
     ended = true;
     keys.clear();
+    pointer.reset();
     endTimer = setTimeout(() => onEnd?.(getSummary(run), { facts: getFacts(run), earlyIds: [...early] }), delay);
   }
 
@@ -197,7 +206,7 @@ export function startGame({
       acc += dt;
       while (acc >= STEP && steps < MAX_STEPS_PER_FRAME && run.state === 'playing') {
         if (stress) fillRats();
-        stepRun(run, STEP, keys.readMoveVector());
+        stepRun(run, STEP, combineMove(keys.readMoveVector(), pointer.readMoveVector()));
         handleEvents();
         acc -= STEP;
         steps++;
@@ -210,7 +219,7 @@ export function startGame({
 
     if (run.state === 'levelup' && !levelUp.open) {
       if (autopick) chooseCard(run, 0);
-      else { keys.clear(); levelUp.show(run.cards, world, world.run.level + 1); }
+      else { keys.clear(); pointer.reset(); levelUp.show(run.cards, world, world.run.level + 1); }
     }
     if (run.state === 'won' || run.state === 'lost') finish(END_DELAY * 1000);
 
@@ -222,12 +231,13 @@ export function startGame({
     enemyView.sync(world, alpha);
     effects.update(run.state === 'playing' || ended ? dt : 0, p);
     hud.update(run);
+    stick.update(pointer);
     view.render();
     if (stress) measureFps(now);
   }
   rafId = requestAnimationFrame(frame);
 
-  if (debug) window.__debug = { run, view, enemyView, heroView, effects, terrain, hud, levelUp, pauseMenu, keys };
+  if (debug) window.__debug = { run, view, enemyView, heroView, effects, terrain, hud, levelUp, pauseMenu, keys, pointer };
 
   let stopped = false;
   return {
@@ -248,6 +258,8 @@ export function startGame({
       document.removeEventListener('visibilitychange', onVisibility);
       if (debug) window.removeEventListener('keydown', onDebugKey);
       detachKeyboard();
+      detachPointer();
+      stick.dispose();
       terrain.dispose();
       enemyView.dispose();
       heroView.dispose();
@@ -282,7 +294,7 @@ function createPauseMenu(uiLayer, { onResume, onAbandon }) {
       if (ok) onAbandon();
     },
   }, 'Aufgeben');
-  const root = el('div', { class: 'overlay pause', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'pause-title', hidden: true },
+  const root = el('div', { class: 'overlay pause', 'data-ui-control': true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'pause-title', hidden: true },
     el('div', { class: 'pause-box' },
       el('h2', { id: 'pause-title', text: 'Pause' }),
       el('p', { class: 'muted', text: 'Esc oder „Weiter“ setzt fort.' }),
