@@ -874,3 +874,40 @@ test('survivor: Tod des letzten Bosses gewinnt auch, wenn er kein Bär ist', () 
   stepRun(run, 0.05, NONE);
   assertEqual(run.state, 'won');
 });
+
+// --- Korrekturen aus der Gesamtprüfung ---
+
+test('survivor: Röhren stößt nicht weg, wenn der Treffer nicht ankommt', () => {
+  const w = behaviorWorld();
+  const { tele } = bossUntilTelegraph(w, 'hirsch', 3);
+  assertEqual(tele.kind, 'ring');
+  w.hero.invulnerableUntil = Infinity;
+  const x = w.hero.x, z = w.hero.z;
+  simulate(w, tele.delay + 0.1, 0.05);
+  assertClose(Math.hypot(w.hero.x - x, w.hero.z - z), 0, 1e-9);
+});
+
+test('survivor: Ansturm-Ankündigung trägt den Boss-Radius, damit der Streifen die Trefferfläche zeigt', () => {
+  const w = behaviorWorld();
+  const { tele } = bossUntilTelegraph(w, 'hirsch', 25);
+  assertEqual(tele.kind, 'dash');
+  assertEqual(tele.radius, ENEMIES.hirsch.radius);
+});
+
+test('survivor: Gift endet mit der Sterbephase und mit dem Sieg', () => {
+  const run = newRun();
+  run.world.hero.poison = { until: run.world.time + 100, dps: 1, nextTick: run.world.time + 50 };
+  lethalContact(run);
+  stepRun(run, 0.05, NONE);
+  assertEqual(run.state, 'dying');
+  assertEqual(run.world.hero.poison, null);
+
+  const won = immortal(newRun());
+  won.world.time = 899.9;
+  stepRun(won, 0.2, NONE);
+  won.world.hero.poison = { until: won.world.time + 100, dps: 0, nextTick: won.world.time + 50 };
+  damageEnemy(won.world, won.spawn.finalBoss, { amount: 1e9, crit: false }, 'x');
+  stepRun(won, 0.05, NONE);
+  assertEqual(won.state, 'won');
+  assertEqual(won.world.hero.poison, null);
+});

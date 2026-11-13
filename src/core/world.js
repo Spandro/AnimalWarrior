@@ -294,13 +294,13 @@ function startBossAttack(world, enemy, mv) {
   });
 }
 
-/** Kündigt einen Ansturm an: Streifen ab dem Boss in Richtung Held. */
+/** Kündigt einen Ansturm an: Streifen ab dem Boss in Richtung Held; `radius` (Boss) lässt die Darstellung zeigen, wie weit sein Körper reicht. */
 function startDash(world, enemy, a) {
   const hero = world.hero;
   const to = towards(enemy, hero, hero.facing);
   telegraph(world, enemy, {
     kind: 'dash', x: enemy.x, z: enemy.z, dirX: to.x, dirZ: to.z, length: a.length, width: a.width,
-    delay: a.windup, damageMul: a.damageMul,
+    radius: enemy.radius, delay: a.windup, damageMul: a.damageMul,
   });
 }
 
@@ -359,9 +359,8 @@ function resolveAttack(world, enemy, recover) {
   if (inside && a.kind === 'swipe' && d > enemy.radius) {
     inside = (dx * a.dirX + dz * a.dirZ) / d >= Math.cos(a.halfAngle);
   }
-  if (inside) {
-    damageHero(world, enemy.damage * a.damageMul);
-    if (a.kind === 'ring' && a.push > 0) pushHero(world, d > 1e-9 ? dx / d : 1, d > 1e-9 ? dz / d : 0, a.push);
+  if (inside && damageHero(world, enemy.damage * a.damageMul) && a.kind === 'ring' && a.push > 0) {
+    pushHero(world, d > 1e-9 ? dx / d : 1, d > 1e-9 ? dz / d : 0, a.push);
   }
   ai.phase = 'recover'; ai.until = world.time + recover; ai.attack = null;
 }

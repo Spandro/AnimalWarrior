@@ -342,6 +342,7 @@ function checkOutcome(run) {
       run.deathTime = world.time;
       run.cards = null;
       hero.invulnerableUntil = Infinity;
+      hero.poison = null;
       world.events.push({ type: 'dying' });
       return;
     }
@@ -353,6 +354,7 @@ function checkOutcome(run) {
 function endRun(run, state, eventType) {
   run.state = state;
   run.cards = null;
+  run.world.hero.poison = null;
   run.world.events.push({ type: eventType });
   finishFacts(run);
 }
