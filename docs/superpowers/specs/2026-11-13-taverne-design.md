@@ -272,6 +272,18 @@ Die Zahlen sind Startwerte fürs Balancing, wie bei den anderen Klassen.
 
 - Eine Figur: Die Giraffe trägt das Erdmännchen auf dem Kopf. Das Bild kommt vom Auftraggeber (Abschnitt 9).
 - Größe in der Welt: etwa 2,6 m. Die Figur ist deutlich größer als die anderen Helden (1,6 m), aber kleiner als der Bär (3,2 m).
+- **Bildfolge (Wunsch des Auftraggebers vom 2026-11-13, nach Lieferung):** `duo.webp` enthält vier Phasen nebeneinander. Von links nach rechts zeigen sie:
+  1. Erdmännchen steht oben auf dem Kopf
+  2. Erdmännchen rutscht herunter (Nüsse fallen)
+  3. Erdmännchen klettert den Hals hinauf
+  4. Erdmännchen sitzt auf dem Rücken
+
+  Die Figur spielt sie in entspanntem Rhythmus immer wieder durch, in der Reihenfolge der Bildpositionen **4 → 3 → 1 → 2**: auf dem Rücken, hochklettern, oben stehen, herunterrutschen.
+  - Die Dauer je Phase steht in den Daten. Startwerte des Entwurfs: Rücken 2,5 s, Klettern 1,2 s, oben 2,5 s, Rutschen 0,8 s.
+  - Die Giraffe bleibt in allen Phasen gleich groß und steht auf demselben Fußpunkt, nur das Erdmännchen wechselt.
+  - Die Bildfolge läuft auch im Stand und in der Vorschau.
+  - Bei „Bewegung reduzieren“ bleibt sie auf Phase 4 (Rücken) stehen.
+  - Der Stall und die Heldenerstellung zeigen als Standbild Phase 1 (oben stehen).
 - Die Größe wirkt **nur im Bild**. Körperradius, Trefferfläche, Kamera und Hindernisse bleiben wie bei allen Helden, damit das Duo nicht schwerer zu spielen ist.
 - Neue Gangart „schreiten“: langsamer, gemächlicher Passgang mit leichtem Wiegen des Halses (eine Neigung, kein Hüpfen).
 - Fehlt das Bild, gibt es eine einfache Ersatzfigur aus Grundformen (langer Hals, kleines Erdmännchen obendrauf), wie bei den anderen Helden. Gleiches gilt für die drehende Vorschau bei der Heldenerstellung.
