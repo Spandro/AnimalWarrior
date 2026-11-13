@@ -1,5 +1,5 @@
 import * as THREE from '../../vendor/three.module.min.js';
-import { BOSS } from '../data/enemies.js';
+import { BOSS_MOVES } from '../data/enemies.js';
 import { describeCard } from '../ui/cardText.js';
 
 /**
@@ -481,9 +481,23 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
     burst(dust, 6, e.x, 0.2, e.z, { speed: 1.6, up: 1, life: 0.45, size: 0.1, endSize: 0.2, color: 0x6e5f4a, gravity: 1, drag: 3 });
   }
 
+  /** Ankündigung eines Ansturms: ganzer Streifen blass, Füllung wächst vom Boss aus bis zum Losrennen. */
+  function dashTelegraph(e) {
+    const o = { life: e.delay, x: e.x, z: e.z, yaw: yawToward(e.dirX, e.dirZ), clock: 'world', start: world.time };
+    decals.add(shapes.strip, { ...o, y: 0.06, color: 0xff3a2a }, (k, d) => {
+      d.mesh.scale.set(e.length, 1, e.width);
+      d.material.opacity = 0.28;
+    });
+    decals.add(shapes.strip, { ...o, y: 0.07, color: 0xd81c1c }, (k, d) => {
+      d.mesh.scale.set(Math.max(0.01, e.length * k), 1, e.width * 0.92);
+      d.material.opacity = 0.3 + 0.3 * k;
+    });
+  }
+
   function bossTelegraph(e) {
+    if (e.kind === 'dash') { dashTelegraph(e); return; }
     const swipe = e.kind === 'swipe';
-    const halfAngle = e.halfAngle ?? BOSS.swipe.halfAngle;
+    const halfAngle = e.halfAngle ?? BOSS_MOVES.baer.near.halfAngle;
     const geoFill = swipe ? shapes.sector(2 * halfAngle / DEG) : shapes.disc;
     const geoEdge = swipe ? shapes.sector(2 * halfAngle / DEG, 0.93) : shapes.ring;
     const o = { color: 0xd81c1c, life: e.delay, x: e.x, z: e.z, yaw: yawToward(e.dirX, e.dirZ), clock: 'world', start: world.time };

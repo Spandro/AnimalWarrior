@@ -3,7 +3,7 @@ import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary,
 import { spawnRadius, hpMul, BOSS_HP_MUL, MAX_ENEMIES, DEFAULT_VIEW, DYING, unlockMinute, weights } from '../src/data/waves.js';
 import { createWorld, stepWorld, spawnEnemy, damageEnemy } from '../src/core/world.js';
 import { obstaclesNear, obstaclesInCell } from '../src/core/terrain.js';
-import { ENEMIES, ELITE, DROPS, BOSS, VENOM, POUNCE } from '../src/data/enemies.js';
+import { ENEMIES, ELITE, DROPS, BOSS, BOSS_MOVES, VENOM, POUNCE } from '../src/data/enemies.js';
 
 const NONE = { moveX: 0, moveZ: 0 };
 function clearSeed() {
@@ -746,4 +746,90 @@ test('survivor: Betäubung beim Ducken bricht den Sprung ab', () => {
   simulate(w, 2, 0.05, () => { if (lynx.ai.phase === 'leap') leapt = true; hits += ofType(w.events, 'heroHit').length; });
   assertTrue(!leapt, 'sprang trotz Betäubung');
   assertEqual(hits, 0);
+});
+
+// --- Boss-Baukasten ---
+
+/** Boss ohne Berührungsschaden; läuft, bis er einen Angriff ankündigt. */
+function bossUntilTelegraph(w, type, x) {
+  const boss = spawnEnemy(w, type, x, 0);
+  boss.contactReadyAt = Infinity;
+  let tele = null;
+  for (let i = 0; i < 400 && !tele; i++) { stepWorld(w, 0.05, NONE); tele = ofType(w.events, 'bossTelegraph')[0] || null; }
+  boss.contactReadyAt = Infinity;
+  return { boss, tele };
+}
+
+test('survivor: jeder Boss hat Nah- und Fernangriff; der Bär wie bisher', () => {
+  assertEqual(Object.keys(BOSS_MOVES), ['baer', 'keiler', 'hirsch', 'wisent']);
+  assertEqual(Object.values(BOSS_MOVES).map((m) => [m.near.kind, m.far.kind]),
+    [['swipe', 'leap'], ['swipe', 'dash'], ['ring', 'dash'], ['ring', 'dash']]);
+  const b = BOSS_MOVES.baer;
+  assertEqual([b.chaseTime, b.recover, b.triggerRange], [BOSS.chaseTime, BOSS.recover, BOSS.swipe.triggerRange]);
+  assertEqual(b.near, { kind: 'swipe', ...BOSS.swipe });
+  assertEqual(b.far, { kind: 'leap', ...BOSS.leap });
+  for (const type of ['hirsch', 'keiler', 'wisent']) {
+    const d = ENEMIES[type];
+    assertEqual([d.behavior, d.hp, d.damage, d.xp], ['boss', 1500, 25, 100]);
+  }
+  assertEqual(['hirsch', 'keiler', 'wisent'].map((t) => ENEMIES[t].name), ['Rothirsch', 'Riesenkeiler', 'Wisent']);
+});
+
+test('survivor: Röhren trifft im Ring und stößt weg, außerhalb kein Treffer', () => {
+  for (const stay of [true, false]) {
+    const w = behaviorWorld();
+    const { boss, tele } = bossUntilTelegraph(w, 'hirsch', 3);
+    assertEqual([tele.kind, tele.delay], ['ring', BOSS_MOVES.hirsch.near.windup]);
+    assertClose(tele.radius, ENEMIES.hirsch.radius + BOSS_MOVES.hirsch.near.reach, 1e-9);
+    if (!stay) w.hero.x = -20;
+    const before = dist(boss, w.hero);
+    const hits = [];
+    simulate(w, tele.delay + 0.1, 0.05, () => hits.push(...ofType(w.events, 'heroHit')));
+    assertEqual(hits.map((h) => h.amount), stay ? [ENEMIES.hirsch.damage * BOSS_MOVES.hirsch.near.damageMul] : []);
+    if (stay) assertClose(dist(boss, w.hero) - before, BOSS_MOVES.hirsch.near.push, 0.05);
+  }
+});
+
+test('survivor: Stampfen des Wisents trifft hart, stößt aber nicht weg', () => {
+  const w = behaviorWorld();
+  const { tele } = bossUntilTelegraph(w, 'wisent', 3);
+  assertEqual(tele.kind, 'ring');
+  const x = w.hero.x, z = w.hero.z;
+  const hits = [];
+  simulate(w, tele.delay + 0.1, 0.05, () => hits.push(...ofType(w.events, 'heroHit')));
+  assertEqual(hits.map((h) => h.amount), [ENEMIES.wisent.damage * BOSS_MOVES.wisent.near.damageMul]);
+  assertClose(Math.hypot(w.hero.x - x, w.hero.z - z), 0, 1e-9);
+});
+
+test('survivor: Geweih-Ansturm läuft seine Länge ab und trifft den stehenden Helden genau einmal', () => {
+  const far = BOSS_MOVES.hirsch.far;
+  const w = behaviorWorld();
+  const { boss, tele } = bossUntilTelegraph(w, 'hirsch', 25);
+  assertEqual([tele.kind, tele.length, tele.width, tele.delay], ['dash', far.length, far.width, far.windup]);
+  const hits = [];
+  simulate(w, far.windup + far.dashTime + 0.2, 0.05, () => hits.push(...ofType(w.events, 'heroHit')));
+  assertEqual(hits.map((h) => h.amount), [ENEMIES.hirsch.damage * far.damageMul]);
+
+  const w2 = behaviorWorld();
+  const r = bossUntilTelegraph(w2, 'hirsch', 25);
+  w2.hero.x = 0; w2.hero.z = -40;
+  simulate(w2, far.windup + far.dashTime + 0.05, 0.05);
+  assertClose(dist(r.boss, r.tele), far.length, 0.3);
+  assertTrue(boss.hp > 0);
+});
+
+test('survivor: Keiler stürmt dreimal, jeder Ansturm neu angekündigt und neu ausgerichtet', () => {
+  const far = BOSS_MOVES.keiler.far;
+  const w = behaviorWorld();
+  const { tele } = bossUntilTelegraph(w, 'keiler', 30);
+  assertEqual(tele.kind, 'dash');
+  w.hero.x = 0; w.hero.z = 12;
+  const teles = [tele];
+  simulate(w, far.count * (far.windup + far.dashTime) + (far.count - 1) * far.gap + 0.2, 0.05,
+    () => teles.push(...ofType(w.events, 'bossTelegraph')));
+  assertEqual(teles.map((t) => t.kind), ['dash', 'dash', 'dash']);
+  for (const t of teles.slice(1)) {
+    const to = Math.hypot(w.hero.x - t.x, w.hero.z - t.z);
+    assertTrue((t.dirX * (w.hero.x - t.x) + t.dirZ * (w.hero.z - t.z)) / to > 0.99, 'nicht auf den Helden ausgerichtet');
+  }
 });

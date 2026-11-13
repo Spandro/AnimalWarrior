@@ -7,7 +7,7 @@ import { stepAbilities } from './abilities.js';
 import { CLASSES } from '../data/classes.js';
 import { bonusModifiers } from '../data/bonuses.js';
 import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, CONTACT_TOLERANCE, HERO_RADIUS, SEPARATION_CELL, MAX_ENEMIES,
-  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS, CURL, SLITHER, VENOM, POUNCE } from '../data/enemies.js';
+  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS_MOVES, CURL, SLITHER, VENOM, POUNCE } from '../data/enemies.js';
 import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
 
 /**
@@ -140,20 +140,25 @@ const BEHAVIORS = {
     circleAndLunge(world, enemy, dt, CIRCLE);
   },
 
-  /** Verfolgen, dann Prankenhieb (nah) oder Sprung (fern) mit Vorwarnung, dann kurze Pause. */
+  /**
+   * Bosse: verfolgen, dann Nah- oder Fernangriff aus `BOSS_MOVES` mit Vorwarnung, dann kurze Pause.
+   * Phasen: chase → (swipe|leap|ring|dash: Ankündigung) → recover; ein Ansturm läuft dash → dashing (→ dashGap → dash …).
+   */
   boss(world, enemy, dt) {
+    const mv = BOSS_MOVES[enemy.type] || BOSS_MOVES.baer;
     const ai = enemy.ai, t = world.time;
-    if (!ai.phase) { ai.phase = 'chase'; ai.until = t + BOSS.chaseTime; }
+    if (!ai.phase) { ai.phase = 'chase'; ai.until = t + mv.chaseTime; }
     if (ai.phase === 'chase') {
       if (t < ai.until) { BEHAVIORS.chase(world, enemy, dt); return; }
-      startBossAttack(world, enemy);
+      startBossAttack(world, enemy, mv);
       return;
     }
-    if (ai.phase === 'swipe' || ai.phase === 'leap') {
-      if (t >= ai.until) resolveBossAttack(world, enemy);
-      return;
-    }
-    if (ai.phase === 'recover' && t >= ai.until) { ai.phase = 'chase'; ai.until = t + BOSS.chaseTime; }
+    if (ai.phase === 'dashing') { stepDash(world, enemy, mv); return; }
+    if (ai.phase === 'dashGap') { if (t >= ai.until) startDash(world, enemy, ai.dash); return; }
+    if (ai.phase === 'recover') { if (t >= ai.until) { ai.phase = 'chase'; ai.until = t + mv.chaseTime; } return; }
+    if (t < ai.until) return;
+    if (ai.phase === 'dash') { ai.phase = 'dashing'; ai.dashStart = ai.until; ai.dashK = 0; ai.dashHit = false; return; }
+    resolveAttack(world, enemy, mv.recover);
   },
 
   /** Dein Schatten: kämpft im Stil der Heldenklasse; nach dem Brechen flieht er vom Helden weg. */
@@ -269,14 +274,63 @@ function shadowMelee(world, enemy, dt, c) {
   BEHAVIORS.chase(world, enemy, dt);
 }
 
-function startBossAttack(world, enemy) {
+/** Wählt Nah- oder Fernangriff des Bosses und kündigt ihn an. */
+function startBossAttack(world, enemy, mv) {
   const hero = world.hero;
   const to = towards(enemy, hero, hero.facing);
-  if (to.d <= enemy.radius + BOSS.swipe.triggerRange) { startSwipe(world, enemy, to, BOSS.swipe); return; }
+  const a = to.d <= enemy.radius + mv.triggerRange ? mv.near : mv.far;
+  if (a.kind === 'swipe') { startSwipe(world, enemy, to, a); return; }
+  if (a.kind === 'dash') { enemy.ai.dash = a; enemy.ai.dashLeft = a.count; startDash(world, enemy, a); return; }
+  if (a.kind === 'ring') {
+    telegraph(world, enemy, {
+      kind: 'ring', x: enemy.x, z: enemy.z, radius: enemy.radius + a.reach, delay: a.windup,
+      dirX: to.x, dirZ: to.z, damageMul: a.damageMul, push: a.push,
+    });
+    return;
+  }
   telegraph(world, enemy, {
-    kind: 'leap', x: hero.x, z: hero.z, radius: BOSS.leap.radius, delay: BOSS.leap.windup,
-    dirX: to.x, dirZ: to.z, damageMul: BOSS.leap.damageMul,
+    kind: 'leap', x: hero.x, z: hero.z, radius: a.radius, delay: a.windup,
+    dirX: to.x, dirZ: to.z, damageMul: a.damageMul,
   });
+}
+
+/** Kündigt einen Ansturm an: Streifen ab dem Boss in Richtung Held. */
+function startDash(world, enemy, a) {
+  const hero = world.hero;
+  const to = towards(enemy, hero, hero.facing);
+  telegraph(world, enemy, {
+    kind: 'dash', x: enemy.x, z: enemy.z, dirX: to.x, dirZ: to.z, length: a.length, width: a.width,
+    delay: a.windup, damageMul: a.damageMul,
+  });
+}
+
+/**
+ * Ansturm: der Boss legt die Streifenlänge gleichmäßig in `dashTime` s zurück (Hindernisse schieben ihn wie sonst)
+ * und trifft den Helden höchstens einmal, wenn seine Bahn in diesem Schritt ihn berührt.
+ */
+function stepDash(world, enemy, mv) {
+  const ai = enemy.ai, a = ai.dash, att = ai.attack, hero = world.hero, t = world.time;
+  const k = Math.min(1, (t - ai.dashStart) / a.dashTime);
+  const step = (k - ai.dashK) * a.length;
+  ai.dashK = k;
+  const x0 = enemy.x, z0 = enemy.z;
+  moveDir(enemy, att.dirX, att.dirZ, step);
+  if (!ai.dashHit && segmentDistance(hero, x0, z0, enemy.x, enemy.z) <= enemy.radius + hero.radius + CONTACT_TOLERANCE) {
+    ai.dashHit = true;
+    damageHero(world, enemy.damage * a.damageMul);
+  }
+  if (k < 1) return;
+  ai.dashLeft--;
+  ai.attack = null;
+  if (ai.dashLeft > 0) { ai.phase = 'dashGap'; ai.until = t + a.gap; return; }
+  ai.phase = 'recover'; ai.until = t + mv.recover;
+}
+
+/** Abstand des Punkts p zur Strecke (x0, z0)–(x1, z1). */
+function segmentDistance(p, x0, z0, x1, z1) {
+  const dx = x1 - x0, dz = z1 - z0, len2 = dx * dx + dz * dz;
+  const u = len2 > 0 ? Math.max(0, Math.min(1, ((p.x - x0) * dx + (p.z - z0) * dz) / len2)) : 0;
+  return Math.hypot(p.x - (x0 + dx * u), p.z - (z0 + dz * u));
 }
 
 /** Hieb im Bogen vor dem Angreifer (Reichweite `s.reach` ab seinem Rand, halber Öffnungswinkel `s.halfAngle`). */
@@ -295,10 +349,6 @@ function telegraph(world, enemy, a) {
   world.events.push({ type: 'bossTelegraph', ...a });
 }
 
-function resolveBossAttack(world, enemy) {
-  resolveAttack(world, enemy, BOSS.recover);
-}
-
 /** Schaden, wenn der Held jetzt in der angekündigten Form steht; dann `recover` s Pause. */
 function resolveAttack(world, enemy, recover) {
   const ai = enemy.ai, a = ai.attack, hero = world.hero;
@@ -309,7 +359,10 @@ function resolveAttack(world, enemy, recover) {
   if (inside && a.kind === 'swipe' && d > enemy.radius) {
     inside = (dx * a.dirX + dz * a.dirZ) / d >= Math.cos(a.halfAngle);
   }
-  if (inside) damageHero(world, enemy.damage * a.damageMul);
+  if (inside) {
+    damageHero(world, enemy.damage * a.damageMul);
+    if (a.kind === 'ring' && a.push > 0) pushHero(world, d > 1e-9 ? dx / d : 1, d > 1e-9 ? dz / d : 0, a.push);
+  }
   ai.phase = 'recover'; ai.until = world.time + recover; ai.attack = null;
 }
 
@@ -384,6 +437,17 @@ export function knockback(world, enemy, distance) {
     enemy.x += dx * distance / steps;
     enemy.z += dz * distance / steps;
     if (!enemy.flying) pushOutOfObstacles(world, enemy);
+  }
+}
+
+/** Stößt den Helden um `distance` in Richtung (dirX, dirZ), in Teilstrecken mit Hinderniskollision. */
+export function pushHero(world, dirX, dirZ, distance) {
+  const hero = world.hero;
+  const steps = Math.max(1, Math.ceil(distance / KNOCKBACK_SUBSTEP));
+  for (let i = 0; i < steps; i++) {
+    hero.x += dirX * distance / steps;
+    hero.z += dirZ * distance / steps;
+    pushOutOfObstacles(world, hero);
   }
 }
 

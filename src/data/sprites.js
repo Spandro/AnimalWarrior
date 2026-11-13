@@ -83,6 +83,9 @@ export const ENEMY_SPRITES = {
   kreuzotter: { sheet: 'gegner2', x: 54, y: 707, w: 319, h: 266, heightM: 0.45, motion: 'slither', footOffset: 0.03 },
   igel: { sheet: 'gegner2', x: 441, y: 714, w: 317, h: 269, heightM: 0.5, motion: 'scurry', footOffset: 0.03 },
   luchs: { sheet: 'gegner2', x: 791, y: 683, w: 428, h: 326, heightM: 1.1, motion: 'lope', footOffset: 0.05 },
+  hirsch: { sheet: 'bosse', x: 34, y: 34, w: 433, h: 538, heightM: 4.0, motion: 'trot', footOffset: 0.12 },
+  keiler: { sheet: 'bosse', x: 574, y: 104, w: 416, h: 390, heightM: 2.4, motion: 'trot', footOffset: 0.1 },
+  wisent: { sheet: 'bosse', x: 34, y: 684, w: 434, h: 390, heightM: 3.0, motion: 'lumber', footOffset: 0.12 },
 };
 
 /** Eingerollter Igel: Drehung um die Bildmitte (rad/s, in Laufrichtung) und Stauchung des Bildes. */

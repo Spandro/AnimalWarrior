@@ -327,7 +327,7 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
   // Gegner: je Typ ein Instanzvorrat, gemalt oder als 3D-Form.
   /** @type {Record<string, ReturnType<typeof createPool>>} */
   const enemyPools = {};
-  const capacity = (type) => (type === 'baer' ? BOSS_CAPACITY : ENEMY_CAPACITY);
+  const capacity = (type) => (ENEMIES[type]?.behavior === 'boss' ? BOSS_CAPACITY : ENEMY_CAPACITY);
   /** @type {ReturnType<typeof createPool>[]} */
   let enemyExtras = [];
   let wingL = null, wingR = null, blobs;
@@ -635,7 +635,7 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
         const hop = Math.max(0, Math.sin(gait * 0.55));
         pool.push(place(x, hop * 0.22 * k, z, yaw, k, k * (1 - 0.12 * hop), k, -0.2 * hop), color);
       } else {
-        const bob = Math.abs(Math.sin(gait)) * 0.05 * k * (e.type === 'baer' ? 2 : 1);
+        const bob = Math.abs(Math.sin(gait)) * 0.05 * k * (e.boss ? 2 : 1);
         pool.push(place(x, bob, z, yaw, k, k, k, 0, Math.sin(gait) * 0.06), color);
       }
     }
