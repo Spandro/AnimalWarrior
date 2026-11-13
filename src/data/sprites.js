@@ -1,8 +1,8 @@
 // Gemalte Figuren: wo sie in den Bildbögen liegen, wie groß sie in der Welt sind und wie sie sich bewegen.
 
 /**
- * @typedef {'hop'|'waddle'|'scurry'|'trot'|'fly'|'hopSlow'|'lope'|'lumber'|'slither'} MotionId
- * @typedef {{ sheet: 'helden'|'gegner'|'gegner2'|'bosse', x: number, y: number, w: number, h: number, heightM: number, motion: MotionId,
+ * @typedef {'hop'|'waddle'|'scurry'|'trot'|'fly'|'hopSlow'|'lope'|'lumber'|'slither'|'stride'} MotionId
+ * @typedef {{ sheet: 'helden'|'gegner'|'gegner2'|'bosse'|'duo', x: number, y: number, w: number, h: number, heightM: number, motion: MotionId,
  *   footOffset: number }} SpriteDef
  *   Pixelrechteck der Figur im Bogen (x, y von links oben; enge Umrandung plus 6 px Rand), Höhe in Weltmetern,
  *   footOffset: Höhe des Standpunkts (Mitte der Fußsohlen in der Schrägansicht) über der Bildunterkante in Metern
@@ -12,12 +12,16 @@
  *   tiltRate Neigungsfrequenz relativ zu freq.
  */
 
-/** Bildbögen, relativ zu index.html. */
+/**
+ * Bildbögen, relativ zu index.html. Geladen wird nur, was ein Eintrag in `HERO_SPRITES` oder `ENEMY_SPRITES`
+ * nutzt: `duo` erst, wenn es den Eintrag `giraffe-hochstapler` gibt.
+ */
 export const SHEETS = {
   helden: 'assets/figuren/helden.webp',
   gegner: 'assets/figuren/gegner.webp',
   gegner2: 'assets/figuren/gegner2.webp',
   bosse: 'assets/figuren/bosse.webp',
+  duo: 'assets/figuren/duo.webp',
 };
 
 /**
@@ -56,7 +60,28 @@ export const BILLBOARD = {
 
 const HERO_HEIGHT = 1.6;
 
-/** @type {Record<string, SpriteDef>} Schlüssel `<tier>-<klasse>` */
+/**
+ * Giraffe mit Erdmännchen auf dem Kopf: Höhe des Bildes und der 3D-Ersatzfigur in Weltmetern (nur Bild;
+ * Körperradius und Trefferfläche sind die der Logik).
+ */
+export const DUO_HEIGHT = 2.6;
+
+/**
+ * Darstellung der Duo-Fähigkeiten: Wurfhöhe der Nüsse (m, Kopfhöhe, statt 0,9 m), Strecke (m), auf der eine Nuss auf
+ * Treffhöhe sinkt, Treffhöhe (m), Nussgröße (m, Radius) und Farbe; Erdhaufen der Buddelfalle (Radius und Höhe in m,
+ * Standzeit in s, Farbe und hellere Kuppe); Erdmännchen der Großfamilie (Anzahl, Abstand zur Lockstelle in m, Höhe in m).
+ */
+export const DUO_FX = {
+  throwHeight: 2.4, dropDistance: 4, hitHeight: 0.7, nutSize: 0.13, nutColor: 0x7a4f2a,
+  moundRadius: 0.7, moundHeight: 0.5, moundLife: 2.2, moundColor: 0x5e4026, moundTop: 0x8a6440,
+  familyCount: 3, familySpread: 1.2, familyHeight: 0.9,
+};
+
+/**
+ * @type {Record<string, SpriteDef>} Schlüssel `<tier>-<klasse>`. Das Duo (`giraffe-hochstapler`, Bogen `duo`, Gangart
+ * `stride`, Höhe `DUO_HEIGHT`) bekommt seinen Eintrag erst, wenn das Bild geliefert und ausgemessen ist; bis dahin
+ * zeigt das Spiel die 3D-Ersatzfigur.
+ */
 export const HERO_SPRITES = {
   'hase-krieger': { sheet: 'helden', x: 113, y: 8, w: 279, h: 411, heightM: HERO_HEIGHT, motion: 'hop', footOffset: 0.08 },
   'hase-magier': { sheet: 'helden', x: 493, y: 8, w: 272, h: 410, heightM: HERO_HEIGHT, motion: 'hop', footOffset: 0.08 },
@@ -120,6 +145,7 @@ export const MOTION = {
   lope: { freq: 2.4, bob: 0.12, tilt: 0.1, squash: 0.05, tiltRate: 1 },
   lumber: { freq: 1.1, bob: 0.1, tilt: 0.07, squash: 0.03, tiltRate: 1 },
   slither: { freq: 1.6, bob: 0, tilt: 0.08, squash: 0.06 },
+  stride: { freq: 1.4, bob: 0.05, tilt: 0.08, squash: 0.02, tiltRate: 1 },
 };
 
 /** Treffer am Helden: Dauer (ms) und Farbfaktor (RGB, multipliziert das Bild) des roten Aufblitzens. */

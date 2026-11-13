@@ -2,10 +2,10 @@
 // Einzige Stelle, die wissen muss, wie eine Figur im Menü gezeigt wird.
 import * as THREE from '../../vendor/three.module.min.js';
 import { buildCharacter, animateCharacter } from '../render/character.js';
-import { spriteMotion } from '../render/sprites.js';
+import { spriteMotion, heroSpriteDef } from '../render/sprites.js';
 import { ANIMALS } from '../data/animals.js';
 import { CLASSES } from '../data/classes.js';
-import { HERO_SPRITES, MOTION_FULL_SPEED } from '../data/sprites.js';
+import { MOTION_FULL_SPEED, DUO_HEIGHT } from '../data/sprites.js';
 
 const BACKGROUND = 0x2c3a2a;
 const GROUND = 0x4a5a3c;
@@ -17,6 +17,8 @@ const FEET_LINE = 0.88;
 const SHOW_PERIOD = 4;
 const SHOW_LENGTH = 1.4;
 const SHOW_SPEED = MOTION_FULL_SPEED * 0.6;
+/** 3D-Vorschau: Höhe (m), auf die das Duo verkleinert wird, damit es in den Bildausschnitt der anderen Helden passt. */
+const DUO_PREVIEW_HEIGHT = 1.7;
 
 const css = (hex) => `#${hex.toString(16).padStart(6, '0')}`;
 
@@ -39,23 +41,39 @@ export function createFigurePreview(shared, { width = 240, height = 260, sprites
   element.setAttribute('role', 'img');
   const ctx = element.getContext('2d');
 
-  /** @type {{ setFigure(a: string, c: string): void, frame(t: number): void, dispose(): void } | null} */
+  /** @typedef {{ setFigure(a: string, c: string): void, frame(t: number): void, dispose(): void }} Painter */
+  /** Gemalt, wenn es für die Figur ein Bild gibt, sonst 3D; beide entstehen erst bei Bedarf. */
+  /** @type {{ sprite?: Painter, figure?: Painter }} */
+  const painters = {};
+  /** @type {Painter|null} */
   let painter = null;
+  /** @type {import('../render/sprites.js').SpriteSheets|null} */
+  let sheets = null;
+  let loaded = false;
   let figure = null;
   let disposed = false;
   let rafId = 0;
   const start = performance.now();
 
+  function choosePainter() {
+    if (!loaded || !figure) return;
+    painter = heroSpriteDef(sheets, ...figure)
+      ? (painters.sprite ??= createSpritePainter(ctx, element, sheets))
+      : (painters.figure ??= createFigurePainter(ctx, element, shared.renderer, width, height));
+    painter.setFigure(...figure);
+  }
+
   Promise.resolve(sprites).then((s) => {
     if (disposed) return;
-    painter = s?.ok ? createSpritePainter(ctx, element, s) : createFigurePainter(ctx, element, shared.renderer, width, height);
-    if (figure) painter.setFigure(...figure);
+    sheets = s ?? null;
+    loaded = true;
+    choosePainter();
   });
 
   function setFigure(animalId, classId) {
     figure = [animalId, classId];
     element.setAttribute('aria-label', `Vorschau: ${ANIMALS[animalId].name} als ${CLASSES[classId].name}`);
-    painter?.setFigure(animalId, classId);
+    choosePainter();
   }
 
   function frame(now) {
@@ -73,7 +91,8 @@ export function createFigurePreview(shared, { width = 240, height = 260, sprites
     dispose() {
       disposed = true;
       cancelAnimationFrame(rafId);
-      painter?.dispose();
+      painters.sprite?.dispose();
+      painters.figure?.dispose();
       element.remove();
     },
   };
@@ -83,7 +102,7 @@ export function createFigurePreview(shared, { width = 240, height = 260, sprites
 function createSpritePainter(ctx, element, sprites) {
   let def = null;
   return {
-    setFigure(animalId, classId) { def = HERO_SPRITES[`${animalId}-${classId}`]; },
+    setFigure(animalId, classId) { def = heroSpriteDef(sprites, animalId, classId); },
     frame(t) {
       const W = element.width, H = element.height;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -150,6 +169,8 @@ function createFigurePainter(ctx, element, renderer, width, height) {
       // Figuren teilen Geometrien und Materialien; daher nur aus der Szene nehmen, nicht freigeben.
       if (figure) scene.remove(figure);
       figure = buildCharacter(animalId, classId);
+      // Das Duo (2,6 m) passt verkleinert in denselben Bildausschnitt; die übrigen Helden bleiben, wie sie sind.
+      if (figure.userData.duo) figure.scale.setScalar(DUO_PREVIEW_HEIGHT / DUO_HEIGHT);
       scene.add(figure);
     },
     frame(t) {

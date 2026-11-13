@@ -1,12 +1,12 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { ENEMIES } from '../data/enemies.js';
 import { ABILITIES } from '../data/abilities.js';
-import { ENEMY_SPRITES, HERO_SPRITES, CROW_FLIGHT_HEIGHT, BILLBOARD, CURL_ROLL } from '../data/sprites.js';
+import { ENEMY_SPRITES, CROW_FLIGHT_HEIGHT, BILLBOARD, CURL_ROLL, DUO_FX } from '../data/sprites.js';
 import { isCurled } from '../core/world.js';
 import { SHADOW } from '../data/shadow.js';
 import { ENV_SPRITES } from '../data/environment.js';
 import {
-  billboardOrientation, spriteGeometry, spriteWidth, spriteMaterial, shadowMaterial, composeSprite, spriteMotion,
+  billboardOrientation, spriteGeometry, spriteWidth, spriteMaterial, shadowMaterial, composeSprite, spriteMotion, heroSpriteDef,
 } from './sprites.js';
 import { buildCharacter, animateCharacter } from './character.js';
 
@@ -372,7 +372,7 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
   let shadowFigure = null;
   function ensureShadowFigure(hero) {
     if (shadowFigure) return shadowFigure;
-    const def = painted ? HERO_SPRITES[`${hero.animalId}-${hero.classId}`] : null;
+    const def = heroSpriteDef(sprites, hero.animalId, hero.classId);
     if (def) {
       const material = mat(new THREE.MeshBasicMaterial({
         map: sprites.textures[def.sheet], color: SHADOW_LOOK.color, transparent: true, opacity: SHADOW_LOOK.opacity,
@@ -408,6 +408,14 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
   const daggers = createPool(root, daggerGeo,
     mat(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.2, emissive: 0x30343a })), 128);
   const daggerTrail = createPool(root, ballGeo, glowMat(0xcfe0ff, 0.35, true), 128);
+  // Nüsse des Duos: Nuss mit dunklerem Hütchen, in Welteinheitsgröße (skaliert mit DUO_FX.nutSize).
+  const nuts = createPool(root, geo(mergeParts([
+    ['sphere', DUO_FX.nutColor, [0, -0.1, 0], [0.85, 0.9, 0.85]],
+    ['sphere', 0x4a2e16, [0, 0.45, 0], [0.8, 0.4, 0.8]],
+    ['cyl', 0x3a2410, [0, 0.85, 0], [0.12, 0.3, 0.12]],
+  ])), mat(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, emissive: 0x24160a })), 96);
+  /** Startpunkt je Nuss beim ersten Erscheinen (nur für die Wurfhöhe). */
+  const nutStart = new WeakMap();
   const spitCore = createPool(root, ballGeo, glowMat(0xa6d84a), 64);
   const spitHalo = createPool(root, ballGeo, glowMat(0x5f9a18, 0.45, true), 64);
   const shadowShotCore = createPool(root, ballGeo, glowMat(0x2a1640), 32);
@@ -465,7 +473,7 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
   }
 
   const allPools = [
-    ...Object.values(enemyPools), ...enemyExtras, blobs, eliteHalo, shadowAura, fireCore, fireHalo, daggers, daggerTrail,
+    ...Object.values(enemyPools), ...enemyExtras, blobs, eliteHalo, shadowAura, fireCore, fireHalo, daggers, daggerTrail, nuts,
     spitCore, spitHalo, shadowShotCore, shadowShotHalo,
     orbCore, orbHalo, poisonDisc, poisonRing, burnDisc, burnRing, targetRing, targetFill, otherDisc, meteorRock,
     xpPool, goldPool, potionPool, chestPool,
@@ -649,6 +657,14 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
         const yaw = Math.atan2(pr.dirX, pr.dirZ);
         daggers.push(place(p.x, 0.9, p.z, yaw, k * 1.15));
         daggerTrail.push(place(p.x - pr.dirX * 0.45, 0.9, p.z - pr.dirZ * 0.45, yaw, 0.07 * k, 0.04 * k, 0.55 * k));
+      } else if (pr.abilityId === 'nussregen') {
+        // Vom Giraffenkopf geworfen: startet auf Kopfhöhe und fällt auf den ersten Metern auf Treffhöhe; dreht sich.
+        let start = nutStart.get(pr);
+        if (!start) nutStart.set(pr, start = { x: pr.x, z: pr.z });
+        const f = Math.min(1, Math.hypot(pr.x - start.x, pr.z - start.z) / DUO_FX.dropDistance);
+        const y = DUO_FX.hitHeight + (DUO_FX.throwHeight - DUO_FX.hitHeight) * (1 - f * f);
+        const s = DUO_FX.nutSize * pr.size / 0.25;
+        nuts.push(place(p.x, y, p.z, Math.atan2(pr.dirX, pr.dirZ), s, s, s, t * 14));
       } else {
         const r = pr.size * (1 + 0.08 * Math.sin(t * 30));
         fireCore.push(place(p.x, 0.95, p.z, 0, r));
@@ -686,7 +702,8 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
         const left = Math.max(0, Math.min(1, zone.delayLeft / delay));
         targetRing.push(place(zone.x, 0.05, zone.z, 0, r));
         targetFill.push(place(zone.x, 0.045, zone.z, 0, Math.max(0.01, r * (1 - left))));
-        meteorRock.push(place(zone.x - 5 * left, 0.6 + 16 * left, zone.z - 5 * left, t * 4, 0.7));
+        // Die Buddelfalle kommt von unten (Erdhaufen in effects.js), alles andere stürzt herab.
+        if (zone.abilityId !== 'buddelfalle') meteorRock.push(place(zone.x - 5 * left, 0.6 + 16 * left, zone.z - 5 * left, t * 4, 0.7));
       } else if (zone.abilityId === 'giftflaeche') {
         const wobble = 1 + 0.025 * Math.sin(t * 3 + zone.x);
         poisonDisc.push(place(zone.x, 0.035, zone.z, 0, r * wobble));

@@ -1,5 +1,6 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { BOSS_MOVES, HERO_RADIUS } from '../data/enemies.js';
+import { DUO_FX } from '../data/sprites.js';
 import { describeCard } from '../ui/cardText.js';
 
 /**
@@ -30,6 +31,7 @@ export const ABILITY_COLOR = {
   erdspalter: 0xb8743a, feuerball: 0xff8a30, frostring: 0x9fe4ff, kettenblitz: 0xc4e4ff, meteor: 0xff7a2a,
   arkankugeln: 0xa880ff, wurfdolche: 0xdfe8ff, giftflaeche: 0x8ccf3c, schattenklon: 0x7a5ad0,
   klingenfaecher: 0xdfe8ff, rauchbombe: 0x9a9aa2,
+  halsschwinger: 0xf2c46a, nussregen: 0xb07a40, stampede: 0xd9aa62, buddelfalle: 0x9a6a3a, grossfamilie: 0xe6c890,
 };
 const colorOf = (id) => ABILITY_COLOR[id] ?? 0xffffff;
 
@@ -428,7 +430,29 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
       }
     } else if (e.abilityId === 'giftflaeche') {
       burst(dust, 14, e.tx ?? e.x, 0.2, e.tz ?? e.z, { speed: 2, up: 2, life: 0.6, size: 0.14, color: 0x7fb83a, spread: e.params.radius * 0.6, gravity: 2 });
+    } else if (e.abilityId === 'buddelfalle') {
+      // Erste Erdkrümel, wo gleich das Loch aufgeht.
+      burst(dust, 8, e.tx ?? e.x, 0.1, e.tz ?? e.z, { speed: 1, up: 2.5, life: 0.5, size: 0.08, color: DUO_FX.moundColor, spread: 0.4, gravity: 9 });
     }
+  }
+
+  /** Buddelfalle geht auf: ein kleiner Erdhaufen am Einschlagpunkt, Erdbrocken fliegen, ein dunkler Fleck bleibt. */
+  function dirtMound(e) {
+    const r = e.radius || 1;
+    // Haufen aus zwei Kuppen (dunkler Fuß, hellere Spitze), die schnell aufwerfen und am Ende einsinken und verblassen.
+    const mound = (color, w, h, y) => decals.add(shapes.sphere, { color, life: DUO_FX.moundLife, x: e.x, y, z: e.z, renderOrder: 2 }, (k, d) => {
+      const rise = Math.min(1, k * 8), sink = k < 0.75 ? 1 : 1 - (k - 0.75) / 0.25;
+      d.mesh.scale.set(w * (0.6 + 0.4 * rise), Math.max(0.001, h * rise * (0.4 + 0.6 * sink)), w * (0.6 + 0.4 * rise));
+      d.material.opacity = sink;
+    });
+    mound(DUO_FX.moundColor, DUO_FX.moundRadius, DUO_FX.moundHeight, 0);
+    mound(DUO_FX.moundTop, DUO_FX.moundRadius * 0.55, DUO_FX.moundHeight * 0.75, DUO_FX.moundHeight * 0.3);
+    decals.add(shapes.disc, { color: 0x2a1a10, life: DUO_FX.moundLife, x: e.x, y: 0.03, z: e.z, renderOrder: 0 }, (k, d) => {
+      d.mesh.scale.setScalar(DUO_FX.moundRadius * 1.8);
+      d.material.opacity = 0.3 * (1 - k);
+    });
+    burst(dust, 18, e.x, 0.2, e.z, { speed: r * 1.6, up: 4, life: 0.7, size: 0.13, endSize: 0.06, color: DUO_FX.moundColor, gravity: 12, drag: 1 });
+    burst(dust, 8, e.x, 0.3, e.z, { speed: r, up: 1, life: 0.8, size: 0.3, endSize: 0.5, color: 0x8a7458, gravity: 0, drag: 2 });
   }
 
   function castBuff(e) {
@@ -442,13 +466,21 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
   }
 
   function castSummon(e) {
+    if (e.abilityId === 'grossfamilie') {
+      // Die Verwandtschaft buddelt sich aus dem Boden: sandiger Staub statt dunklem Rauch.
+      burst(dust, 18, e.tx ?? e.x, 0.2, e.tz ?? e.z, { speed: 2, up: 2.5, life: 0.6, size: 0.12, endSize: 0.05, color: DUO_FX.moundColor, gravity: 9, spread: DUO_FX.familySpread });
+      burst(dust, 8, e.tx ?? e.x, 0.3, e.tz ?? e.z, { speed: 1.5, up: 0.8, life: 0.7, size: 0.25, endSize: 0.4, color: 0xb89a70, gravity: 0, drag: 3 });
+      return;
+    }
     burst(dust, 18, e.tx ?? e.x, 0.6, e.tz ?? e.z, { speed: 2.5, up: 1.5, life: 0.6, size: 0.25, endSize: 0.45, color: 0x2a2238, gravity: 0, drag: 3 });
   }
 
   function castProjectile(e) {
     const color = colorOf(e.abilityId);
+    // Das Erdmännchen wirft vom Giraffenkopf: der Wurf startet auf Kopfhöhe.
+    const y = e.abilityId === 'nussregen' ? DUO_FX.throwHeight : 0.9;
     for (let j = 0, n = count(5); j < n; j++) {
-      glow.spawn(e.x + e.dirX * 0.6, 0.9, e.z + e.dirZ * 0.6, e.dirX * rand(2, 5) + rand(-1, 1), rand(0, 1), e.dirZ * rand(2, 5) + rand(-1, 1),
+      glow.spawn(e.x + e.dirX * 0.6, y, e.z + e.dirZ * 0.6, e.dirX * rand(2, 5) + rand(-1, 1), rand(0, 1), e.dirZ * rand(2, 5) + rand(-1, 1),
         { life: 0.18, size: 0.06, color, drag: 4 });
     }
   }
@@ -561,7 +593,7 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
     for (const e of events) {
       switch (e.type) {
         case 'cast': CAST[e.shape]?.(e); break;
-        case 'explosion': explosion(e); break;
+        case 'explosion': if (e.abilityId === 'buddelfalle') dirtMound(e); else explosion(e); break;
         case 'hit': hit(e); break;
         case 'kill': kill(e); break;
         case 'bossTelegraph': bossTelegraph(e); break;

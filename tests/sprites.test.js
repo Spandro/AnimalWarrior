@@ -1,13 +1,16 @@
 import { test, assertEqual, assertClose, assertTrue } from './runner.js';
-import { removeBackground, spriteUv, spriteMotion } from '../src/render/sprites.js';
+import { removeBackground, spriteUv, spriteMotion, heroSpriteDef, usedSheets } from '../src/render/sprites.js';
 import { lookYaw } from '../src/render/hero.js';
-import { HERO_SPRITES, ENEMY_SPRITES, MOTION, IDLE, SHEETS, SHEET_HOLES } from '../src/data/sprites.js';
+import { buildCharacter, animateCharacter } from '../src/render/character.js';
+import * as THREE from '../vendor/three.module.min.js';
+import { HERO_SPRITES, ENEMY_SPRITES, MOTION, IDLE, SHEETS, SHEET_HOLES, DUO_HEIGHT } from '../src/data/sprites.js';
 import { ENEMIES } from '../src/data/enemies.js';
 import { ANIMALS } from '../src/data/animals.js';
 import { CLASSES } from '../src/data/classes.js';
 import { isValidPair } from '../src/core/roster.js';
 
 const OPTS = { threshold: 28, feather: 60 };
+const DUO_KEY = 'giraffe-hochstapler';
 
 /** Bild mit weißem Grund; `paint(x, y)` liefert [r, g, b] oder null für Weiß. */
 function image(w, h, paint) {
@@ -159,11 +162,47 @@ test('sprites: jede Heldenkombination und jeder Gegnertyp hat ein Bild', () => {
   for (const a of Object.keys(ANIMALS)) {
     for (const c of Object.keys(CLASSES)) {
       if (!isValidPair(a, c)) continue;
-      if (a === 'giraffe' && !HERO_SPRITES[`${a}-${c}`]) continue; // Bild des Duos: erst, wenn es einen Eintrag gibt (Aufgabe 5)
-      check(`${a}-${c}`, HERO_SPRITES[`${a}-${c}`]);
+      const key = `${a}-${c}`;
+      if (key === DUO_KEY && !HERO_SPRITES[key]) continue; // ein fehlender Duo-Eintrag ist erlaubt (eigener Test unten)
+      check(key, HERO_SPRITES[key]);
     }
   }
   for (const type of Object.keys(ENEMIES)) check(type, ENEMY_SPRITES[type]);
+});
+
+test('sprites: stride ist eine bekannte Gangart; SHEETS.duo ist relativ; ein fehlender Duo-Eintrag ist erlaubt', () => {
+  assertEqual(MOTION.stride, { freq: 1.4, bob: 0.05, tilt: 0.08, squash: 0.02, tiltRate: 1 });
+  assertEqual(SHEETS.duo, 'assets/figuren/duo.webp');
+  assertTrue(!SHEETS.duo.startsWith('/'), 'Pfad muss relativ sein');
+  assertEqual(DUO_HEIGHT, 2.6);
+  // Geladene Bögen ohne Duo-Bild: es gibt kein Bild für das Duo, die Grundhelden behalten ihres.
+  const sheets = { ok: true, textures: { helden: {} }, sizes: {}, canvases: {} };
+  const duo = HERO_SPRITES[DUO_KEY];
+  if (duo) {
+    assertEqual([duo.sheet, duo.motion, duo.heightM], ['duo', 'stride', DUO_HEIGHT]);
+    assertEqual(heroSpriteDef({ ...sheets, textures: { ...sheets.textures, duo: {} } }, 'giraffe', 'hochstapler'), duo);
+  }
+  assertEqual(heroSpriteDef(sheets, 'giraffe', 'hochstapler'), null);
+  assertEqual(heroSpriteDef(sheets, 'hase', 'krieger'), HERO_SPRITES['hase-krieger']);
+  assertEqual(heroSpriteDef({ ok: false, textures: {} }, 'hase', 'krieger'), null);
+  assertEqual(heroSpriteDef(undefined, 'hase', 'krieger'), null);
+  // Geladen werden nur Bögen, die ein Eintrag nutzt: ohne Duo-Eintrag kein Versuch, duo.webp zu holen.
+  const used = usedSheets();
+  for (const s of [...Object.values(HERO_SPRITES), ...Object.values(ENEMY_SPRITES)]) assertTrue(used.includes(s.sheet), s.sheet);
+  assertEqual(used.includes('duo'), !!duo);
+});
+
+test('sprites: die Ersatzfigur des Duos ist etwa 2,6 m hoch und lässt sich bewegen', () => {
+  const fig = buildCharacter('giraffe', 'hochstapler');
+  const box = new THREE.Box3().setFromObject(fig);
+  assertTrue(Math.abs(box.max.y - DUO_HEIGHT) < 0.2 && box.min.y > -0.05, `Höhe ${box.min.y.toFixed(2)}…${box.max.y.toFixed(2)}`);
+  for (const attackT of [undefined, 0.2, 0.5, 0.9]) {
+    animateCharacter(fig, { speed: 4, time: 1.3, attackT });
+    fig.traverse((o) => assertTrue([o.position.x, o.position.y, o.rotation.x, o.rotation.z].every(Number.isFinite), o.name));
+  }
+  // Die Grundhelden bleiben unverändert (etwa 1,6 m).
+  const hase = new THREE.Box3().setFromObject(buildCharacter('hase', 'krieger'));
+  assertTrue(hase.max.y < 2.1, `Hase ${hase.max.y}`);
 });
 
 test('sprites: alle Gegnerausschnitte liegen im Bogen; die neuen wie ausgemessen', () => {

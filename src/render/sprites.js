@@ -1,6 +1,6 @@
 // Gemalte Figuren: Bildbögen laden, weißen Hintergrund entfernen, Texturen anlegen, Bewegung berechnen.
 import * as THREE from '../../vendor/three.module.min.js';
-import { SHEETS, SHEET_HOLES, BACKGROUND, BILLBOARD, MOTION, IDLE, ATTACK, MOTION_FULL_SPEED, HOP_BACK_LEAN } from '../data/sprites.js';
+import { SHEETS, SHEET_HOLES, HERO_SPRITES, ENEMY_SPRITES, BACKGROUND, BILLBOARD, MOTION, IDLE, ATTACK, MOTION_FULL_SPEED, HOP_BACK_LEAN } from '../data/sprites.js';
 
 /**
  * @typedef {{ width: number, height: number, data: Uint8ClampedArray|Uint8Array }} ImageDataLike
@@ -214,17 +214,46 @@ export function prepareSheet(image, holes = []) {
 }
 
 /**
- * Lädt beide Bildbögen, entfernt den Hintergrund und legt je Bogen eine Textur und ein 2D-Canvas
- * (für die Menüvorschau) an. Wirft nie: schlägt etwas fehl, `ok: false`.
+ * Bildbögen, die ein Eintrag in `HERO_SPRITES` oder `ENEMY_SPRITES` nutzt (nur diese werden geladen).
+ * @returns {string[]}
+ */
+export function usedSheets() {
+  return [...new Set([...Object.values(HERO_SPRITES), ...Object.values(ENEMY_SPRITES)].map((s) => s.sheet))];
+}
+
+/**
+ * Bildausschnitt eines Helden, wenn es einen Eintrag gibt und sein Bogen geladen ist; sonst `null` (dann zeigt
+ * man die 3D-Ersatzfigur). So führt ein fehlender Eintrag oder ein fehlendes Bild (etwa das Duo) nie zu einem Fehler.
+ * @param {SpriteSheets|null|undefined} sprites
+ * @param {string} animalId
+ * @param {string} classId
+ * @returns {import('../data/sprites.js').SpriteDef|null}
+ */
+export function heroSpriteDef(sprites, animalId, classId) {
+  const def = HERO_SPRITES[`${animalId}-${classId}`];
+  return sprites?.ok && def && sprites.textures?.[def.sheet] ? def : null;
+}
+
+/**
+ * Lädt die genutzten Bildbögen, entfernt den Hintergrund und legt je Bogen eine Textur und ein 2D-Canvas
+ * (für die Menüvorschau) an. Wirft nie: fehlt ein Bogen der Gegner, `ok: false` (alles in 3D); fehlt einer, den nur
+ * Helden nutzen, zeigen diese Helden ihre 3D-Ersatzfigur ({@link heroSpriteDef}).
  * @returns {Promise<SpriteSheets>}
  */
 export async function loadSpriteSheets() {
   const result = { ok: false, textures: {}, sizes: {}, canvases: {} };
   try {
-    const entries = Object.entries(SHEETS);
-    const images = await Promise.all(entries.map(([, url]) => loadImage(url)));
-    entries.forEach(([id], k) => {
-      const sheet = prepareSheet(images[k], SHEET_HOLES[id] || []);
+    const ids = usedSheets();
+    const required = new Set(Object.values(ENEMY_SPRITES).map((s) => s.sheet));
+    const images = await Promise.allSettled(ids.map((id) => loadImage(SHEETS[id])));
+    ids.forEach((id, k) => {
+      const loaded = images[k];
+      if (loaded.status === 'rejected') {
+        if (required.has(id)) throw loaded.reason;
+        console.warn(`Figurenbild ${SHEETS[id]} nicht verfügbar, zeige dafür 3D-Figuren.`);
+        return;
+      }
+      const sheet = prepareSheet(loaded.value, SHEET_HOLES[id] || []);
       result.textures[id] = sheet.texture;
       result.sizes[id] = sheet.size;
       result.canvases[id] = sheet.canvas;

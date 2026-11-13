@@ -1,11 +1,11 @@
 import * as THREE from '../../vendor/three.module.min.js';
-import { buildCharacter, animateCharacter } from './character.js';
+import { buildCharacter, animateCharacter, buildMeerkat, animateMeerkat } from './character.js';
 import { createTracker } from './enemies.js';
 import {
-  billboardOrientation, spriteGeometry, spriteWidth, spriteMaterial, shadowMaterial, composeSprite, spriteMotion,
+  billboardOrientation, spriteGeometry, spriteWidth, spriteMaterial, shadowMaterial, composeSprite, spriteMotion, heroSpriteDef,
 } from './sprites.js';
 import { CLASSES } from '../data/classes.js';
-import { HERO_SPRITES, BILLBOARD, AIM_TURN_DURATION, HERO_FLASH, HERO_POISON_TINT, DYING_TILT } from '../data/sprites.js';
+import { DUO_FX, BILLBOARD, AIM_TURN_DURATION, HERO_FLASH, HERO_POISON_TINT, DYING_TILT } from '../data/sprites.js';
 import { ABILITIES } from '../data/abilities.js';
 
 /** Dauer der Hiebanimation in Weltsekunden. */
@@ -37,7 +37,9 @@ const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
  * @param {{ sprites?: import('./sprites.js').SpriteSheets, camera?: THREE.Camera }} [options]
  */
 export function createHeroView(scene, animalId, classId, { sprites, camera } = {}) {
-  const body = sprites?.ok && HERO_SPRITES[`${animalId}-${classId}`] ? createSpriteBody(scene, animalId, classId, sprites, camera) : createFigureBody(scene, animalId, classId);
+  const def = heroSpriteDef(sprites, animalId, classId);
+  const body = def ? createSpriteBody(scene, def, sprites, camera) : createFigureBody(scene, animalId, classId);
+  const family = createFamily(scene);
 
   // Heller Bodenring unter dem Helden, damit er im Gewühl auffindbar bleibt.
   const ringGeo = new THREE.RingGeometry(0.62, 0.74, 40).rotateX(-Math.PI / 2);
@@ -63,6 +65,8 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
   let speed = 0, lastX = NaN, lastZ = NaN, lastT = NaN, lastRenderT = NaN;
   /** Treffer-Aufblitzen (Echtzeit in ms) und Sterbezustand (Neigung und Deckkraft, 0…1). */
   let flashUntil = -Infinity, dyingTilt = 0, opacity = 1, dying = false;
+  /** Beschwörungen eines Bildes, nach Darstellung getrennt (wiederverwendet). */
+  const clonesNow = [], familyNow = [];
 
   /**
    * Startet die Hiebanimation bei jedem Einsatz der Startfähigkeit.
@@ -115,11 +119,16 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
     });
     ringMat.opacity = RING_OPACITY * opacity;
     ring.position.set(position.x, 0.03, position.z);
-    body.updateClones(world.summons, t);
+    // Großfamilie: statt der dunklen Heldenkopie drei Erdmännchen um die Lockstelle; andere Beschwörungen bleiben Klone.
+    clonesNow.length = 0; familyNow.length = 0;
+    for (const s of world.summons) (s.abilityId === 'grossfamilie' ? familyNow : clonesNow).push(s);
+    body.updateClones(clonesNow, t);
+    family.update(familyNow, t);
   }
 
   function dispose() {
     body.dispose();
+    family.dispose();
     scene.remove(ring);
     ringGeo.dispose();
     ringMat.dispose();
@@ -161,8 +170,7 @@ export function lookYaw(facing, aim) {
 }
 
 /** Gemalter Held: eine Bildtafel mit Bodenschatten; Klone als dunkle Kopien derselben Tafel. */
-function createSpriteBody(scene, animalId, classId, sprites, camera) {
-  const def = HERO_SPRITES[`${animalId}-${classId}`];
+function createSpriteBody(scene, def, sprites, camera) {
   const orient = billboardOrientation(camera);
   const geometry = spriteGeometry(def, sprites.sizes[def.sheet]);
   const material = spriteMaterial(sprites.textures[def.sheet]);
@@ -258,6 +266,35 @@ function createSpriteBody(scene, animalId, classId, sprites, camera) {
       blobGeo.dispose();
       blobMat.dispose();
     },
+  };
+}
+
+/**
+ * Erdmännchen der Großfamilie: je Beschwörung `DUO_FX.familyCount` kleine Figuren aus Grundformen im Kreis um die
+ * Lockstelle; sie wachsen beim Erscheinen und schrumpfen beim Verschwinden.
+ */
+function createFamily(scene) {
+  /** @type {THREE.Group[]} */
+  const figures = [];
+  return {
+    update(summons, t) {
+      let i = 0;
+      for (const s of summons) {
+        const fade = Math.min(1, s.timeLeft / 0.4);
+        for (let j = 0; j < DUO_FX.familyCount; j++, i++) {
+          let f = figures[i];
+          if (!f) { f = buildMeerkat(DUO_FX.familyHeight); scene.add(f); figures.push(f); }
+          const a = (j / DUO_FX.familyCount) * Math.PI * 2 + 0.5;
+          f.position.set(s.x + Math.cos(a) * DUO_FX.familySpread, 0, s.z + Math.sin(a) * DUO_FX.familySpread);
+          f.rotation.y = Math.atan2(Math.cos(a), Math.sin(a)); // schauen nach außen, zu den Gegnern
+          f.scale.setScalar(0.4 + 0.6 * fade);
+          animateMeerkat(f, t + j * 1.9);
+          f.visible = true;
+        }
+      }
+      for (; i < figures.length; i++) figures[i].visible = false;
+    },
+    dispose() { scene.remove(...figures); },
   };
 }
 

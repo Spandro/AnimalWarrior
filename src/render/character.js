@@ -1,6 +1,5 @@
 import * as THREE from '../../vendor/three.module.min.js';
-import { ANIMALS } from '../data/animals.js';
-import { CLASSES } from '../data/classes.js';
+import { DUO_HEIGHT } from '../data/sprites.js';
 
 /**
  * Heldenfiguren aus Grundkörpern. Lokale Achsen: y oben, Blickrichtung (vorn) ist +z,
@@ -286,16 +285,14 @@ const DRESS = { krieger: dressKrieger, magier: dressMagier, dieb: dressDieb };
 // ---------------------------------------------------------------- Aufbau
 
 /**
- * Baut eine Heldenfigur. Blickrichtung +z; die Gruppe dreht man über `rotation.y`.
- * @param {'hase'|'ente'|'waschbaer'} animalId
- * @param {'krieger'|'magier'|'dieb'} classId
+ * Baut eine Heldenfigur. Blickrichtung +z; die Gruppe dreht man über `rotation.y`. Das Duo (Giraffe mit
+ * Erdmännchen, nur als Hochstapler) ist eine eigene Ersatzfigur, siehe {@link buildDuo}.
+ * @param {'hase'|'ente'|'waschbaer'|'giraffe'} animalId
+ * @param {'krieger'|'magier'|'dieb'|'hochstapler'} classId
  * @returns {THREE.Group} mit `userData.parts` ({@link CharacterParts}) und `userData.attach` ({@link AttachPoints})
  */
 export function buildCharacter(animalId, classId) {
-  // Tier oder Klasse der Daten ohne eigene Figur (das Duo bis zur Ersatzfigur) werden als Hase im Kriegergewand gebaut,
-  // statt zu werfen.
-  if (!Object.hasOwn(ANIMAL_LOOK, animalId) && Object.hasOwn(ANIMALS, animalId)) animalId = 'hase';
-  if (!Object.hasOwn(DRESS, classId) && Object.hasOwn(CLASSES, classId)) classId = 'krieger';
+  if (animalId === 'giraffe' && classId === 'hochstapler') return buildDuo();
   const look = ANIMAL_LOOK[animalId];
   if (!look) throw new Error('Unbekanntes Tier: ' + animalId);
   if (!DRESS[classId]) throw new Error('Unbekannte Klasse: ' + classId);
@@ -398,7 +395,9 @@ const lerp = (a, b, t) => a + (b - a) * t;
  * @param {THREE.Group} group Rückgabe von {@link buildCharacter}
  * @param {AnimationInput} input speed in m/s, time in s, attackT 0→1 während eines Hiebs (sonst weglassen)
  */
-export function animateCharacter(group, { speed = 0, time = 0, attackT } = {}) {
+export function animateCharacter(group, input = {}) {
+  if (group.userData.duo) { animateDuo(group, input); return; }
+  const { speed = 0, time = 0, attackT } = input;
   const { parts, rest } = group.userData;
   const move = Math.min(1, Math.max(0, speed) / FULL_SPEED);
   const phase = time * STRIDE_RATE;
@@ -438,4 +437,188 @@ export function animateCharacter(group, { speed = 0, time = 0, attackT } = {}) {
       parts.ears[i].rotation.x = rest.earX[i] - 0.25 * move + Math.sin(time * 1.7 + i) * 0.04;
     }
   }
+}
+
+// ---------------------------------------------------------------- Duo: Giraffe mit Erdmännchen
+
+const GIRAFFE = { fur: 0xd9a650, patch: 0x7a4a22, light: 0xefdcb0, hoof: 0x3a2c22, mane: 0x6a4020 };
+const MEERKAT = { fur: 0xc9a46e, light: 0xe8d3a8, dark: 0x3b2c20 };
+/** Schulterhöhe der Giraffe (Drehpunkt der Beine) und Neigung des Halses nach vorn (rad), vor dem Skalieren. */
+const DUO_LEG = 1.15;
+const DUO_NECK_TILT = 0.28;
+
+/** Kapsel mit echtem Radius r und echter Gesamtlänge len entlang y (eigene, geteilte Geometrie je Maß). */
+function rod(parent, material, pos, r, len, rot) {
+  const g = geo(`rod:${r}:${len}`, () => new THREE.CapsuleGeometry(r, Math.max(0.001, len - 2 * r), 6, 12));
+  return add(parent, g, material, pos, [1, 1, 1], rot);
+}
+
+/**
+ * Kleines Erdmännchen aus Grundformen, aufrecht stehend; Füße auf y = 0, Kopf oben bei etwa `height`.
+ * @param {number} height Gesamthöhe in Metern (ohne Hut)
+ * @param {{ hat?: boolean }} [options] `hat`: kleiner Zylinder (der Hochstapler auf dem Giraffenkopf)
+ * @returns {THREE.Group} mit `userData.meerkat` ({ body, head, tail })
+ */
+export function buildMeerkat(height, { hat = false } = {}) {
+  const root = new THREE.Group();
+  root.name = 'meerkat';
+  const k = group(root, [0, 0, 0], 'meerkatScale'); // Figur in Einheitsgröße (1 m), dann skaliert
+  k.scale.setScalar(height);
+  const fur = mat(MEERKAT.fur), light = mat(MEERKAT.light), dark = mat(MEERKAT.dark, { rough: 0.6 });
+  for (const s of [1, -1]) add(k, SPHERE(), fur, [s * 0.07, 0.04, 0.03], [0.06, 0.04, 0.09]); // Füße
+  const body = group(k, [0, 0.08, 0], 'body');
+  rod(body, fur, [0, 0.33, 0], 0.12, 0.7);
+  add(body, SPHERE(), light, [0, 0.33, 0.06], [0.085, 0.25, 0.07]);                        // heller Bauch
+  for (const s of [1, -1]) rod(body, fur, [s * 0.08, 0.46, 0.08], 0.03, 0.17, [0.9, 0, s * 0.2]); // Ärmchen vor der Brust
+  const head = group(body, [0, 0.8, 0.01], 'head');
+  add(head, SPHERE(), fur, [0, 0, 0], [0.1, 0.1, 0.11]);
+  add(head, CONE(), light, [0, -0.02, 0.12], [0.06, 0.12, 0.06], [Math.PI / 2, 0, 0]);  // spitze Schnauze
+  add(head, SPHERE(), NOSE_DARK, [0, -0.02, 0.18], [0.018, 0.015, 0.015]);
+  for (const s of [1, -1]) {
+    add(head, SPHERE(), dark, [s * 0.05, 0.02, 0.07], [0.035, 0.03, 0.03]);              // dunkle Augenflecken
+    add(head, SPHERE(), EYE, [s * 0.052, 0.025, 0.093], [0.014, 0.014, 0.01]);
+    add(head, SPHERE(), dark, [s * 0.085, 0.05, -0.01], [0.025, 0.025, 0.012]);           // Ohren
+  }
+  if (hat) {
+    const hatMat = mat(0x2a2430, { rough: 0.6 });
+    add(head, CYL(), hatMat, [0, 0.085, -0.01], [0.1, 0.012, 0.1]);                       // Krempe
+    add(head, CYL(), hatMat, [0, 0.15, -0.01], [0.065, 0.13, 0.065]);
+    add(head, CYL(), mat(0x9a2f2f), [0, 0.105, -0.01], [0.067, 0.025, 0.067]);            // Hutband
+  }
+  const tail = group(k, [0, 0.12, -0.08], 'tail');
+  rod(tail, fur, [0, 0, -0.13], 0.025, 0.3, [Math.PI / 2 + 0.5, 0, 0]);
+  add(tail, SPHERE(), dark, [0, -0.1, -0.24], [0.025, 0.025, 0.03]);
+  root.userData.meerkat = { body, head, tail };
+  return root;
+}
+
+/**
+ * Erdmännchen hält Ausschau: wiegt sich leicht und dreht den Kopf ruckartig zur nächsten Seite
+ * (rein aus der Zeit, ohne innere Uhr).
+ * @param {THREE.Group} meerkat Rückgabe von {@link buildMeerkat}
+ * @param {number} time s
+ */
+export function animateMeerkat(meerkat, time) {
+  const { body, head, tail } = meerkat.userData.meerkat;
+  body.rotation.z = Math.sin(time * 1.3) * 0.05;
+  const step = Math.floor(time / 0.9);
+  const k = Math.min(1, (time / 0.9 - step) * 5);
+  const look = (n) => Math.sin(n * 2.4) * 0.7;
+  head.rotation.y = look(step) + (look(step + 1) - look(step)) * smooth(k);
+  tail.rotation.y = Math.sin(time * 2) * 0.2;
+}
+
+/**
+ * Ersatzfigur des Duos: Giraffenkörper mit langem Hals, auf dem Kopf steht ein Erdmännchen mit Zylinder.
+ * Auf `DUO_HEIGHT` skaliert; nur Bild, Körperradius und Trefferfläche sind die der Logik.
+ * @returns {THREE.Group} mit `userData.duo` und den Teilen für {@link animateDuo}
+ */
+function buildDuo() {
+  const root = new THREE.Group();
+  root.name = 'hero:giraffe:hochstapler';
+  const fig = group(root, [0, 0, 0], 'duoScale');
+  const fur = mat(GIRAFFE.fur), patch = mat(GIRAFFE.patch, { rough: 0.95 }), light = mat(GIRAFFE.light);
+  const hoof = mat(GIRAFFE.hoof, { rough: 0.5 }), mane = mat(GIRAFFE.mane);
+
+  // Beine: Drehpunkt an Schulter und Hüfte; vorn links, vorn rechts, hinten links, hinten rechts.
+  const legs = [];
+  for (const [x, z, name] of [[0.15, 0.3, 'legFL'], [-0.15, 0.3, 'legFR'], [0.15, -0.32, 'legBL'], [-0.15, -0.32, 'legBR']]) {
+    const leg = group(fig, [x, DUO_LEG, z], name);
+    rod(leg, fur, [0, -0.3, 0], 0.062, 0.6);
+    rod(leg, fur, [0, -0.8, 0], 0.042, 0.62);
+    add(leg, SPHERE(), light, [0, -0.6, 0], [0.065, 0.065, 0.065]);                     // Knie
+    add(leg, CYL(), hoof, [0, -DUO_LEG + 0.04, 0.01], [0.06, 0.08, 0.07]);
+    legs.push(leg);
+  }
+
+  // Rumpf: nach hinten abfallend, mit Flecken.
+  const body = group(fig, [0, DUO_LEG, 0], 'body');
+  add(body, SPHERE(), fur, [0, 0.12, 0], [0.27, 0.27, 0.52], [0.12, 0, 0]);
+  add(body, SPHERE(), light, [0, 0.0, 0.05], [0.22, 0.17, 0.42]);                          // heller Bauch
+  for (const [x, y, z, r] of [[0.22, 0.2, 0.18, 0.09], [0.24, 0.1, -0.12, 0.1], [0.2, 0.26, -0.3, 0.08], [0.25, 0.0, 0.3, 0.07]]) {
+    for (const s of [1, -1]) add(body, SPHERE(), patch, [s * x, y, z], [0.03, r, r * 1.2]);
+  }
+  add(body, SPHERE(), patch, [0, 0.37, -0.05], [0.1, 0.03, 0.12]);                         // Fleck auf dem Rücken
+
+  const tail = group(body, [0, 0.2, -0.5], 'tail');
+  tail.rotation.x = -0.35;
+  rod(tail, fur, [0, -0.2, 0], 0.025, 0.45);
+  add(tail, SPHERE(), mane, [0, -0.44, 0], [0.045, 0.08, 0.045]);
+
+  // Hals: Drehpunkt vorn oben am Rumpf, nach vorn geneigt; trägt den Kopf.
+  const neck = group(body, [0, 0.22, 0.36], 'neck');
+  rod(neck, fur, [0, 0.42, 0], 0.1, 0.95);
+  for (const [y, r] of [[0.2, 0.06], [0.45, 0.055], [0.68, 0.05]]) {
+    for (const s of [1, -1]) add(neck, SPHERE(), patch, [s * 0.085, y, 0], [0.025, r, r]);
+  }
+  for (let i = 0; i < 6; i++) add(neck, BOX(), mane, [0, 0.1 + i * 0.14, -0.09], [0.03, 0.12, 0.05]); // Mähne
+
+  const head = group(neck, [0, 0.9, 0.02], 'head');
+  add(head, SPHERE(), fur, [0, 0, 0.02], [0.11, 0.11, 0.14]);
+  add(head, SPHERE(), light, [0, -0.03, 0.17], [0.075, 0.075, 0.12]);                      // Schnauze
+  add(head, SPHERE(), NOSE_DARK, [0, -0.01, 0.27], [0.03, 0.02, 0.02]);
+  for (const s of [1, -1]) {
+    add(head, SPHERE(), EYE, [s * 0.085, 0.03, 0.08], [0.022, 0.026, 0.022]);
+    const ear = group(head, [s * 0.1, 0.05, -0.04], s > 0 ? 'earL' : 'earR');
+    ear.rotation.z = s * -1.1;
+    add(ear, SPHERE(), fur, [0, 0.07, 0], [0.03, 0.08, 0.02]);
+    // Hörnchen (Ossikone) mit dunkler Kuppe
+    add(head, CYL(), fur, [s * 0.045, 0.12, -0.05], [0.018, 0.12, 0.018], [-0.15, 0, s * -0.15]);
+    add(head, SPHERE(), mane, [s * 0.054, 0.18, -0.06], [0.026, 0.026, 0.026]);
+  }
+
+  // Das Erdmännchen steht hinter den Hörnchen auf dem Kopf und schaut nach vorn.
+  const rider = buildMeerkat(0.44, { hat: true });
+  rider.position.set(0, 0.07, -0.1);
+  head.add(rider);
+
+  root.userData.duo = true;
+  root.userData.parts = { body, neck, head, tail, legs, rider };
+  root.userData.attach = { hand: head, offHand: head, head: rider, torso: body };
+  root.userData.animalId = 'giraffe';
+  root.userData.classId = 'hochstapler';
+  root.userData.rest = { bodyY: body.position.y, tailX: tail.rotation.x };
+  animateDuo(root, {});
+  // Auf die Bildhöhe bringen (gemessen in der Ruhehaltung).
+  const top = new THREE.Box3().setFromObject(fig).max.y;
+  fig.scale.setScalar(DUO_HEIGHT / top);
+  return root;
+}
+
+/**
+ * Pose des Duos rein aus den Eingaben: Passgang (die Beine einer Seite gemeinsam), nickender Hals; beim Hieb
+ * (Halsschwinger) holt der Hals zur Seite aus und schwingt quer nach vorn. Das Erdmännchen hält Ausschau.
+ * @param {THREE.Group} group
+ * @param {AnimationInput} input
+ */
+function animateDuo(group, { speed = 0, time = 0, attackT } = {}) {
+  const { parts, rest } = group.userData;
+  const move = Math.min(1, Math.max(0, speed) / FULL_SPEED);
+  const phase = time * STRIDE_RATE * 0.6; // lange Beine: ruhigere Schritte
+  const swing = Math.sin(phase) * 0.45 * move;
+  const breathe = Math.sin(time * 1.6);
+  parts.legs[0].rotation.x = swing; parts.legs[2].rotation.x = swing;
+  parts.legs[1].rotation.x = -swing; parts.legs[3].rotation.x = -swing;
+
+  const idleX = DUO_NECK_TILT + Math.sin(phase * 2) * 0.05 * move + breathe * 0.02;
+  let neckX = idleX, neckY = 0, neckZ = 0;
+  if (attackT !== undefined && attackT > 0 && attackT < 1) {
+    // Ausholen nach rechts hinten, quer nach links vorn durchschwingen, zurück in die Ruhehaltung.
+    if (attackT < 0.35) {
+      const k = smooth(attackT / 0.35);
+      neckY = lerp(0, -0.7, k); neckX = lerp(idleX, 0.05, k);
+    } else if (attackT < 0.6) {
+      const k = smooth((attackT - 0.35) / 0.25), dip = Math.sin(Math.PI * k);
+      neckY = lerp(-0.7, 0.7, k); neckX = lerp(0.05, 0.75, dip); neckZ = -0.25 * dip;
+    } else {
+      const k = smooth((attackT - 0.6) / 0.4);
+      neckY = lerp(0.7, 0, k); neckX = lerp(0.05, idleX, k);
+    }
+  }
+  parts.neck.rotation.set(neckX, neckY, neckZ);
+  parts.head.rotation.set(-neckX * 0.8, 0, 0); // Kopf bleibt ungefähr waagerecht
+  parts.body.position.y = rest.bodyY + Math.abs(Math.cos(phase)) * 0.04 * move + breathe * 0.005;
+  parts.body.rotation.set(0, neckY * 0.15, Math.sin(phase) * 0.03 * move);
+  parts.tail.rotation.set(rest.tailX, Math.sin(time * 2.2) * 0.25, 0);
+  animateMeerkat(parts.rider, time);
 }
