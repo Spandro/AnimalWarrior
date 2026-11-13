@@ -121,7 +121,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/serve.ps1 -Port 8080
 
 - Diese Datei und die beiden Pläne (Kästchen je Schritt)
 - `git log` – jede Aufgabe ist ein eigener Commit mit sprechendem Betreff
-- Auf diesem Rechner zusätzlich das Arbeitsprotokoll der Subagenten-Ausführung (nicht im Repo, weil von Git ignoriert): `.superpowers/sdd/2026-11-13-spielgefuehl-und-handy/progress.md` mit Prüfbefunden, zurückgestellten Kleinigkeiten und Entscheidungen; dort liegen auch die Aufträge je Aufgabe (`task-N-brief.md`) und die Berichte (`task-N-report.md`)
+- Das Arbeitsprotokoll der Ausführung lag unter `.superpowers/sdd/<plan>/progress.md` (von Git ignoriert) und wird nach der Gesamtprüfung gelöscht. Alles, was darüber hinaus zählt – Entscheidungen, zurückgestellte Kleinigkeiten, Prüfbefunde –, steht deshalb hier in den Abschnitten 7 und 8. Für Paket 1 ist dieser Ordner bereits weg.
 
 ## 7. Paket 1 ist abgeschlossen
 
