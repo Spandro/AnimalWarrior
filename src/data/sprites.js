@@ -85,6 +85,9 @@ export const ENEMY_SPRITES = {
   luchs: { sheet: 'gegner2', x: 791, y: 683, w: 428, h: 326, heightM: 1.1, motion: 'lope', footOffset: 0.05 },
 };
 
+/** Eingerollter Igel: Drehung um die Bildmitte (rad/s, in Laufrichtung) und Stauchung des Bildes. */
+export const CURL_ROLL = { spin: 10, scale: 0.85 };
+
 /** Flughöhe der Krähe über dem Boden (m, Unterkante des Bildes). */
 export const CROW_FLIGHT_HEIGHT = 1.2;
 

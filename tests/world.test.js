@@ -1,7 +1,7 @@
 import { test, assertEqual, assertClose, assertTrue } from './runner.js';
-import { createWorld, stepWorld, spawnEnemy, damageEnemy, damageHero, recomputeHeroStats } from '../src/core/world.js';
+import { createWorld, stepWorld, spawnEnemy, damageEnemy, damageHero, recomputeHeroStats, isCurled } from '../src/core/world.js';
 import { obstaclesInCell, obstaclesNear } from '../src/core/terrain.js';
-import { DROPS, ELITE, ENEMIES } from '../src/data/enemies.js';
+import { DROPS, ELITE, ENEMIES, CURL } from '../src/data/enemies.js';
 
 const NONE = { moveX: 0, moveZ: 0 };
 /** Seed, dessen Gelände um den Startpunkt frei ist (damit Laufstrecken nicht durch Hindernisse gestört werden). */
@@ -284,4 +284,47 @@ test('world: Boss bleibt außerhalb des Heldenkreises', () => {
     stepWorld(w, 0.05, NONE);
     assertTrue(Math.hypot(bear.x - w.hero.x, bear.z - w.hero.z) >= w.hero.radius + bear.radius - 1e-6);
   }
+});
+
+// Igel (Einrollen)
+const HIT = (amount) => ({ amount, crit: false });
+
+test('world: Igel rollt sich nach einem Treffer ein; der auslösende Treffer zählt voll', () => {
+  const w = newWorld();
+  const igel = spawnEnemy(w, 'igel', 6, 0);
+  assertTrue(!isCurled(w, igel));
+  damageEnemy(w, igel, HIT(5), 'x');
+  assertEqual(igel.hp, 15);
+  assertTrue(isCurled(w, igel));
+});
+
+test('world: eingerollter Igel nimmt ein Fünftel Schaden und rollt dreimal so schnell', () => {
+  const w = newWorld();
+  const igel = spawnEnemy(w, 'igel', 6, 0);
+  damageEnemy(w, igel, HIT(5), 'x');
+  damageEnemy(w, igel, HIT(5), 'x');
+  assertClose(igel.hp, 14, 1e-9);
+  assertEqual(w.events.filter((e) => e.type === 'hit').map((e) => e.amount), [5, 1]);
+  run(w, 0.5, 0.05, NONE);
+  assertClose(6 - igel.x, CURL.speedMul * ENEMIES.igel.speed * 0.5, 0.05);
+});
+
+test('world: Igel entrollt nach 2,5 s und rollt sich 1,5 s lang nicht erneut ein', () => {
+  const w = newWorld();
+  const igel = spawnEnemy(w, 'igel', 6, 0);
+  igel.hp = 1e6;
+  const t0 = w.time;
+  let recurledAt = null;
+  for (let i = 0; i <= 60; i++) {
+    w.time = t0 + i * 0.1;
+    const before = igel.hp;
+    damageEnemy(w, igel, HIT(10), 'x');
+    const since = w.time - t0;
+    if (since > 2.55 && since < 3.95) {
+      assertTrue(!isCurled(w, igel), `eingerollt bei ${since.toFixed(1)} s`);
+      assertClose(before - igel.hp, 10, 1e-9);
+    }
+    if (recurledAt === null && since >= 3.95 && isCurled(w, igel)) recurledAt = since;
+  }
+  assertClose(recurledAt, 4, 0.06);
 });

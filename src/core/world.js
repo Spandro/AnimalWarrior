@@ -7,7 +7,7 @@ import { stepAbilities } from './abilities.js';
 import { CLASSES } from '../data/classes.js';
 import { bonusModifiers } from '../data/bonuses.js';
 import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, CONTACT_TOLERANCE, HERO_RADIUS, SEPARATION_CELL, MAX_ENEMIES,
-  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS } from '../data/enemies.js';
+  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS, CURL } from '../data/enemies.js';
 import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
 
 /**
@@ -74,6 +74,14 @@ const BEHAVIORS = {
       ai.phase = 'walk'; ai.until = t + CHARGE.interval;
     }
     BEHAVIORS.chase(world, enemy, dt);
+  },
+
+  /** Igel: verfolgt; eingerollt (nach einem Treffer) rollt er mit `CURL.speedMul`-fachem Tempo direkt aufs Ziel. */
+  curl(world, enemy, dt) {
+    if (!isCurled(world, enemy)) { BEHAVIORS.chase(world, enemy, dt); return; }
+    const to = towards(enemy, enemyTarget(world, enemy));
+    if (to.d === 0) return;
+    moveDir(enemy, to.x, to.z, Math.min(to.d, enemySpeed(world, enemy) * CURL.speedMul * dt));
   },
 
   /** Nähert sich mit seitlichem Versatz, der regelmäßig die Seite wechselt. */
@@ -257,6 +265,15 @@ function resolveAttack(world, enemy, recover) {
   }
   if (inside) damageHero(world, enemy.damage * a.damageMul);
   ai.phase = 'recover'; ai.until = world.time + recover; ai.attack = null;
+}
+
+/**
+ * Ob ein Igel gerade eingerollt ist.
+ * @param {World} world
+ * @param {Enemy} enemy
+ */
+export function isCurled(world, enemy) {
+  return world.time < (enemy.ai.curledUntil ?? -Infinity);
 }
 
 /**
@@ -448,7 +465,8 @@ export function spawnShadow(world, x, z, { hp, damage, expiresAt }) {
 export function damageEnemy(world, enemy, hit, abilityId) {
   const index = world.enemies.indexOf(enemy);
   if (index < 0 || enemy.untargetable) return;
-  world.events.push({ type: 'hit', x: enemy.x, z: enemy.z, amount: hit.amount, crit: hit.crit });
+  const amount = enemy.behavior === 'curl' ? curlOnHit(world, enemy, hit.amount) : hit.amount;
+  world.events.push({ type: 'hit', x: enemy.x, z: enemy.z, amount, crit: hit.crit });
   const dbA = world.run.damageByAbility;
   if (enemy.shadow) {
     const dealt = Math.max(0, Math.min(hit.amount, enemy.hp - 1));
@@ -457,8 +475,8 @@ export function damageEnemy(world, enemy, hit, abilityId) {
     if (enemy.hp <= 1) startShadowFlee(world, enemy);
     return;
   }
-  enemy.hp -= hit.amount;
-  dbA[abilityId] = (dbA[abilityId] || 0) + hit.amount;
+  enemy.hp -= amount;
+  dbA[abilityId] = (dbA[abilityId] || 0) + amount;
   if (enemy.hp > 0) return;
 
   world.enemies.splice(index, 1);
@@ -470,6 +488,20 @@ export function damageEnemy(world, enemy, hit, abilityId) {
   if (world.rng.chance(DROPS.goldChance)) drop('gold', world.rng.int(1, 3));
   if (world.rng.chance(DROPS.potionChance)) drop('potion', DROPS.potionHeal);
   if (enemy.elite) drop('chest', DROPS.chestGold);
+}
+
+/**
+ * Igel: eingerollt nimmt er nur `CURL.damageTaken` des Schadens; sonst rollt ihn ein Treffer ein (dieser zählt voll),
+ * sofern die Abklingzeit vorbei ist. Liefert den wirksamen Schaden.
+ */
+function curlOnHit(world, enemy, amount) {
+  const ai = enemy.ai, t = world.time;
+  if (isCurled(world, enemy)) return amount * CURL.damageTaken;
+  if (t >= (ai.curlReadyAt ?? -Infinity)) {
+    ai.curledUntil = t + CURL.duration;
+    ai.curlReadyAt = ai.curledUntil + CURL.cooldown;
+  }
+  return amount;
 }
 
 /** Der Schatten ist gebrochen: Truhe an seiner Stelle, dann flieht er unantastbar `SHADOW.fleeDuration` s. */
