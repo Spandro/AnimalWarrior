@@ -1,8 +1,9 @@
-# Neue Gegner und Bosse: Bilder vorbereitet (noch nicht im Spiel)
+# Neue Gegner und Bosse: Bilder
 
-Stand 2026-11-13. Die Bilder hat der Auftraggeber geliefert; sie liegen im Repo, sind aber noch nicht eingebaut.
-Was jedes Tier im Spiel tut (Tempo, Leben, Angriff, ab welcher Minute), ist noch nicht geklärt. Das kommt mit
-dem Paket „Neue Gegner“ (Wünsche klären, Spec, Plan, wie in `docs/UEBERGABE.md` beschrieben).
+Stand 2026-11-13. Die Bilder hat der Auftraggeber geliefert; sie sind **eingebaut** (Paket „Neue Gegner und wechselnde
+Bosse“, Spec `docs/superpowers/specs/2026-11-13-neue-gegner-und-bosse-design.md`). Ausschnitte, Höhen und Gangarten
+stehen in `ENEMY_SPRITES` (`src/data/sprites.js`), die Startpunkte für eingeschlossenes Papierweiß in `SHEET_HOLES`.
+Die Rollen unten waren der Ausgangspunkt der Klärung; was jedes Tier jetzt tut, steht in der Spec.
 
 ## Dateien
 
@@ -33,7 +34,7 @@ ohne Überlappung mit Nachbarn. Format wie `SpriteDef` in `src/data/sprites.js` 
 | keiler | bosse | 574 | 104 | 416 | 390 |
 | wisent | bosse | 34 | 684 | 434 | 390 |
 
-Höhe in Metern (`heightM`), Standpunkt (`footOffset`) und Gangart (`motion`) legt erst der Einbau fest.
+Höhe in Metern (`heightM`), Standpunkt (`footOffset`) und Gangart (`motion`) stehen seit dem Einbau in `ENEMY_SPRITES`.
 
 ## Eingeschlossenes Papierweiß
 
@@ -51,14 +52,14 @@ Ohne Zusatz blieben sie im Spiel als weiße Flecken stehen (im Browser auf Grasg
 | bosse | Lücke im Hirschgeweih | 233 | 296, 165 |
 | bosse | kleine Lücke im Hirschgeweih | 31 | 388, 127 |
 
-Vorschlag für den Einbau: je Bogen eine Liste solcher Punkte in den Daten; `removeBackground` füllt zusätzlich von
-dort aus (gleiche Schwelle und gleicher weicher Rand wie vom Bildrand). Ein Test sichert, dass ein umschlossenes Weiß
-nur mit Punkt entfernt wird. Für die Weißkanten (Fuchsschwanz, Dachsgesicht, Uhu) war nichts nötig, sie sind sauber.
+So eingebaut: `SHEET_HOLES` je Bogen; `removeBackground` füllt zusätzlich von dort aus (gleiche Schwelle und gleicher
+weicher Rand wie vom Bildrand). Ein Test sichert, dass ein umschlossenes Weiß nur mit Punkt entfernt wird; im Browser
+war danach in beiden Bögen keine deckende weiße Fläche ab 20 Pixeln mehr übrig. Für die Weißkanten (Fuchsschwanz, Dachsgesicht, Uhu) war nichts nötig, sie sind sauber.
 
 **Nebenbefund:** Auch `assets/figuren/helden.webp` hat kleine umschlossene, rein weiße Stellen (bis 133 Pixel, z. B.
 um 1052/450, 933/659, 738/839). Ob sie im Spiel als Fleck auffallen, ist nicht geprüft.
 
-## Vorschläge für die Rollen (noch offen)
+## Vorschläge für die Rollen (Ausgangspunkt der Klärung)
 
 Aus dem Bildauftrag, nur als Ausgangspunkt für die Klärung:
 

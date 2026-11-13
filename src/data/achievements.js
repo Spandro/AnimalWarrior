@@ -1,3 +1,5 @@
+import { BOSS_POOL } from './waves.js';
+
 /**
  * Lebenslange Zähler im Spielstand (gemeinsam für alle Helden).
  * @typedef {{ kills: Record<string, number>, runs: number, wins: number, winsByAnimal: Record<string, number>,
@@ -49,8 +51,49 @@ export const ACHIEVEMENTS = [
     line: 'Er wollte nur kuscheln. Vermutlich.', gold: 75, check: killed('baer', 1),
   },
   {
-    id: 'baerenhunger', title: 'Bärenhunger', condition: 'Besiege in einem Durchgang zwei Bären',
-    line: 'Honig ist jetzt wieder vorrätig.', gold: 100, check: (c) => (c.run.killsByType.baer || 0) >= 2,
+    id: 'baerenhunger', title: 'Bärenhunger', condition: 'Besiege insgesamt zwei Bären',
+    line: 'Honig ist jetzt wieder vorrätig.', gold: 100, check: killed('baer', 2),
+  },
+  {
+    id: 'fuchsteufelswild', title: 'Fuchsteufelswild', condition: 'Besiege insgesamt 100 Füchse',
+    line: 'So schlau waren sie dann doch nicht.', gold: 50, check: killed('fuchs', 100),
+  },
+  {
+    id: 'stachelkugel', title: 'Stachelkugel', condition: 'Besiege insgesamt 50 Igel',
+    line: 'Die Stacheln nimmst du als Andenken mit.', gold: 50, check: killed('igel', 50),
+  },
+  {
+    id: 'dachsschaden', title: 'Dachsschaden', condition: 'Besiege insgesamt 50 Dachse',
+    line: 'Der Bau ist jetzt zu vermieten.', gold: 50, check: killed('dachs', 50),
+  },
+  {
+    id: 'schlangenbeschwoerer', title: 'Schlangenbeschwörer', condition: 'Besiege insgesamt 50 Kreuzottern',
+    line: 'Gegengift? Brauchst du nicht.', gold: 50, check: killed('kreuzotter', 50),
+  },
+  {
+    id: 'nachteule', title: 'Nachteule', condition: 'Besiege insgesamt 50 Uhus',
+    line: 'Uhu? Du!', gold: 75, check: killed('uhu', 50),
+  },
+  {
+    id: 'luchsauge', title: 'Luchsauge', condition: 'Besiege insgesamt 50 Luchse',
+    line: 'Er hat dich gesehen. Geholfen hat es ihm nicht.', gold: 75, check: killed('luchs', 50),
+  },
+  {
+    id: 'platzhirsch', title: 'Platzhirsch', condition: 'Besiege einen Rothirsch',
+    line: 'Jetzt bist du hier der Platzhirsch.', gold: 75, check: killed('hirsch', 1),
+  },
+  {
+    id: 'saustark', title: 'Saustark', condition: 'Besiege einen Riesenkeiler',
+    line: 'Das Wildschwein nennt dich jetzt Chef.', gold: 75, check: killed('keiler', 1),
+  },
+  {
+    id: 'wisentlich', title: 'Wisentlich stärker', condition: 'Besiege einen Wisent',
+    line: 'Ein Wisent weniger, ein Wissen mehr.', gold: 75, check: killed('wisent', 1),
+  },
+  {
+    id: 'grosswildjaeger', title: 'Großwildjäger', condition: 'Besiege jeden der vier Bosse mindestens einmal',
+    line: 'Die Wildnis spricht nur noch flüsternd von dir.', gold: 150,
+    check: (c) => BOSS_POOL.every((type) => (c.stats.kills[type] || 0) >= 1),
   },
   {
     id: 'ueberlebenskuenstler', title: 'Überlebenskünstler', condition: 'Gewinne einen Durchgang',

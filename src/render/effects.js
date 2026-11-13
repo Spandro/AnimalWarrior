@@ -1,5 +1,5 @@
 import * as THREE from '../../vendor/three.module.min.js';
-import { BOSS } from '../data/enemies.js';
+import { BOSS_MOVES, HERO_RADIUS } from '../data/enemies.js';
 import { describeCard } from '../ui/cardText.js';
 
 /**
@@ -481,9 +481,27 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
     burst(dust, 6, e.x, 0.2, e.z, { speed: 1.6, up: 1, life: 0.45, size: 0.1, endSize: 0.2, color: 0x6e5f4a, gravity: 1, drag: 3 });
   }
 
+  /**
+   * Ankündigung eines Ansturms: ganzer Streifen blass, Füllung wächst vom Boss aus bis zum Losrennen. Der Streifen
+   * zeigt die Trefferfläche: Bahn plus Körper des Bosses (`radius`) und des Helden.
+   */
+  function dashTelegraph(e) {
+    const o = { life: e.delay, x: e.x, z: e.z, yaw: yawToward(e.dirX, e.dirZ), clock: 'world', start: world.time };
+    const length = e.length + (e.radius ?? 0) + HERO_RADIUS, width = e.width + 2 * HERO_RADIUS;
+    decals.add(shapes.strip, { ...o, y: 0.06, color: 0xff3a2a }, (k, d) => {
+      d.mesh.scale.set(length, 1, width);
+      d.material.opacity = 0.28;
+    });
+    decals.add(shapes.strip, { ...o, y: 0.07, color: 0xd81c1c }, (k, d) => {
+      d.mesh.scale.set(Math.max(0.01, length * k), 1, width * 0.92);
+      d.material.opacity = 0.3 + 0.3 * k;
+    });
+  }
+
   function bossTelegraph(e) {
+    if (e.kind === 'dash') { dashTelegraph(e); return; }
     const swipe = e.kind === 'swipe';
-    const halfAngle = e.halfAngle ?? BOSS.swipe.halfAngle;
+    const halfAngle = e.halfAngle ?? BOSS_MOVES.baer.near.halfAngle;
     const geoFill = swipe ? shapes.sector(2 * halfAngle / DEG) : shapes.disc;
     const geoEdge = swipe ? shapes.sector(2 * halfAngle / DEG, 0.93) : shapes.ring;
     const o = { color: 0xd81c1c, life: e.delay, x: e.x, z: e.z, yaw: yawToward(e.dirX, e.dirZ), clock: 'world', start: world.time };
@@ -553,7 +571,7 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
         case 'shadowAppear': case 'shadowVanish': shadowSmoke(e); break;
         case 'shadowFlee': shadowSmoke(e, 0.5); break;
         case 'heroHit':
-          vignette.hit(0.45 + (e.amount / hero.stats.maxHp) * 4);
+          if (!e.poison) vignette.hit(0.45 + (e.amount / hero.stats.maxHp) * 4);
           break;
         case 'heal':
           if (e.amount >= 1) numbers.show('+' + Math.round(e.amount), hero.x, 1.8, hero.z, 'heal');

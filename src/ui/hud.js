@@ -5,10 +5,10 @@ import { el, formatNumber } from './dom.js';
 import { displayTime } from '../modes/survivor.js';
 import { xpToNext } from '../core/progression.js';
 import { ABILITIES } from '../data/abilities.js';
+import { ENEMIES } from '../data/enemies.js';
 import { ABILITY_COLOR } from '../render/effects.js';
 
 const MAX_ABILITIES = 5;
-const BOSS_NAME = 'Bär';
 const SHADOW_NAME = 'Dein Schatten';
 /** So lange steht ein Spruch des Schattens da (Weltsekunden). */
 const TAUNT_SECONDS = 3;
@@ -77,7 +77,7 @@ export function createHud(uiLayer, { onPause } = {}) {
   const timerNode = el('div', { class: 'hud-timer', 'aria-label': 'Zeit' });
   const goldNode = el('strong');
   const killsNode = el('strong');
-  const bossName = el('span', { class: 'hud-boss-name', text: BOSS_NAME });
+  const bossName = el('span', { class: 'hud-boss-name', text: '' });
   const bossBar = bar('hud-boss-bar', 'Leben des Bosses');
   const boss = el('div', { class: 'hud-boss', hidden: true }, bossName, bossBar.root);
   const shadowTime = el('span', { class: 'hud-shadow-time' });
@@ -123,7 +123,7 @@ export function createHud(uiLayer, { onPause } = {}) {
   const setGold = textCell(goldNode);
   const setKills = textCell(killsNode);
   const setShadowTime = textCell(shadowTime);
-  let bossShown = false, shadowShown = false, tauntUntil = -Infinity;
+  let bossShown = false, bossType = '', shadowShown = false, tauntUntil = -Infinity;
 
   return {
     /**
@@ -173,6 +173,7 @@ export function createHud(uiLayer, { onPause } = {}) {
         else if (e.boss && !e.untargetable && !b) b = e;
       }
       if (!!b !== bossShown) { boss.hidden = !b; bossShown = !!b; }
+      if (b && b.type !== bossType) { bossType = b.type; bossName.textContent = ENEMIES[b.type]?.name ?? ''; }
       if (b) bossBar.set(b.hp / b.maxHp, `${Math.max(0, Math.ceil(b.hp))} / ${Math.round(b.maxHp)}`, Math.round(b.maxHp));
       if (!!sh !== shadowShown) { shadowBox.hidden = !sh; shadowShown = !!sh; }
       if (sh) {

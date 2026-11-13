@@ -80,10 +80,16 @@ export const ENEMY_SPRITES = {
   fuchs: { sheet: 'gegner2', x: 9, y: 330, w: 425, h: 224, heightM: 0.75, motion: 'lope', footOffset: 0.04 },
   dachs: { sheet: 'gegner2', x: 458, y: 304, w: 359, h: 269, heightM: 0.7, motion: 'trot', footOffset: 0.04 },
   uhu: { sheet: 'gegner2', x: 831, y: 174, w: 413, h: 413, heightM: 0.9, motion: 'fly', footOffset: 0 },
-  kreuzotter: { sheet: 'gegner2', x: 54, y: 707, w: 319, h: 266, heightM: 0.45, motion: 'slither', footOffset: 0.03 },
+  kreuzotter: { sheet: 'gegner2', x: 54, y: 707, w: 319, h: 266, heightM: 0.55, motion: 'slither', footOffset: 0.03 },
   igel: { sheet: 'gegner2', x: 441, y: 714, w: 317, h: 269, heightM: 0.5, motion: 'scurry', footOffset: 0.03 },
   luchs: { sheet: 'gegner2', x: 791, y: 683, w: 428, h: 326, heightM: 1.1, motion: 'lope', footOffset: 0.05 },
+  hirsch: { sheet: 'bosse', x: 34, y: 34, w: 433, h: 538, heightM: 4.0, motion: 'trot', footOffset: 0.12 },
+  keiler: { sheet: 'bosse', x: 574, y: 104, w: 416, h: 390, heightM: 2.4, motion: 'trot', footOffset: 0.1 },
+  wisent: { sheet: 'bosse', x: 34, y: 684, w: 434, h: 390, heightM: 3.0, motion: 'lumber', footOffset: 0.12 },
 };
+
+/** Eingerollter Igel: Drehung um die Bildmitte (rad/s, in Laufrichtung) und Stauchung des Bildes. */
+export const CURL_ROLL = { spin: 10, scale: 0.85 };
 
 /** Flughöhe der Krähe über dem Boden (m, Unterkante des Bildes). */
 export const CROW_FLIGHT_HEIGHT = 1.2;
@@ -118,6 +124,9 @@ export const MOTION = {
 
 /** Treffer am Helden: Dauer (ms) und Farbfaktor (RGB, multipliziert das Bild) des roten Aufblitzens. */
 export const HERO_FLASH = { ms: 120, color: [1, 0.22, 0.22] };
+
+/** Vergifteter Held (Kreuzotter): Farbfaktor (RGB) seines Bildes, solange das Gift wirkt; das Aufblitzen hat Vorrang. */
+export const HERO_POISON_TINT = [0.62, 1, 0.55];
 
 /** Kamerawackeln bei einem Treffer: Ausschlag in Welteinheiten und Dauer in Sekunden. */
 export const SHAKE = { amount: 0.08, seconds: 0.15 };

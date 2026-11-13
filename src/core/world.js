@@ -7,7 +7,7 @@ import { stepAbilities } from './abilities.js';
 import { CLASSES } from '../data/classes.js';
 import { bonusModifiers } from '../data/bonuses.js';
 import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, CONTACT_TOLERANCE, HERO_RADIUS, SEPARATION_CELL, MAX_ENEMIES,
-  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS } from '../data/enemies.js';
+  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS_MOVES, CURL, SLITHER, VENOM, POUNCE } from '../data/enemies.js';
 import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
 
 /**
@@ -16,7 +16,9 @@ import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
  * @typedef {{ id: string, level: number, cooldownLeft: number }} HeroAbility
  * @typedef {{ modifiers: Modifier[], timeLeft: number, abilityId?: string }} Buff
  * @typedef {{ x: number, z: number, facing: {x:number,z:number}, hp: number, stats: Stats, modifiers: Modifier[],
- *   abilities: HeroAbility[], buffs: Buff[], radius: number, invulnerableUntil: number, animalId: string, classId: string }} Hero
+ *   abilities: HeroAbility[], buffs: Buff[], radius: number, invulnerableUntil: number,
+ *   poison: { until: number, dps: number, nextTick: number } | null, animalId: string, classId: string }} Hero
+ *   `poison`: Gift der Kreuzotter (VENOM), nur im Lauf.
  * @typedef {{ id: number, type: string, x: number, z: number, hp: number, maxHp: number, radius: number, speed: number,
  *   damage: number, elite: boolean, boss: boolean, flying: boolean, behavior: string, slowUntil: number, slowFactor: number,
  *   confusedUntil: number, stunnedUntil: number, contactReadyAt: number, hitReadyAt: Record<string, number>, ai: object,
@@ -76,18 +78,56 @@ const BEHAVIORS = {
     BEHAVIORS.chase(world, enemy, dt);
   },
 
-  /** Nähert sich mit seitlichem Versatz, der regelmäßig die Seite wechselt. */
-  strafe(world, enemy, dt) {
-    const ai = enemy.ai, t = world.time;
-    if (!ai.side) { ai.side = enemy.id % 2 ? 1 : -1; ai.switchAt = t + STRAFE.switchInterval; }
-    if (t >= ai.switchAt) { ai.side = -ai.side; ai.switchAt = t + STRAFE.switchInterval; }
+  /** Igel: verfolgt; eingerollt (nach einem Treffer) rollt er mit `CURL.speedMul`-fachem Tempo direkt aufs Ziel. */
+  curl(world, enemy, dt) {
+    if (!isCurled(world, enemy)) { BEHAVIORS.chase(world, enemy, dt); return; }
     const to = towards(enemy, enemyTarget(world, enemy));
     if (to.d === 0) return;
-    const step = enemySpeed(world, enemy) * dt;
-    if (to.d <= step) { moveDir(enemy, to.x, to.z, to.d); return; }
-    const lx = -to.z * ai.side * STRAFE.lateral, lz = to.x * ai.side * STRAFE.lateral;
-    const len = Math.hypot(to.x + lx, to.z + lz);
-    moveDir(enemy, (to.x + lx) / len, (to.z + lz) / len, step);
+    moveDir(enemy, to.x, to.z, Math.min(to.d, enemySpeed(world, enemy) * CURL.speedMul * dt));
+  },
+
+  /**
+   * Luchs: verfolgt; in `POUNCE.engageRange` duckt er sich mit Ankündigung (Kreis am Ziel) und springt dann
+   * sichtbar dorthin. Eine Betäubung während des Duckens bricht den Sprung ab.
+   */
+  pounce(world, enemy, dt) {
+    const ai = enemy.ai, t = world.time;
+    if (ai.phase === 'crouch') {
+      if (enemy.stunnedUntil > ai.crouchStart) { ai.phase = 'chase'; ai.readyAt = t + POUNCE.cooldown; return; }
+      if (t < ai.until) return;
+      ai.phase = 'leap'; ai.leapStart = ai.until; ai.fromX = enemy.x; ai.fromZ = enemy.z;
+    }
+    if (ai.phase === 'leap') {
+      const k = Math.min(1, (t - ai.leapStart) / POUNCE.leapTime);
+      enemy.x = ai.fromX + (ai.tx - ai.fromX) * k;
+      enemy.z = ai.fromZ + (ai.tz - ai.fromZ) * k;
+      if (k < 1) return;
+      const hero = world.hero;
+      if (Math.hypot(hero.x - ai.tx, hero.z - ai.tz) <= POUNCE.radius) damageHero(world, enemy.damage * POUNCE.damageMul);
+      ai.phase = 'chase'; ai.readyAt = t + POUNCE.cooldown;
+      return;
+    }
+    const target = enemyTarget(world, enemy);
+    const to = towards(enemy, target);
+    if (t >= (ai.readyAt ?? 0) && to.d <= POUNCE.engageRange) {
+      ai.phase = 'crouch'; ai.crouchStart = t; ai.until = t + POUNCE.crouch; ai.tx = target.x; ai.tz = target.z;
+      world.events.push({
+        type: 'bossTelegraph', kind: 'leap', x: target.x, z: target.z, radius: POUNCE.radius,
+        delay: POUNCE.crouch + POUNCE.leapTime, dirX: to.x, dirZ: to.z, damageMul: POUNCE.damageMul,
+      });
+      return;
+    }
+    BEHAVIORS.chase(world, enemy, dt);
+  },
+
+  /** Nähert sich mit seitlichem Versatz, der regelmäßig die Seite wechselt. */
+  strafe(world, enemy, dt) {
+    approachSideways(world, enemy, dt, STRAFE);
+  },
+
+  /** Kreuzotter: wie strafe, nur enger gewunden. */
+  slither(world, enemy, dt) {
+    approachSideways(world, enemy, dt, SLITHER);
   },
 
   /** Hält Abstand und schießt auf den Helden. */
@@ -100,20 +140,25 @@ const BEHAVIORS = {
     circleAndLunge(world, enemy, dt, CIRCLE);
   },
 
-  /** Verfolgen, dann Prankenhieb (nah) oder Sprung (fern) mit Vorwarnung, dann kurze Pause. */
+  /**
+   * Bosse: verfolgen, dann Nah- oder Fernangriff aus `BOSS_MOVES` mit Vorwarnung, dann kurze Pause.
+   * Phasen: chase → (swipe|leap|ring|dash: Ankündigung) → recover; ein Ansturm läuft dash → dashing (→ dashGap → dash …).
+   */
   boss(world, enemy, dt) {
+    const mv = BOSS_MOVES[enemy.type] || BOSS_MOVES.baer;
     const ai = enemy.ai, t = world.time;
-    if (!ai.phase) { ai.phase = 'chase'; ai.until = t + BOSS.chaseTime; }
+    if (!ai.phase) { ai.phase = 'chase'; ai.until = t + mv.chaseTime; }
     if (ai.phase === 'chase') {
       if (t < ai.until) { BEHAVIORS.chase(world, enemy, dt); return; }
-      startBossAttack(world, enemy);
+      startBossAttack(world, enemy, mv);
       return;
     }
-    if (ai.phase === 'swipe' || ai.phase === 'leap') {
-      if (t >= ai.until) resolveBossAttack(world, enemy);
-      return;
-    }
-    if (ai.phase === 'recover' && t >= ai.until) { ai.phase = 'chase'; ai.until = t + BOSS.chaseTime; }
+    if (ai.phase === 'dashing') { stepDash(world, enemy, mv); return; }
+    if (ai.phase === 'dashGap') { if (t >= ai.until) startDash(world, enemy, ai.dash); return; }
+    if (ai.phase === 'recover') { if (t >= ai.until) { ai.phase = 'chase'; ai.until = t + mv.chaseTime; } return; }
+    if (t < ai.until) return;
+    if (ai.phase === 'dash') { ai.phase = 'dashing'; ai.dashStart = ai.until; ai.dashK = 0; ai.dashHit = false; return; }
+    resolveAttack(world, enemy, mv.recover);
   },
 
   /** Dein Schatten: kämpft im Stil der Heldenklasse; nach dem Brechen flieht er vom Helden weg. */
@@ -137,6 +182,20 @@ const BEHAVIORS = {
     }
   },
 };
+
+/** Nähert sich mit seitlichem Versatz (Anteil `c.lateral`), Seitenwechsel alle `c.switchInterval` s. */
+function approachSideways(world, enemy, dt, c) {
+  const ai = enemy.ai, t = world.time;
+  if (!ai.side) { ai.side = enemy.id % 2 ? 1 : -1; ai.switchAt = t + c.switchInterval; }
+  if (t >= ai.switchAt) { ai.side = -ai.side; ai.switchAt = t + c.switchInterval; }
+  const to = towards(enemy, enemyTarget(world, enemy));
+  if (to.d === 0) return;
+  const step = enemySpeed(world, enemy) * dt;
+  if (to.d <= step) { moveDir(enemy, to.x, to.z, to.d); return; }
+  const lx = -to.z * ai.side * c.lateral, lz = to.x * ai.side * c.lateral;
+  const len = Math.hypot(to.x + lx, to.z + lz);
+  moveDir(enemy, (to.x + lx) / len, (to.z + lz) / len, step);
+}
 
 /**
  * Hält `c.minRange`–`c.maxRange` Abstand zum Ziel und feuert alle `c.fireInterval` s `count` Geschosse auf den
@@ -215,14 +274,63 @@ function shadowMelee(world, enemy, dt, c) {
   BEHAVIORS.chase(world, enemy, dt);
 }
 
-function startBossAttack(world, enemy) {
+/** Wählt Nah- oder Fernangriff des Bosses und kündigt ihn an. */
+function startBossAttack(world, enemy, mv) {
   const hero = world.hero;
   const to = towards(enemy, hero, hero.facing);
-  if (to.d <= enemy.radius + BOSS.swipe.triggerRange) { startSwipe(world, enemy, to, BOSS.swipe); return; }
+  const a = to.d <= enemy.radius + mv.triggerRange ? mv.near : mv.far;
+  if (a.kind === 'swipe') { startSwipe(world, enemy, to, a); return; }
+  if (a.kind === 'dash') { enemy.ai.dash = a; enemy.ai.dashLeft = a.count; startDash(world, enemy, a); return; }
+  if (a.kind === 'ring') {
+    telegraph(world, enemy, {
+      kind: 'ring', x: enemy.x, z: enemy.z, radius: enemy.radius + a.reach, delay: a.windup,
+      dirX: to.x, dirZ: to.z, damageMul: a.damageMul, push: a.push,
+    });
+    return;
+  }
   telegraph(world, enemy, {
-    kind: 'leap', x: hero.x, z: hero.z, radius: BOSS.leap.radius, delay: BOSS.leap.windup,
-    dirX: to.x, dirZ: to.z, damageMul: BOSS.leap.damageMul,
+    kind: 'leap', x: hero.x, z: hero.z, radius: a.radius, delay: a.windup,
+    dirX: to.x, dirZ: to.z, damageMul: a.damageMul,
   });
+}
+
+/** Kündigt einen Ansturm an: Streifen ab dem Boss in Richtung Held; `radius` (Boss) lässt die Darstellung zeigen, wie weit sein Körper reicht. */
+function startDash(world, enemy, a) {
+  const hero = world.hero;
+  const to = towards(enemy, hero, hero.facing);
+  telegraph(world, enemy, {
+    kind: 'dash', x: enemy.x, z: enemy.z, dirX: to.x, dirZ: to.z, length: a.length, width: a.width,
+    radius: enemy.radius, delay: a.windup, damageMul: a.damageMul,
+  });
+}
+
+/**
+ * Ansturm: der Boss legt die Streifenlänge gleichmäßig in `dashTime` s zurück (Hindernisse schieben ihn wie sonst)
+ * und trifft den Helden höchstens einmal, wenn seine Bahn in diesem Schritt ihn berührt.
+ */
+function stepDash(world, enemy, mv) {
+  const ai = enemy.ai, a = ai.dash, att = ai.attack, hero = world.hero, t = world.time;
+  const k = Math.min(1, (t - ai.dashStart) / a.dashTime);
+  const step = (k - ai.dashK) * a.length;
+  ai.dashK = k;
+  const x0 = enemy.x, z0 = enemy.z;
+  moveDir(enemy, att.dirX, att.dirZ, step);
+  if (!ai.dashHit && segmentDistance(hero, x0, z0, enemy.x, enemy.z) <= enemy.radius + hero.radius + CONTACT_TOLERANCE) {
+    ai.dashHit = true;
+    damageHero(world, enemy.damage * a.damageMul);
+  }
+  if (k < 1) return;
+  ai.dashLeft--;
+  ai.attack = null;
+  if (ai.dashLeft > 0) { ai.phase = 'dashGap'; ai.until = t + a.gap; return; }
+  ai.phase = 'recover'; ai.until = t + mv.recover;
+}
+
+/** Abstand des Punkts p zur Strecke (x0, z0)–(x1, z1). */
+function segmentDistance(p, x0, z0, x1, z1) {
+  const dx = x1 - x0, dz = z1 - z0, len2 = dx * dx + dz * dz;
+  const u = len2 > 0 ? Math.max(0, Math.min(1, ((p.x - x0) * dx + (p.z - z0) * dz) / len2)) : 0;
+  return Math.hypot(p.x - (x0 + dx * u), p.z - (z0 + dz * u));
 }
 
 /** Hieb im Bogen vor dem Angreifer (Reichweite `s.reach` ab seinem Rand, halber Öffnungswinkel `s.halfAngle`). */
@@ -241,10 +349,6 @@ function telegraph(world, enemy, a) {
   world.events.push({ type: 'bossTelegraph', ...a });
 }
 
-function resolveBossAttack(world, enemy) {
-  resolveAttack(world, enemy, BOSS.recover);
-}
-
 /** Schaden, wenn der Held jetzt in der angekündigten Form steht; dann `recover` s Pause. */
 function resolveAttack(world, enemy, recover) {
   const ai = enemy.ai, a = ai.attack, hero = world.hero;
@@ -255,8 +359,19 @@ function resolveAttack(world, enemy, recover) {
   if (inside && a.kind === 'swipe' && d > enemy.radius) {
     inside = (dx * a.dirX + dz * a.dirZ) / d >= Math.cos(a.halfAngle);
   }
-  if (inside) damageHero(world, enemy.damage * a.damageMul);
+  if (inside && damageHero(world, enemy.damage * a.damageMul) && a.kind === 'ring' && a.push > 0) {
+    pushHero(world, d > 1e-9 ? dx / d : 1, d > 1e-9 ? dz / d : 0, a.push);
+  }
   ai.phase = 'recover'; ai.until = world.time + recover; ai.attack = null;
+}
+
+/**
+ * Ob ein Igel gerade eingerollt ist.
+ * @param {World} world
+ * @param {Enemy} enemy
+ */
+export function isCurled(world, enemy) {
+  return world.time < (enemy.ai.curledUntil ?? -Infinity);
 }
 
 /**
@@ -324,6 +439,17 @@ export function knockback(world, enemy, distance) {
   }
 }
 
+/** Stößt den Helden um `distance` in Richtung (dirX, dirZ), in Teilstrecken mit Hinderniskollision. */
+export function pushHero(world, dirX, dirZ, distance) {
+  const hero = world.hero;
+  const steps = Math.max(1, Math.ceil(distance / KNOCKBACK_SUBSTEP));
+  for (let i = 0; i < steps; i++) {
+    hero.x += dirX * distance / steps;
+    hero.z += dirZ * distance / steps;
+    pushOutOfObstacles(world, hero);
+  }
+}
+
 /** Verwirrter Gegner: läuft in eine zufällige Richtung, die etwa einmal pro Sekunde neu gewürfelt wird. */
 function wander(world, enemy, dt) {
   if (!enemy.wander || world.time >= enemy.wander.rerollAt) {
@@ -350,7 +476,7 @@ export function createWorld({ seed, animalId, classId, modifiers = [] }) {
       x: 0, z: 0, facing: { x: 1, z: 0 },
       hp: stats.maxHp, stats, modifiers: [...modifiers],
       abilities: [{ id: CLASSES[classId].startAbility, level: 1, cooldownLeft: 0 }],
-      buffs: [], radius: HERO_RADIUS, invulnerableUntil: 0, animalId, classId,
+      buffs: [], radius: HERO_RADIUS, invulnerableUntil: 0, poison: null, animalId, classId,
     },
     enemies: [], projectiles: [], enemyProjectiles: [], zones: [], orbitals: [], summons: [], pickups: [], events: [],
     run: { level: 1, xp: 0, kills: 0, gold: 0, bonuses: {}, damageByAbility: {}, revivesLeft: 0 },
@@ -448,7 +574,8 @@ export function spawnShadow(world, x, z, { hp, damage, expiresAt }) {
 export function damageEnemy(world, enemy, hit, abilityId) {
   const index = world.enemies.indexOf(enemy);
   if (index < 0 || enemy.untargetable) return;
-  world.events.push({ type: 'hit', x: enemy.x, z: enemy.z, amount: hit.amount, crit: hit.crit });
+  const amount = enemy.behavior === 'curl' ? curlOnHit(world, enemy, hit.amount) : hit.amount;
+  world.events.push({ type: 'hit', x: enemy.x, z: enemy.z, amount, crit: hit.crit });
   const dbA = world.run.damageByAbility;
   if (enemy.shadow) {
     const dealt = Math.max(0, Math.min(hit.amount, enemy.hp - 1));
@@ -457,8 +584,8 @@ export function damageEnemy(world, enemy, hit, abilityId) {
     if (enemy.hp <= 1) startShadowFlee(world, enemy);
     return;
   }
-  enemy.hp -= hit.amount;
-  dbA[abilityId] = (dbA[abilityId] || 0) + hit.amount;
+  enemy.hp -= amount;
+  dbA[abilityId] = (dbA[abilityId] || 0) + amount;
   if (enemy.hp > 0) return;
 
   world.enemies.splice(index, 1);
@@ -470,6 +597,20 @@ export function damageEnemy(world, enemy, hit, abilityId) {
   if (world.rng.chance(DROPS.goldChance)) drop('gold', world.rng.int(1, 3));
   if (world.rng.chance(DROPS.potionChance)) drop('potion', DROPS.potionHeal);
   if (enemy.elite) drop('chest', DROPS.chestGold);
+}
+
+/**
+ * Igel: eingerollt nimmt er nur `CURL.damageTaken` des Schadens; sonst rollt ihn ein Treffer ein (dieser zählt voll),
+ * sofern die Abklingzeit vorbei ist. Liefert den wirksamen Schaden.
+ */
+function curlOnHit(world, enemy, amount) {
+  const ai = enemy.ai, t = world.time;
+  if (isCurled(world, enemy)) return amount * CURL.damageTaken;
+  if (t >= (ai.curlReadyAt ?? -Infinity)) {
+    ai.curledUntil = t + CURL.duration;
+    ai.curlReadyAt = ai.curledUntil + CURL.cooldown;
+  }
+  return amount;
 }
 
 /** Der Schatten ist gebrochen: Truhe an seiner Stelle, dann flieht er unantastbar `SHADOW.fleeDuration` s. */
@@ -485,18 +626,46 @@ function startShadowFlee(world, enemy) {
 
 /**
  * Schaden am Helden über Ausweichen und Rüstung.
+ * Gifttreffer (`poison`) tragen im Ereignis `heroHit` das Feld `poison: true`.
  * @param {World} world
  * @param {number} rawAmount
+ * @param {{ poison?: boolean }} [opts]
+ * @returns {boolean} ob Schaden ankam
  */
-export function damageHero(world, rawAmount) {
+export function damageHero(world, rawAmount, { poison = false } = {}) {
   const hero = world.hero;
-  if (world.time < hero.invulnerableUntil) return;
+  if (world.time < hero.invulnerableUntil) return false;
   const res = resolveHit(world.rng,
     { baseDamage: rawAmount, damage: 1, critChance: 0, critDamage: 1 },
     { armor: hero.stats.armor, dodge: hero.stats.dodge });
-  if (res.dodged) { world.events.push({ type: 'dodge' }); return; }
+  if (res.dodged) { world.events.push({ type: 'dodge' }); return false; }
   hero.hp -= res.amount;
-  world.events.push({ type: 'heroHit', amount: res.amount });
+  world.events.push(poison ? { type: 'heroHit', amount: res.amount, poison: true } : { type: 'heroHit', amount: res.amount });
+  return true;
+}
+
+/** Ein durchgekommener Otterbiss vergiftet (oder frischt das Gift auf); der Tick-Takt eines laufenden Gifts bleibt. */
+function poisonHero(world, enemy) {
+  const hero = world.hero, t = world.time;
+  const dps = VENOM.dpsMul * enemy.damage;
+  if (hero.poison) {
+    hero.poison.until = t + VENOM.duration;
+    hero.poison.dps = Math.max(hero.poison.dps, dps);
+  } else {
+    hero.poison = { until: t + VENOM.duration, dps, nextTick: t + VENOM.tick };
+  }
+}
+
+/** Gift-Ticks bis zur aktuellen Zeit; nach dem letzten Tick ist das Gift weg. */
+function stepPoison(world) {
+  const hero = world.hero, p = hero.poison;
+  if (!p) return;
+  const end = p.until + 1e-9;
+  while (p.nextTick <= end && world.time >= p.nextTick) {
+    p.nextTick += VENOM.tick;
+    damageHero(world, p.dps * VENOM.tick, { poison: true });
+  }
+  if (p.nextTick > end) hero.poison = null;
 }
 
 function pushOutOfObstacles(world, e) {
@@ -630,9 +799,10 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
     const min = e.radius + hero.radius + CONTACT_TOLERANCE;
     if (dx * dx + dz * dz <= min * min && world.time >= e.contactReadyAt) {
       e.contactReadyAt = world.time + CONTACT_INTERVAL;
-      damageHero(world, e.damage);
+      if (damageHero(world, e.damage) && ENEMIES[e.type]?.venom) poisonHero(world, e);
     }
   }
+  stepPoison(world);
 
   if (!inert) collectPickups(world);
 }

@@ -1,5 +1,5 @@
 import { test, assertEqual, assertTrue, assertClose } from './runner.js';
-import { shouldPlay, createSfx } from '../src/audio/sfx.js';
+import { shouldPlay, createSfx, eventSound } from '../src/audio/sfx.js';
 import { SFX, SFX_LIMITS, volumeToGain } from '../src/data/sfx.js';
 
 const limits = { hit: 12 };
@@ -123,4 +123,10 @@ test('sfx: 50 pickup-Ereignisse in einem Aufruf starten höchstens eine Stimmeng
   const before = log.oscillators;
   sfx.handle(Array.from({ length: 50 }, () => ({ type: 'pickup' })));
   assertEqual(log.oscillators - before, SFX.pickup.filter((v) => v.kind === 'tone').length);
+});
+
+test('sfx: Gifttreffer spielt keinen Ton, normaler Treffer schon', () => {
+  assertEqual(eventSound({ type: 'heroHit', amount: 1.5, poison: true }), null);
+  assertEqual(eventSound({ type: 'heroHit', amount: 6 }), 'heroHit');
+  assertEqual(eventSound({ type: 'kill' }), 'kill');
 });

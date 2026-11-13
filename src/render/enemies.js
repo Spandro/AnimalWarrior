@@ -1,7 +1,8 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { ENEMIES } from '../data/enemies.js';
 import { ABILITIES } from '../data/abilities.js';
-import { ENEMY_SPRITES, HERO_SPRITES, CROW_FLIGHT_HEIGHT, BILLBOARD } from '../data/sprites.js';
+import { ENEMY_SPRITES, HERO_SPRITES, CROW_FLIGHT_HEIGHT, BILLBOARD, CURL_ROLL } from '../data/sprites.js';
+import { isCurled } from '../core/world.js';
 import { SHADOW } from '../data/shadow.js';
 import { ENV_SPRITES } from '../data/environment.js';
 import {
@@ -203,12 +204,23 @@ const wingParts = (s) => [
   ['sphere', 0x15151a, [s * 0.66, -0.01, -0.06], [0.16, 0.025, 0.13]],
 ];
 
-/** Fassungsvermögen je Gegnertyp: 300 reguläre insgesamt plus ausgenommene Elite; Bären sind Bosse. */
+/** Fassungsvermögen je Gegnertyp: 300 reguläre insgesamt plus ausgenommene Elite; Bosse haben eigene kleine Vorräte. */
 /** 3D-Ersatz für Tiere ohne eigene Form: Kennung → Form aus ENEMY_PARTS. */
 const FALLBACK_SHAPE = {
   fuchs: 'wolf', luchs: 'wolf', dachs: 'wildschwein', keiler: 'wildschwein', igel: 'ratte', kreuzotter: 'ratte',
   uhu: 'kraehe', hirsch: 'baer', wisent: 'baer',
 };
+
+/**
+ * Eingerollter Igel: dreht das Bild um seine Mitte statt um die Fußlinie (Ausgleich über Hub und Ausfall)
+ * und staucht es etwas zur Kugel.
+ * @param {number} time
+ * @param {number} height Bildhöhe in Metern
+ */
+function rollMotion(time, height) {
+  const a = time * CURL_ROLL.spin, h = (height * CURL_ROLL.scale) / 2;
+  return { tilt: a, offsetY: h * (1 - Math.cos(a)), lunge: -h * Math.sin(a), scaleX: CURL_ROLL.scale, scaleY: CURL_ROLL.scale };
+}
 
 const ENEMY_CAPACITY = 320;
 const BOSS_CAPACITY = 4;
@@ -315,7 +327,7 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
   // Gegner: je Typ ein Instanzvorrat, gemalt oder als 3D-Form.
   /** @type {Record<string, ReturnType<typeof createPool>>} */
   const enemyPools = {};
-  const capacity = (type) => (type === 'baer' ? BOSS_CAPACITY : ENEMY_CAPACITY);
+  const capacity = (type) => (ENEMIES[type]?.behavior === 'boss' ? BOSS_CAPACITY : ENEMY_CAPACITY);
   /** @type {ReturnType<typeof createPool>[]} */
   let enemyExtras = [];
   let wingL = null, wingR = null, blobs;
@@ -573,7 +585,8 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
       else if (confused) color.multiply(TINT.confuse);
       if (world.time < e.slowUntil) color.multiply(TINT.slow);
 
-      const motion = spriteMotion(sprite.motion, { speed: stunned ? 0 : g?.speed ?? 0, time: t + ph });
+      let motion = spriteMotion(sprite.motion, { speed: stunned ? 0 : g?.speed ?? 0, time: t + ph });
+      if (isCurled(world, e)) motion = rollMotion(t + ph, size.height * k);
       const lift = sprite.motion === 'fly' ? CROW_FLIGHT_HEIGHT * k : 0;
       pool.push(composeSprite(m, orient, p.x, lift, p.z, size.width * k, size.height * k, g?.face ?? 1, motion, sprite.footOffset * k), color);
       const air = lift + motion.offsetY;
@@ -622,7 +635,7 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
         const hop = Math.max(0, Math.sin(gait * 0.55));
         pool.push(place(x, hop * 0.22 * k, z, yaw, k, k * (1 - 0.12 * hop), k, -0.2 * hop), color);
       } else {
-        const bob = Math.abs(Math.sin(gait)) * 0.05 * k * (e.type === 'baer' ? 2 : 1);
+        const bob = Math.abs(Math.sin(gait)) * 0.05 * k * (e.boss ? 2 : 1);
         pool.push(place(x, bob, z, yaw, k, k, k, 0, Math.sin(gait) * 0.06), color);
       }
     }

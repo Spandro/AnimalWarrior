@@ -18,6 +18,9 @@ export const ENEMIES = {
   uhu: { id: 'uhu', name: 'Uhu', hp: 35, speed: 4.0, damage: 10, radius: 0.5, xp: 6, behavior: 'charge', flying: true },
   luchs: { id: 'luchs', name: 'Luchs', hp: 40, speed: 4.4, damage: 14, radius: 0.5, xp: 7, behavior: 'pounce' },
   baer: { id: 'baer', name: 'Bär', hp: 1500, speed: 3.2, damage: 25, radius: 1.4, xp: 100, behavior: 'boss' },
+  keiler: { id: 'keiler', name: 'Riesenkeiler', hp: 1500, speed: 3.6, damage: 25, radius: 1.3, xp: 100, behavior: 'boss' },
+  hirsch: { id: 'hirsch', name: 'Rothirsch', hp: 1500, speed: 3.3, damage: 25, radius: 1.3, xp: 100, behavior: 'boss' },
+  wisent: { id: 'wisent', name: 'Wisent', hp: 1500, speed: 2.8, damage: 25, radius: 1.6, xp: 100, behavior: 'boss' },
 };
 
 export const ELITE = { hpMul: 8, scale: 1.6, xpMul: 10 };
@@ -56,9 +59,10 @@ export const SLITHER = { lateral: 0.8, switchInterval: 0.6 };
 
 /**
  * Gift der Kreuzotter: ein durchgekommener Biss vergiftet `duration` s; alle `tick` s verliert der Held
- * `dpsMul` × Schaden der Otter × `tick` Leben. Ein neuer Biss frischt die Dauer auf, stapelt aber nicht.
+ * `dpsMul` × Schaden der Otter × `tick` Leben (gerundet wie jeder Treffer, daher ganze Sekunden: 3 je Tick bei
+ * Schaden 6). Ein neuer Biss frischt die Dauer auf, stapelt aber nicht.
  */
-export const VENOM = { duration: 4, tick: 0.5, dpsMul: 0.5 };
+export const VENOM = { duration: 4, tick: 1, dpsMul: 0.5 };
 
 /**
  * Igel: nimmt er Schaden, rollt er sich `duration` s ein, nimmt dann nur `damageTaken` des Schadens und rollt mit
@@ -99,4 +103,45 @@ export const BOSS = {
   recover: 0.5,
   swipe: { reach: 3, halfAngle: Math.PI / 3, windup: 0.7, damageMul: 1, triggerRange: 4 },
   leap: { radius: 3.5, windup: 1.2, damageMul: 2 },
+};
+
+/**
+ * Angriffe der Bosse (Baukasten). Ablauf für alle: `chaseTime` s verfolgen; steht der Held höchstens `triggerRange`
+ * jenseits des Boss-Rands, kommt `near`, sonst `far`; nach der Ankündigung (`windup`) wirkt der Angriff, dann
+ * `recover` s Pause. Formen:
+ * - `swipe`: Bogen vor dem Boss, Reichweite `reach` ab seinem Rand, halber Öffnungswinkel `halfAngle`
+ * - `leap`: Kreis mit `radius` an der Heldenposition; der Boss landet dort
+ * - `ring`: Kreis um den Boss (Radius = Boss-Radius + `reach`); ein Treffer stößt den Helden `push` weit weg
+ * - `dash`: Streifen (`length` × `width`) ab dem Boss Richtung Held; der Boss rennt ihn in `dashTime` s ab und trifft
+ *   höchstens einmal je Ansturm; `count` Anstürme, dazwischen `gap` s, jeder neu ausgerichtet und angekündigt
+ * Schaden: Bossschaden × `damageMul`.
+ * @typedef {{ kind: 'swipe', reach: number, halfAngle: number, windup: number, damageMul: number }
+ *   | { kind: 'leap', radius: number, windup: number, damageMul: number }
+ *   | { kind: 'ring', reach: number, windup: number, damageMul: number, push: number }
+ *   | { kind: 'dash', length: number, width: number, windup: number, dashTime: number, damageMul: number,
+ *       count: number, gap: number }} BossAttack
+ * @typedef {{ chaseTime: number, recover: number, triggerRange: number, near: BossAttack, far: BossAttack }} BossMoves
+ * @type {Record<'baer'|'keiler'|'hirsch'|'wisent', BossMoves>}
+ */
+export const BOSS_MOVES = {
+  baer: {
+    chaseTime: BOSS.chaseTime, recover: BOSS.recover, triggerRange: BOSS.swipe.triggerRange,
+    near: { kind: 'swipe', ...BOSS.swipe },
+    far: { kind: 'leap', ...BOSS.leap },
+  },
+  keiler: {
+    chaseTime: 2.5, recover: 0.5, triggerRange: 3.5,
+    near: { kind: 'swipe', reach: 2.5, halfAngle: Math.PI / 4, windup: 0.5, damageMul: 1 },
+    far: { kind: 'dash', length: 14, width: 2.6, windup: 0.7, dashTime: 0.6, damageMul: 1.2, count: 3, gap: 0.4 },
+  },
+  hirsch: {
+    chaseTime: 3, recover: 0.6, triggerRange: 4,
+    near: { kind: 'ring', reach: 4, windup: 0.9, damageMul: 1, push: 4 },
+    far: { kind: 'dash', length: 18, width: 2.6, windup: 1.0, dashTime: 0.8, damageMul: 1.6, count: 1, gap: 0 },
+  },
+  wisent: {
+    chaseTime: 3.5, recover: 0.8, triggerRange: 4.5,
+    near: { kind: 'ring', reach: 5.5, windup: 1.1, damageMul: 1.8, push: 0 },
+    far: { kind: 'dash', length: 28, width: 3.2, windup: 1.3, dashTime: 1.2, damageMul: 2, count: 1, gap: 0 },
+  },
 };

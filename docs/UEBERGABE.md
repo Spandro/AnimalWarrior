@@ -2,14 +2,14 @@
 
 Diese Datei ist für die nächste Sitzung gedacht, falls die laufende abbricht. Sie wird an jedem Pausenpunkt aktualisiert.
 
-Zuletzt aktualisiert: 2026-11-13 während Paket 3 (Taverne, wird vor Paket 2 entworfen). Spec `docs/superpowers/specs/2026-11-13-taverne-design.md` ist **freigegeben**; Plan `docs/superpowers/plans/2026-11-13-taverne.md` (acht Aufgaben) ist **freigegeben**. Nächster Schritt: Bau mit Subagenten (je Aufgabe Bauer und Prüfer), nicht gleichzeitig mit dem Paket „Neue Gegner“ im selben Ordner. Wirte der Taverne: der Affe Kasimir (Würfelbecher und Höher oder tiefer) und die Elster Madame Funkel (Glücksrad), so entschieden vom Auftraggeber.
+Zuletzt aktualisiert: 2026-11-13. **Paket „Neue Gegner und wechselnde Bosse“ ist abgeschlossen, geprüft und gepusht** (Abschnitt 1); der Bau der Taverne kann jetzt auf diesem Stand (Erfolge, Bildbögen) beginnen. Stand davor: während Paket 3 (Taverne, wird vor Paket 2 entworfen). Spec `docs/superpowers/specs/2026-11-13-taverne-design.md` ist **freigegeben**; Plan `docs/superpowers/plans/2026-11-13-taverne.md` (acht Aufgaben) ist **freigegeben**. Nächster Schritt: Bau mit Subagenten (je Aufgabe Bauer und Prüfer), nicht gleichzeitig mit dem Paket „Neue Gegner“ im selben Ordner. Wirte der Taverne: der Affe Kasimir (Würfelbecher und Höher oder tiefer) und die Elster Madame Funkel (Glücksrad), so entschieden vom Auftraggeber.
 
 ## 1. Was fertig ist
 
 **Erster Bauabschnitt (abgeschlossen, geprüft, auf GitHub):** Wellen-Modus komplett.
 
 - Helden: Hase, Ente, Waschbär × Krieger, Magier, Dieb; bis zu sechs Speicherplätze
-- 15-Minuten-Durchgang, sechs Gegnerarten, Elite-Gegner, Bär als Boss bei 5/10/15 Minuten
+- 15-Minuten-Durchgang, sechs Gegnerarten, Elite-Gegner, Bär als Boss bei 5/10/15 Minuten (seit dem Paket „Neue Gegner“: elf Gegnerarten und drei wechselnde aus vier Bossen)
 - Schatten-Boss bei 3:30, 8:00, 12:30 (unbesiegbar, vertreibbar)
 - 15 Fähigkeiten und 7 Boni mit lustigen Namen, Dauerboni gegen Gold, 22 Erfolge
 - Gemalte Figuren aus `assets/figuren/helden.webp` und `gegner.webp`
@@ -60,6 +60,29 @@ Die kleinen Befunde stehen unten in Abschnitt 8.
 - `.claude/launch.json` startet den Server jetzt mit `python3` (macOS); die PowerShell-Variante
   heißt `animalwarrior-windows`.
 
+**Paket „Neue Gegner und wechselnde Bosse“ (abgeschlossen, geprüft, gepusht, 2026-11-13):**
+
+- Spec: `docs/superpowers/specs/2026-11-13-neue-gegner-und-bosse-design.md`, Plan:
+  `docs/superpowers/plans/2026-11-13-neue-gegner-und-bosse.md` (beide freigegeben); gebaut „sparsam“ (inline, am Ende ein
+  frischer Prüfer). Commits `34201ed` bis `00dff01`. Teststand: **381 Tests grün**.
+- Sechs neue Gegner aus `assets/figuren/gegner2.webp`: Fuchs (ab Min. 1, Zickzack), Igel (3, rollt sich bei Treffer ein,
+  nimmt dann 1/5 Schaden), Dachs (5, zäh), Kreuzotter (7, Gift: 4 s, 3 je Sekunde bei Grundschaden, frischt auf statt
+  zu stapeln; Held grünlich), Uhu (8, fliegender Ansturm), Luchs (10, duckt sich und springt mit Bodenkreis).
+- Bosse aus `assets/figuren/bosse.webp`: je Durchgang drei verschiedene aus Bär, Rothirsch, Riesenkeiler, Wisent
+  (`bossOrder(seed)` in `src/modes/survivor.js`, eigener Zufallsgeber, `world.rng` unberührt). Angriffe datengetrieben in
+  `BOSS_MOVES` (`src/data/enemies.js`): Formen `swipe`, `leap`, `ring` (Druckwelle, Hirsch stößt weg), `dash` (Ansturm,
+  Keiler dreimal). Der Bär kämpft wie vorher. Bossanzeige zeigt den Namen; Texte sprechen von „den Bossen“.
+- Eingeschlossenes Papierweiß: Startpunkte je Bogen in `SHEET_HOLES` (`src/data/sprites.js`), `removeBackground` füllt
+  zusätzlich von dort. Im Browser auf Gras geprüft: keine weißen Flecken; Entenfedern bleiben weiß.
+- Zehn neue Erfolge (jetzt 33); „Bärenhunger“ heißt weiter so, verlangt aber „insgesamt zwei Bären“. Spielstand-Format
+  unverändert (Version 2), alte Stände bleiben gültig.
+- Gegner-Bildtafeln haben jetzt je Bogen ein eigenes Material (vorher fest der Bogen `gegner`).
+- Entscheidungen beim Bau (stehen auch in der Spec bzw. in den Commits): Gift tickt jede Sekunde statt jede halbe
+  (Treffer werden auf ganze Zahlen gerundet); Ausweichen gilt auch für Gift-Ticks; ein Ansturm frontal in den stehenden
+  Helden endet vor ihm (ein Treffer); Kreuzotter 0,55 m statt 0,45 m hoch.
+- Gesamtprüfung: keine kritischen Befunde; behoben: Druckwelle stieß auch ohne gelandeten Treffer weg; Ansturmstreifen
+  war kleiner als die Trefferfläche; Gift endete nicht mit Sterbephase/Sieg. Kleinigkeiten stehen in Abschnitt 8.
+
 ## 2. Was noch fehlt (vom Auftraggeber gewünscht, noch nicht entworfen)
 
 Reihenfolge wie vereinbart; jedes Paket bekommt eigenen Entwurf, Spec und Plan.
@@ -82,17 +105,6 @@ Vom Auftraggeber bestätigt („Passt so“): Auszahlung im Schnitt 90–95 % de
 
 **Weitere offene Wünsche und Ideen**
 
-- **Paket „Neue Gegner und wechselnde Bosse“ (eigene Sitzung, läuft parallel zur Taverne):** Wünsche geklärt
-  (2026-11-13), Spec `docs/superpowers/specs/2026-11-13-neue-gegner-und-bosse-design.md` **freigegeben**, Plan
-  `docs/superpowers/plans/2026-11-13-neue-gegner-und-bosse.md` (neun Aufgaben) **freigegeben**; Ausführung „sparsam“
-  (inline, `superpowers:executing-plans`, am Ende ein frischer Prüfer), Protokoll in
-  `.superpowers/sdd/2026-11-13-neue-gegner-und-bosse/progress.md`. **Aufgabe 1 und 2 fertig** (`34201ed`, `3b3aad9`,
-  346 Tests grün). Bis Aufgabe 3–5 laufen Igel, Kreuzotter und Luchs nur hinterher (Rückfall `chase`). Sicherungspunkt bei
-  92 % 5-Stunden-Limit (frei ab 23:10 Uhr am 13.11.); weiter mit Aufgabe 3.
-  Entschieden: sechs neue Gegner (Igel rollt sich ein, Kreuzotter vergiftet, Luchs springt an; Fuchs, Dachs, Uhu mit
-  vorhandenen Kampfweisen), je Durchgang drei verschiedene Bosse zufällig aus Bär, Rothirsch, Riesenkeiler, Wisent, jeder
-  neue Boss mit eigenem Nah- und Fernangriff, zehn neue Erfolge, „Bärenhunger“ wird „insgesamt zwei Bären“. Bilder:
-  `docs/neue-gegner-bilder.md`.
 - Getroffene Gegner blitzen nicht auf (Trefferereignisse tragen keine Gegnerkennung)
 - Balancing ist ungespielt: Wer still steht, stirbt sehr schnell; 15 Minuten hat noch niemand am Stück gespielt
 - Ton hat noch niemand gehört
@@ -160,6 +172,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/serve.ps1 -Port 8080
    - Die Deko einer Zelle liegt in einem zusammengefassten Netz statt in Instanzen je Art.
 
 ## 8. Zurückgestellte Kleinigkeiten (bekannt, nicht dringend)
+
+Aus der Gesamtprüfung von „Neue Gegner und wechselnde Bosse“ (bewusst zurückgestellt):
+
+- Wird ein Luchs mitten im Sprung betäubt oder verwirrt, landet er nach Ende der Betäubung sofort am Ziel und trifft;
+  Verwirrung bricht das Ducken nicht ab (nur Betäubung)
+- Ein ausgewichener Gift-Tick zeigt „Ausgewichen“ und zählt für „Glückspilz“
+- `src/audio/sfx.js`: JSDoc von `shouldPlay` und `eventSound` vertauscht; `src/render/enemies.js`: Kommentar
+  „Fassungsvermögen“ steht über `FALLBACK_SHAPE` statt über den Kapazitäten
+- Gift-Leuchtfarbe der 3D-Ersatzfigur steht im Code (`src/render/hero.js`) statt in `src/data`
+- Ein eingerollter Igel dreht sich auch betäubt weiter (nur Darstellung)
+- Nebenbefund aus `docs/neue-gegner-bilder.md`: `helden.webp` hat kleine eingeschlossene weiße Stellen (bis ~80 Pixel
+  deckendes Weiß, z. B. um 98/691, 764/887); ob sie im Spiel auffallen, ist ungeprüft
 
 Aus der Gesamtprüfung von Paket 1 (bewusst zurückgestellt):
 

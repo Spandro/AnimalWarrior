@@ -1,4 +1,5 @@
 import { createWorld, stepWorld, spawnEnemy, spawnShadow, cappedEnemyCount, knockback } from '../core/world.js';
+import { createRng } from '../core/rng.js';
 import { pendingLevelUps, rollCards, applyCard, openChest } from '../core/progression.js';
 import { obstaclesNear } from '../core/terrain.js';
 import { chestsNear } from '../core/chests.js';
@@ -8,7 +9,7 @@ import { MAX_LEVEL } from '../data/bonuses.js';
 import { SHADOW, SHADOW_LINES, shadowMaxHp } from '../data/shadow.js';
 import {
   RUN_DURATION, MAX_ENEMIES, unlockMinute, weights, MAX_FORMULA_MINUTE, spawnPerSecond, hpMul, dmgMul,
-  ELITE_INTERVAL, BOSS_TIMES, BOSS_HP_MUL, LEASH_DISTANCE, CAP_BACKLOG, SPAWN_REROLLS, MAX_SUBSTEP, REVIVE,
+  ELITE_INTERVAL, BOSS_TIMES, BOSS_HP_MUL, BOSS_POOL, BOSS_ORDER_SALT, LEASH_DISTANCE, CAP_BACKLOG, SPAWN_REROLLS, MAX_SUBSTEP, REVIVE,
   DEFAULT_VIEW, spawnRadius, DYING,
 } from '../data/waves.js';
 
@@ -30,7 +31,8 @@ import {
  * @typedef {import('../data/animals.js').Modifier} Modifier
  * @typedef {'playing'|'levelup'|'paused'|'dying'|'won'|'lost'} RunState
  * @typedef {{ acc: number, backlog: number, strongPending: number, nextEliteAt: number, bossIndex: number,
- *   finalBoss: import('../core/world.js').Enemy|null, shadowIndex: number }} SpawnState
+ *   bossOrder: string[], finalBoss: import('../core/world.js').Enemy|null, shadowIndex: number }} SpawnState
+ *   `bossOrder`: Bosskennungen für BOSS_TIMES (aus `bossOrder(seed)`).
  * @typedef {import('../data/achievements.js').RunFacts} RunFacts
  * @typedef {{ world: World, state: RunState, cards: Card[]|null, view: { halfW: number, halfH: number },
  *   timeScale: number, events: object[], spawn: SpawnState, facts: RunFacts, streakFrom: number,
@@ -41,6 +43,21 @@ import {
  */
 
 /**
+ * Bossfolge eines Durchgangs: drei verschiedene Bosse aus BOSS_POOL in zufälliger Reihenfolge, aus dem Seed bestimmt.
+ * @param {number} seed
+ * @returns {string[]}
+ */
+export function bossOrder(seed) {
+  const rng = createRng(seed ^ BOSS_ORDER_SALT);
+  const pool = [...BOSS_POOL];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rng.next() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, BOSS_TIMES.length);
+}
+
+/**
  * @param {{ seed: number, animalId: string, classId: string, modifiers?: Modifier[], revive?: boolean, timeScale?: number }} opts
  * @returns {Run}
  */
@@ -49,7 +66,10 @@ export function createSurvivorRun({ seed, animalId, classId, modifiers = [], rev
   world.run.revivesLeft = revive ? 1 : 0;
   return {
     world, state: 'playing', cards: null, view: { ...DEFAULT_VIEW }, timeScale, events: [],
-    spawn: { acc: 0, backlog: 0, strongPending: 0, nextEliteAt: ELITE_INTERVAL, bossIndex: 0, finalBoss: null, shadowIndex: 0 },
+    spawn: {
+      acc: 0, backlog: 0, strongPending: 0, nextEliteAt: ELITE_INTERVAL, bossIndex: 0, bossOrder: bossOrder(seed), finalBoss: null,
+      shadowIndex: 0,
+    },
     facts: {
       ended: false, won: false, time: 0, level: 1, kills: 0, killsByType: {}, dodges: 0, goldEarned: 0, level10At: null,
       shadowsRouted: 0, revived: 0, hpFractionAtEnd: 1, longestNoKillStreak: 0, maxedAbilities: 0, chestsOpened: 0, animalId, classId,
@@ -229,9 +249,10 @@ function spawnWaves(run, dt) {
   // Bosse (nie mehr als fällig; im echten Spiel höchstens einer pro Schritt)
   while (spawn.bossIndex < BOSS_TIMES.length && world.time >= BOSS_TIMES[spawn.bossIndex]) {
     const index = spawn.bossIndex++;
-    const pos = ringPosition(run, ENEMIES.baer.radius, false, true);
-    const boss = spawnEnemy(world, 'baer', pos.x, pos.z, { hpMul: BOSS_HP_MUL[index], dmgMul: dmgMul(minute) });
-    world.events.push({ type: 'bossSpawn', index });
+    const type = spawn.bossOrder[index];
+    const pos = ringPosition(run, ENEMIES[type].radius, false, true);
+    const boss = spawnEnemy(world, type, pos.x, pos.z, { hpMul: BOSS_HP_MUL[index], dmgMul: dmgMul(minute) });
+    world.events.push({ type: 'bossSpawn', index, enemyType: type });
     if (index === BOSS_TIMES.length - 1) spawn.finalBoss = boss;
   }
   if (spawn.finalBoss) return; // nach dem letzten Boss keine neuen Gegner
@@ -310,6 +331,7 @@ function checkOutcome(run) {
       world.run.revivesLeft--;
       hero.hp = hero.stats.maxHp * REVIVE.hpFraction;
       hero.invulnerableUntil = world.time + REVIVE.invulnerable;
+      hero.poison = null;
       for (const e of world.enemies) {
         if ((e.x - hero.x) ** 2 + (e.z - hero.z) ** 2 <= REVIVE.pushRadius ** 2) knockback(world, e, REVIVE.pushDistance);
       }
@@ -320,6 +342,7 @@ function checkOutcome(run) {
       run.deathTime = world.time;
       run.cards = null;
       hero.invulnerableUntil = Infinity;
+      hero.poison = null;
       world.events.push({ type: 'dying' });
       return;
     }
@@ -331,6 +354,7 @@ function checkOutcome(run) {
 function endRun(run, state, eventType) {
   run.state = state;
   run.cards = null;
+  run.world.hero.poison = null;
   run.world.events.push({ type: eventType });
   finishFacts(run);
 }

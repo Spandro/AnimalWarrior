@@ -29,8 +29,12 @@ export const dmgMul = (minute) => 1 + 0.12 * minute;
 export const ELITE_INTERVAL = 120;
 /** Zeitpunkte der drei Bosse. */
 export const BOSS_TIMES = [300, 600, 900];
-/** Lebensfaktor der Bosse (auf ENEMIES.baer.hp). */
+/** Lebensfaktor der Bosse je Auftritt (auf das Grundleben des jeweiligen Bosses). */
 export const BOSS_HP_MUL = [1, 2.5, 5];
+/** Bosse, aus denen jeder Durchgang drei verschiedene in zufälliger Reihenfolge zieht. */
+export const BOSS_POOL = ['baer', 'hirsch', 'keiler', 'wisent'];
+/** Wird mit dem Seed verknüpft: eigener Zufallsgeber für die Bossfolge, damit `world.rng` unberührt bleibt. */
+export const BOSS_ORDER_SALT = 0x5b0551;
 /** Gegner (außer Bossen) weiter als diese Strecke vom Helden werden auf den Erscheinungsring versetzt. */
 export const LEASH_DISTANCE = 45;
 

@@ -1,9 +1,9 @@
 import { test, assertEqual, assertClose, assertTrue } from './runner.js';
-import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary, displayTime, abandonRun, skipDying } from '../src/modes/survivor.js';
-import { spawnRadius, hpMul, BOSS_HP_MUL, MAX_ENEMIES, DEFAULT_VIEW, DYING, unlockMinute, weights } from '../src/data/waves.js';
+import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary, displayTime, abandonRun, skipDying, bossOrder } from '../src/modes/survivor.js';
+import { spawnRadius, hpMul, BOSS_HP_MUL, MAX_ENEMIES, DEFAULT_VIEW, DYING, unlockMinute, weights, BOSS_POOL } from '../src/data/waves.js';
 import { createWorld, stepWorld, spawnEnemy, damageEnemy } from '../src/core/world.js';
 import { obstaclesNear, obstaclesInCell } from '../src/core/terrain.js';
-import { ENEMIES, ELITE, DROPS, BOSS } from '../src/data/enemies.js';
+import { ENEMIES, ELITE, DROPS, BOSS, BOSS_MOVES, VENOM, POUNCE } from '../src/data/enemies.js';
 
 const NONE = { moveX: 0, moveZ: 0 };
 function clearSeed() {
@@ -136,28 +136,31 @@ test('survivor: bei 120 s existiert ein Elite-Gegner mit Typ-hp × hpMul(2) × 8
   assertEqual(elites[0].maxHp, ENEMIES[elites[0].type].hp * hpMul(2) * ELITE.hpMul);
 });
 
-test('survivor: bei 300 s und 600 s erscheint je ein Bär, der zweite mit 2,5-fachem Leben', () => {
+test('survivor: bei 300 s und 600 s erscheint je ein Boss der Folge, der zweite mit 2,5-fachem Leben', () => {
   const run = immortal(newRun());
   const w = run.world;
+  const order = bossOrder(SEED);
   w.time = 299.9;
   stepRun(run, 0.2, NONE);
-  assertEqual(ofType(run.events, 'bossSpawn'), [{ type: 'bossSpawn', index: 0 }]);
+  assertEqual(ofType(run.events, 'bossSpawn'), [{ type: 'bossSpawn', index: 0, enemyType: order[0] }]);
   w.time = 599.9;
   stepRun(run, 0.2, NONE);
-  assertEqual(ofType(run.events, 'bossSpawn'), [{ type: 'bossSpawn', index: 1 }]);
-  const bears = w.enemies.filter((e) => e.boss);
-  assertEqual(bears.map((b) => b.maxHp), [ENEMIES.baer.hp * BOSS_HP_MUL[0], ENEMIES.baer.hp * BOSS_HP_MUL[1]]);
-  assertEqual(bears.map((b) => b.type), ['baer', 'baer']);
+  assertEqual(ofType(run.events, 'bossSpawn'), [{ type: 'bossSpawn', index: 1, enemyType: order[1] }]);
+  const bosses = w.enemies.filter((e) => e.boss);
+  assertEqual(bosses.map((b) => b.maxHp), [ENEMIES[order[0]].hp * BOSS_HP_MUL[0], ENEMIES[order[1]].hp * BOSS_HP_MUL[1]]);
+  assertEqual(bosses.map((b) => b.type), order.slice(0, 2));
 });
 
-test('survivor: bei 900 s dritter Bär, danach kein weiterer Gegner; sein Tod → won', () => {
+test('survivor: bei 900 s dritter Boss, danach kein weiterer Gegner; sein Tod → won', () => {
   const run = immortal(newRun());
   const w = run.world;
+  const third = bossOrder(SEED)[2];
   w.time = 899.9;
   stepRun(run, 0.2, NONE);
   const spawns = ofType(run.events, 'bossSpawn');
-  assertEqual(spawns[spawns.length - 1], { type: 'bossSpawn', index: 2 });
-  const last = w.enemies.filter((e) => e.boss).find((b) => b.maxHp === ENEMIES.baer.hp * BOSS_HP_MUL[2]);
+  assertEqual(spawns[spawns.length - 1], { type: 'bossSpawn', index: 2, enemyType: third });
+  const last = w.enemies.filter((e) => e.boss).find((b) => b.maxHp === ENEMIES[third].hp * BOSS_HP_MUL[2]);
+  assertEqual(last.type, third);
   assertTrue(!!last);
   const maxId = Math.max(...w.enemies.map((e) => e.id));
   play(run, 20);
@@ -618,4 +621,293 @@ test('survivor: dyingLeft ignoriert das Debug-timeScale: 1,0 s Echtzeit, Welt nu
   stepRun(run, 0.02, NONE);
   assertEqual(run.state, 'lost');
   assertClose(w.time - died, DYING.duration * DYING.timeScale, 1e-9);
+});
+
+// --- Kreuzotter (Schlängeln, Gift) ---
+
+/** Lässt die Otter einmal am Helden zubeißen und nimmt sie dann weg; liefert die Welt. */
+function bitten(w) {
+  spawnEnemy(w, 'kreuzotter', w.hero.x + 0.9, w.hero.z);
+  stepWorld(w, 0.05, NONE);
+  w.enemies = w.enemies.filter((e) => e.type !== 'kreuzotter');
+  return w;
+}
+const poisonHits = (events) => events.filter((e) => e.type === 'heroHit' && e.poison);
+
+test('survivor: Otterbiss vergiftet: 4 Ticks zu je 0,5 × Schaden je Sekunde', () => {
+  const w = bitten(behaviorWorld());
+  assertTrue(!!w.hero.poison, 'nicht vergiftet');
+  const ticks = [];
+  simulate(w, 5, 0.05, () => ticks.push(...poisonHits(w.events)));
+  assertEqual(ticks.length, VENOM.duration / VENOM.tick);
+  assertEqual(ticks.length, 4);
+  for (const h of ticks) assertClose(h.amount, VENOM.dpsMul * ENEMIES.kreuzotter.damage * VENOM.tick, 1e-9);
+  assertEqual(w.hero.poison, null);
+});
+
+test('survivor: neuer Biss frischt das Gift auf, stapelt aber nicht', () => {
+  const w = bitten(behaviorWorld());
+  const times = [];
+  simulate(w, 2, 0.05, () => { if (poisonHits(w.events).length) times.push(w.time); });
+  bitten(w);
+  const second = w.time;
+  simulate(w, 6, 0.05, () => { if (poisonHits(w.events).length) times.push(w.time); });
+  for (let i = 1; i < times.length; i++) assertTrue(times[i] - times[i - 1] > VENOM.tick - 0.06, `Ticks zu dicht bei ${times[i]}`);
+  const last = times[times.length - 1];
+  assertTrue(last <= second + VENOM.duration + 1e-6 && last > second + VENOM.duration - VENOM.tick - 0.1, `letzter Tick ${last - second}`);
+});
+
+test('survivor: ausgewichener oder abgeprallter Biss vergiftet nicht', () => {
+  const w = behaviorWorld();
+  w.hero.invulnerableUntil = Infinity;
+  bitten(w);
+  assertEqual(w.hero.poison, null);
+  const w2 = behaviorWorld();
+  w2.hero.stats.dodge = 1;
+  bitten(w2);
+  assertEqual(w2.hero.poison, null);
+});
+
+test('survivor: Wiederbelebung hebt Gift auf', () => {
+  const run = newRun({ revive: true });
+  const w = run.world;
+  w.hero.poison = { until: w.time + 100, dps: 1e6, nextTick: w.time + 0.01 };
+  stepRun(run, 0.05, NONE);
+  assertEqual(ofType(run.events, 'revive').length, 1);
+  assertEqual(run.state, 'playing');
+  assertEqual(w.hero.poison, null);
+});
+
+test('survivor: Kreuzotter windet sich und wechselt die Seite alle 0,6 s', () => {
+  const w = behaviorWorld();
+  const otter = spawnEnemy(w, 'kreuzotter', 20, 0);
+  let lastSide = 0, switches = 0, px = otter.x, pz = otter.z;
+  simulate(w, 3, 0.05, () => {
+    const mx = otter.x - px, mz = otter.z - pz;
+    const tx = w.hero.x - px, tz = w.hero.z - pz;
+    const side = Math.sign(tx * mz - tz * mx);
+    if (side && lastSide && side !== lastSide) switches++;
+    if (side) lastSide = side;
+    px = otter.x; pz = otter.z;
+  });
+  assertTrue(switches >= 4 && switches <= 6, `${switches} Seitenwechsel`);
+});
+
+// --- Luchs (Anspringen) ---
+
+/** Luchs bei (12, 0) ohne Berührungsschaden; läuft, bis er den Sprung ankündigt. */
+function lynxUntilTelegraph(w) {
+  const lynx = spawnEnemy(w, 'luchs', w.hero.x + 12, w.hero.z);
+  lynx.contactReadyAt = Infinity;
+  let tele = null;
+  for (let i = 0; i < 100 && !tele; i++) { stepWorld(w, 0.05, NONE); tele = ofType(w.events, 'bossTelegraph')[0] || null; }
+  return { lynx, tele };
+}
+
+test('survivor: Luchs duckt sich in 8 Abstand und kündigt den Sprung an der Heldenposition an', () => {
+  const w = behaviorWorld();
+  const { lynx, tele } = lynxUntilTelegraph(w);
+  assertTrue(!!tele, 'keine Ankündigung');
+  assertEqual([tele.kind, tele.radius], ['leap', POUNCE.radius]);
+  assertClose(tele.delay, POUNCE.crouch + POUNCE.leapTime, 1e-9);
+  assertClose(dist(tele, w.hero), 0, 1e-9);
+  assertTrue(dist(lynx, w.hero) <= POUNCE.engageRange + 0.01);
+  const x = lynx.x;
+  simulate(w, POUNCE.crouch - 0.1, 0.05);
+  assertClose(lynx.x, x, 1e-9);
+});
+
+test('survivor: Luchs trifft bei der Landung im Kreis, sonst nicht', () => {
+  for (const stay of [true, false]) {
+    const w = behaviorWorld();
+    const { lynx, tele } = lynxUntilTelegraph(w);
+    if (!stay) w.hero.x = -20;
+    const hits = [];
+    simulate(w, POUNCE.crouch + POUNCE.leapTime + 0.05, 0.05, () => hits.push(...ofType(w.events, 'heroHit')));
+    assertEqual(hits.map((h) => h.amount), stay ? [ENEMIES.luchs.damage * POUNCE.damageMul] : []);
+    if (!stay) assertTrue(dist(lynx, tele) < 0.3, `Luchs landete ${dist(lynx, tele)} vom Ziel`);
+  }
+});
+
+test('survivor: nach dem Sprung 3 s kein neuer Sprung', () => {
+  const w = behaviorWorld();
+  const { lynx } = lynxUntilTelegraph(w);
+  const times = [w.time];
+  simulate(w, 10, 0.05, () => { if (ofType(w.events, 'bossTelegraph').length) times.push(w.time); });
+  assertTrue(times.length >= 2, 'kein zweiter Sprung');
+  for (let i = 1; i < times.length; i++) {
+    assertTrue(times[i] - times[i - 1] >= POUNCE.crouch + POUNCE.leapTime + POUNCE.cooldown - 0.06, `zu früh: ${times[i] - times[i - 1]}`);
+  }
+  assertTrue(lynx.hp > 0);
+});
+
+test('survivor: Betäubung beim Ducken bricht den Sprung ab', () => {
+  const w = behaviorWorld();
+  const { lynx } = lynxUntilTelegraph(w);
+  lynx.stunnedUntil = w.time + 0.3;
+  let leapt = false, hits = 0;
+  simulate(w, 2, 0.05, () => { if (lynx.ai.phase === 'leap') leapt = true; hits += ofType(w.events, 'heroHit').length; });
+  assertTrue(!leapt, 'sprang trotz Betäubung');
+  assertEqual(hits, 0);
+});
+
+// --- Boss-Baukasten ---
+
+/** Boss ohne Berührungsschaden; läuft, bis er einen Angriff ankündigt. */
+function bossUntilTelegraph(w, type, x) {
+  const boss = spawnEnemy(w, type, x, 0);
+  boss.contactReadyAt = Infinity;
+  let tele = null;
+  for (let i = 0; i < 400 && !tele; i++) { stepWorld(w, 0.05, NONE); tele = ofType(w.events, 'bossTelegraph')[0] || null; }
+  boss.contactReadyAt = Infinity;
+  return { boss, tele };
+}
+
+test('survivor: jeder Boss hat Nah- und Fernangriff; der Bär wie bisher', () => {
+  assertEqual(Object.keys(BOSS_MOVES), ['baer', 'keiler', 'hirsch', 'wisent']);
+  assertEqual(Object.values(BOSS_MOVES).map((m) => [m.near.kind, m.far.kind]),
+    [['swipe', 'leap'], ['swipe', 'dash'], ['ring', 'dash'], ['ring', 'dash']]);
+  const b = BOSS_MOVES.baer;
+  assertEqual([b.chaseTime, b.recover, b.triggerRange], [BOSS.chaseTime, BOSS.recover, BOSS.swipe.triggerRange]);
+  assertEqual(b.near, { kind: 'swipe', ...BOSS.swipe });
+  assertEqual(b.far, { kind: 'leap', ...BOSS.leap });
+  for (const type of ['hirsch', 'keiler', 'wisent']) {
+    const d = ENEMIES[type];
+    assertEqual([d.behavior, d.hp, d.damage, d.xp], ['boss', 1500, 25, 100]);
+  }
+  assertEqual(['hirsch', 'keiler', 'wisent'].map((t) => ENEMIES[t].name), ['Rothirsch', 'Riesenkeiler', 'Wisent']);
+});
+
+test('survivor: Röhren trifft im Ring und stößt weg, außerhalb kein Treffer', () => {
+  for (const stay of [true, false]) {
+    const w = behaviorWorld();
+    const { boss, tele } = bossUntilTelegraph(w, 'hirsch', 3);
+    assertEqual([tele.kind, tele.delay], ['ring', BOSS_MOVES.hirsch.near.windup]);
+    assertClose(tele.radius, ENEMIES.hirsch.radius + BOSS_MOVES.hirsch.near.reach, 1e-9);
+    if (!stay) w.hero.x = -20;
+    const before = dist(boss, w.hero);
+    const hits = [];
+    simulate(w, tele.delay + 0.1, 0.05, () => hits.push(...ofType(w.events, 'heroHit')));
+    assertEqual(hits.map((h) => h.amount), stay ? [ENEMIES.hirsch.damage * BOSS_MOVES.hirsch.near.damageMul] : []);
+    if (stay) assertClose(dist(boss, w.hero) - before, BOSS_MOVES.hirsch.near.push, 0.05);
+  }
+});
+
+test('survivor: Stampfen des Wisents trifft hart, stößt aber nicht weg', () => {
+  const w = behaviorWorld();
+  const { tele } = bossUntilTelegraph(w, 'wisent', 3);
+  assertEqual(tele.kind, 'ring');
+  const x = w.hero.x, z = w.hero.z;
+  const hits = [];
+  simulate(w, tele.delay + 0.1, 0.05, () => hits.push(...ofType(w.events, 'heroHit')));
+  assertEqual(hits.map((h) => h.amount), [ENEMIES.wisent.damage * BOSS_MOVES.wisent.near.damageMul]);
+  assertClose(Math.hypot(w.hero.x - x, w.hero.z - z), 0, 1e-9);
+});
+
+test('survivor: Geweih-Ansturm läuft seine Länge ab und trifft den stehenden Helden genau einmal', () => {
+  const far = BOSS_MOVES.hirsch.far;
+  const w = behaviorWorld();
+  const { boss, tele } = bossUntilTelegraph(w, 'hirsch', 25);
+  assertEqual([tele.kind, tele.length, tele.width, tele.delay], ['dash', far.length, far.width, far.windup]);
+  const hits = [];
+  simulate(w, far.windup + far.dashTime + 0.2, 0.05, () => hits.push(...ofType(w.events, 'heroHit')));
+  assertEqual(hits.map((h) => h.amount), [ENEMIES.hirsch.damage * far.damageMul]);
+
+  const w2 = behaviorWorld();
+  const r = bossUntilTelegraph(w2, 'hirsch', 25);
+  w2.hero.x = 0; w2.hero.z = -40;
+  simulate(w2, far.windup + far.dashTime + 0.05, 0.05);
+  assertClose(dist(r.boss, r.tele), far.length, 0.3);
+  assertTrue(boss.hp > 0);
+});
+
+test('survivor: Keiler stürmt dreimal, jeder Ansturm neu angekündigt und neu ausgerichtet', () => {
+  const far = BOSS_MOVES.keiler.far;
+  const w = behaviorWorld();
+  const { tele } = bossUntilTelegraph(w, 'keiler', 30);
+  assertEqual(tele.kind, 'dash');
+  w.hero.x = 0; w.hero.z = 12;
+  const teles = [tele];
+  simulate(w, far.count * (far.windup + far.dashTime) + (far.count - 1) * far.gap + 0.2, 0.05,
+    () => teles.push(...ofType(w.events, 'bossTelegraph')));
+  assertEqual(teles.map((t) => t.kind), ['dash', 'dash', 'dash']);
+  for (const t of teles.slice(1)) {
+    const to = Math.hypot(w.hero.x - t.x, w.hero.z - t.z);
+    assertTrue((t.dirX * (w.hero.x - t.x) + t.dirZ * (w.hero.z - t.z)) / to > 0.99, 'nicht auf den Helden ausgerichtet');
+  }
+});
+
+// --- Wechselnde Bosse ---
+
+test('survivor: bossOrder liefert drei verschiedene Bosse aus dem Pool, gleich bei gleichem Seed', () => {
+  assertEqual(BOSS_POOL, ['baer', 'hirsch', 'keiler', 'wisent']);
+  const seen = [new Set(), new Set(), new Set()];
+  for (let s = 1; s <= 200; s++) {
+    const o = bossOrder(s);
+    assertEqual(o.length, 3);
+    assertEqual(new Set(o).size, 3);
+    for (const b of o) assertTrue(BOSS_POOL.includes(b), b);
+    assertEqual(bossOrder(s), o);
+    o.forEach((b, i) => seen[i].add(b));
+  }
+  for (const set of seen) assertEqual(set.size, BOSS_POOL.length);
+});
+
+test('survivor: Bossauswahl verbraucht world.rng nicht', () => {
+  const run = createSurvivorRun({ seed: 77, animalId: 'hase', classId: 'krieger' });
+  const fresh = createWorld({ seed: 77, animalId: 'hase', classId: 'krieger' });
+  assertEqual(run.world.rng.next(), fresh.rng.next());
+  assertEqual(run.spawn.bossOrder, bossOrder(77));
+});
+
+test('survivor: Tod des letzten Bosses gewinnt auch, wenn er kein Bär ist', () => {
+  let seed = SEED;
+  while ((bossOrder(seed)[2] === 'baer' || obstaclesNear(seed, 0, 0, 16).length) && seed < SEED + 500) seed++;
+  assertTrue(bossOrder(seed)[2] !== 'baer', 'kein Seed mit anderem Endboss');
+  const run = immortal(newRun({ seed }));
+  const w = run.world;
+  w.time = 899.9;
+  stepRun(run, 0.2, NONE);
+  const last = run.spawn.finalBoss;
+  assertEqual(last.type, bossOrder(seed)[2]);
+  damageEnemy(w, last, { amount: 1e9, crit: false }, 'x');
+  stepRun(run, 0.05, NONE);
+  assertEqual(run.state, 'won');
+});
+
+// --- Korrekturen aus der Gesamtprüfung ---
+
+test('survivor: Röhren stößt nicht weg, wenn der Treffer nicht ankommt', () => {
+  const w = behaviorWorld();
+  const { tele } = bossUntilTelegraph(w, 'hirsch', 3);
+  assertEqual(tele.kind, 'ring');
+  w.hero.invulnerableUntil = Infinity;
+  const x = w.hero.x, z = w.hero.z;
+  simulate(w, tele.delay + 0.1, 0.05);
+  assertClose(Math.hypot(w.hero.x - x, w.hero.z - z), 0, 1e-9);
+});
+
+test('survivor: Ansturm-Ankündigung trägt den Boss-Radius, damit der Streifen die Trefferfläche zeigt', () => {
+  const w = behaviorWorld();
+  const { tele } = bossUntilTelegraph(w, 'hirsch', 25);
+  assertEqual(tele.kind, 'dash');
+  assertEqual(tele.radius, ENEMIES.hirsch.radius);
+});
+
+test('survivor: Gift endet mit der Sterbephase und mit dem Sieg', () => {
+  const run = newRun();
+  run.world.hero.poison = { until: run.world.time + 100, dps: 1, nextTick: run.world.time + 50 };
+  lethalContact(run);
+  stepRun(run, 0.05, NONE);
+  assertEqual(run.state, 'dying');
+  assertEqual(run.world.hero.poison, null);
+
+  const won = immortal(newRun());
+  won.world.time = 899.9;
+  stepRun(won, 0.2, NONE);
+  won.world.hero.poison = { until: won.world.time + 100, dps: 0, nextTick: won.world.time + 50 };
+  damageEnemy(won.world, won.spawn.finalBoss, { amount: 1e9, crit: false }, 'x');
+  stepRun(won, 0.05, NONE);
+  assertEqual(won.state, 'won');
+  assertEqual(won.world.hero.poison, null);
 });

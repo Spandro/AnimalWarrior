@@ -196,7 +196,7 @@ export function startGame({
     sfx?.handle(run.events);
     let startedDying = false;
     for (const e of run.events) {
-      if (e.type === 'heroHit') {
+      if (e.type === 'heroHit' && !e.poison) {
         heroView.flash();
         if (!reducedMotion) view.shake();
       } else if (e.type === 'dying') {

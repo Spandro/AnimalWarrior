@@ -5,7 +5,7 @@ import {
   billboardOrientation, spriteGeometry, spriteWidth, spriteMaterial, shadowMaterial, composeSprite, spriteMotion,
 } from './sprites.js';
 import { CLASSES } from '../data/classes.js';
-import { HERO_SPRITES, BILLBOARD, AIM_TURN_DURATION, HERO_FLASH, DYING_TILT } from '../data/sprites.js';
+import { HERO_SPRITES, BILLBOARD, AIM_TURN_DURATION, HERO_FLASH, HERO_POISON_TINT, DYING_TILT } from '../data/sprites.js';
 import { ABILITIES } from '../data/abilities.js';
 
 /** Dauer der Hiebanimation in Weltsekunden. */
@@ -111,7 +111,7 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
       aim: t < aimDirUntil ? aimDir : null, speed, time: t, frameDt,
       attackT: since >= 0 && since < ATTACK_DURATION ? since / ATTACK_DURATION : undefined,
       visible: dying || !(world.time < hero.invulnerableUntil && Math.floor(t * BLINK_HZ) % 2),
-      flash: performance.now() < flashUntil, dyingTilt, opacity,
+      flash: performance.now() < flashUntil, poisoned: !!hero.poison, dyingTilt, opacity,
     });
     ringMat.opacity = RING_OPACITY * opacity;
     ring.position.set(position.x, 0.03, position.z);
@@ -145,7 +145,7 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
 /**
  * @typedef {{ position: THREE.Vector3, facing: { x: number, z: number }, aimSide?: number,
  *   aim?: { x: number, z: number } | null, speed: number, time: number,
- *   frameDt: number, attackT?: number, visible: boolean }} BodyInput
+ *   frameDt: number, attackT?: number, visible: boolean, flash: boolean, poisoned: boolean }} BodyInput
  */
 
 /**
@@ -188,7 +188,7 @@ function createSpriteBody(scene, animalId, classId, sprites, camera) {
   /** Blickseite der Klone, beim ersten Erscheinen vom Helden übernommen. */
   const cloneFace = new WeakMap();
   let face = 1;
-  let lookFlash = false, lookOpacity = 1;
+  let lookFlash = 'plain', lookOpacity = 1;
 
   const placeBlob = (x, z, scale, lift) => {
     const k = scale * (1 - 0.35 * Math.min(1, lift / 0.4));
@@ -198,16 +198,19 @@ function createSpriteBody(scene, animalId, classId, sprites, camera) {
 
   return {
     /** @param {BodyInput} input */
-    update({ position, facing, aimSide, speed, time, attackT, visible, flash, dyingTilt, opacity }) {
+    update({ position, facing, aimSide, speed, time, attackT, visible, flash, poisoned, dyingTilt, opacity }) {
       if (aimSide) face = aimSide;
       else if (facing.x > BILLBOARD.flipHysteresis) face = 1;
       else if (facing.x < -BILLBOARD.flipHysteresis) face = -1;
       const m = spriteMotion(def.motion, { speed, time, attackT });
       m.tilt += dyingTilt * DYING_TILT;
-      // Nur bei Änderung schreiben: rotes Aufblitzen und Ausblenden betreffen allein diese Tafel (eigenes Material).
-      if (flash !== lookFlash) {
-        lookFlash = flash;
-        if (flash) material.color.setRGB(...HERO_FLASH.color); else material.color.setScalar(BILLBOARD.shade);
+      // Nur bei Änderung schreiben: Aufblitzen, Gifttönung und Ausblenden betreffen allein diese Tafel (eigenes Material).
+      const tint = flash ? 'flash' : poisoned ? 'poison' : 'plain';
+      if (tint !== lookFlash) {
+        lookFlash = tint;
+        if (tint === 'flash') material.color.setRGB(...HERO_FLASH.color);
+        else if (tint === 'poison') material.color.setRGB(...HERO_POISON_TINT).multiplyScalar(BILLBOARD.shade);
+        else material.color.setScalar(BILLBOARD.shade);
       }
       if (opacity !== lookOpacity) {
         const wasSolid = lookOpacity >= 1;
@@ -280,7 +283,7 @@ function createFigureBody(scene, animalId, classId) {
     o.material = copies.get(o.material);
   });
   const baseEmissive = new Map(ownMaterials.map((m) => [m, m.emissive.getHex()]));
-  let lookFlash = false, lookOpacity = 1;
+  let lookFlash = 'plain', lookOpacity = 1;
 
   function makeClone() {
     const c = buildCharacter(animalId, classId);
@@ -292,16 +295,19 @@ function createFigureBody(scene, animalId, classId) {
 
   return {
     /** @param {BodyInput} input */
-    update({ position, facing, aim, speed, time, frameDt, attackT, visible, flash, dyingTilt, opacity }) {
+    update({ position, facing, aim, speed, time, frameDt, attackT, visible, flash, poisoned, dyingTilt, opacity }) {
       const target = lookYaw(facing, aim);
       yaw = wrapAngle(yaw + wrapAngle(target - yaw) * Math.min(1, TURN_RATE * frameDt * 60));
       animateCharacter(figure, { speed, time, attackT });
       figure.position.copy(position);
       figure.rotation.y = yaw;
       figure.rotation.z = dyingTilt * DYING_TILT;
-      if (flash !== lookFlash) {
-        lookFlash = flash;
-        for (const m of ownMaterials) { m.emissive.setHex(flash ? 0xff2020 : baseEmissive.get(m)); }
+      const tint = flash ? 'flash' : poisoned ? 'poison' : 'plain';
+      if (tint !== lookFlash) {
+        lookFlash = tint;
+        for (const m of ownMaterials) {
+          m.emissive.setHex(tint === 'flash' ? 0xff2020 : tint === 'poison' ? 0x1f5a14 : baseEmissive.get(m));
+        }
       }
       if (opacity !== lookOpacity) {
         lookOpacity = opacity;

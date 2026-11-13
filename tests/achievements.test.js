@@ -21,8 +21,8 @@ const byId = (id) => ACHIEVEMENTS.find((a) => a.id === id);
 
 // ------------------------------------------------------------------ Daten
 
-test('achievements: 27 eindeutige Ids mit Titel, Bedingung, Spruch und positivem Gold', () => {
-  assertEqual(ACHIEVEMENTS.length, 27);
+test('achievements: 37 eindeutige Ids mit Titel, Bedingung, Spruch und positivem Gold', () => {
+  assertEqual(ACHIEVEMENTS.length, 37);
   assertEqual(new Set(ACHIEVEMENTS.map((a) => a.id)).size, ACHIEVEMENTS.length);
   for (const a of ACHIEVEMENTS) {
     for (const key of ['id', 'title', 'condition', 'line']) assertTrue(typeof a[key] === 'string' && a[key].trim() !== '', `${a.id}.${key}`);
@@ -39,6 +39,27 @@ test('achievements: Texte und Gold wie vorgegeben', () => {
   assertEqual([z.title, z.gold], ['Zoo-Direktor', 200]);
   assertEqual(byId('froschkoenig').title, 'Kein Froschkönig');
   assertEqual(byId('sparschwein').gold, 50);
+  assertEqual(byId('baerenhunger').condition, 'Besiege insgesamt zwei Bären');
+});
+
+test('achievements: Texte und Gold der neuen Tier- und Boss-Erfolge', () => {
+  const rows = [
+    ['fuchsteufelswild', 'Fuchsteufelswild', 'Besiege insgesamt 100 Füchse', 'So schlau waren sie dann doch nicht.', 50],
+    ['stachelkugel', 'Stachelkugel', 'Besiege insgesamt 50 Igel', 'Die Stacheln nimmst du als Andenken mit.', 50],
+    ['dachsschaden', 'Dachsschaden', 'Besiege insgesamt 50 Dachse', 'Der Bau ist jetzt zu vermieten.', 50],
+    ['schlangenbeschwoerer', 'Schlangenbeschwörer', 'Besiege insgesamt 50 Kreuzottern', 'Gegengift? Brauchst du nicht.', 50],
+    ['nachteule', 'Nachteule', 'Besiege insgesamt 50 Uhus', 'Uhu? Du!', 75],
+    ['luchsauge', 'Luchsauge', 'Besiege insgesamt 50 Luchse', 'Er hat dich gesehen. Geholfen hat es ihm nicht.', 75],
+    ['platzhirsch', 'Platzhirsch', 'Besiege einen Rothirsch', 'Jetzt bist du hier der Platzhirsch.', 75],
+    ['saustark', 'Saustark', 'Besiege einen Riesenkeiler', 'Das Wildschwein nennt dich jetzt Chef.', 75],
+    ['wisentlich', 'Wisentlich stärker', 'Besiege einen Wisent', 'Ein Wisent weniger, ein Wissen mehr.', 75],
+    ['grosswildjaeger', 'Großwildjäger', 'Besiege jeden der vier Bosse mindestens einmal', 'Die Wildnis spricht nur noch flüsternd von dir.', 150],
+  ];
+  for (const [id, ...rest] of rows) {
+    const a = byId(id);
+    assertTrue(!!a, id);
+    assertEqual([a.title, a.condition, a.line, a.gold], rest);
+  }
 });
 
 /** [id, Kontext, der nicht genügt, Kontext, der genügt] */
@@ -50,7 +71,19 @@ const CASES = [
   ['froschkoenig', { stats: { kills: { giftkroete: 49 } } }, { stats: { kills: { giftkroete: 50 } } }],
   ['rudelfuehrer', { stats: { kills: { wolf: 99 } } }, { stats: { kills: { wolf: 100 } } }],
   ['baerendienst', { stats: { kills: { baer: 0 } } }, { stats: { kills: { baer: 1 } } }],
-  ['baerenhunger', { run: { killsByType: { baer: 1 } } }, { run: { killsByType: { baer: 2 } } }],
+  ['baerenhunger', { stats: { kills: { baer: 1 } }, run: { killsByType: { baer: 1 } } }, { stats: { kills: { baer: 2 } } }],
+  ['fuchsteufelswild', { stats: { kills: { fuchs: 99 } } }, { stats: { kills: { fuchs: 100 } } }],
+  ['stachelkugel', { stats: { kills: { igel: 49 } } }, { stats: { kills: { igel: 50 } } }],
+  ['dachsschaden', { stats: { kills: { dachs: 49 } } }, { stats: { kills: { dachs: 50 } } }],
+  ['schlangenbeschwoerer', { stats: { kills: { kreuzotter: 49 } } }, { stats: { kills: { kreuzotter: 50 } } }],
+  ['nachteule', { stats: { kills: { uhu: 49 } } }, { stats: { kills: { uhu: 50 } } }],
+  ['luchsauge', { stats: { kills: { luchs: 49 } } }, { stats: { kills: { luchs: 50 } } }],
+  ['platzhirsch', { stats: { kills: { hirsch: 0 } } }, { stats: { kills: { hirsch: 1 } } }],
+  ['saustark', { stats: { kills: { keiler: 0 } } }, { stats: { kills: { keiler: 1 } } }],
+  ['wisentlich', { stats: { kills: { wisent: 0 } } }, { stats: { kills: { wisent: 1 } } }],
+  ['grosswildjaeger',
+    { stats: { kills: { baer: 3, hirsch: 1, keiler: 2 } } },
+    { stats: { kills: { baer: 1, hirsch: 1, keiler: 1, wisent: 1 } } }],
   ['ueberlebenskuenstler', { run: { ended: true, won: false } }, { run: { ended: true, won: true } }],
   ['selbstgespraech', { stats: { shadowsRouted: 0 } }, { stats: { shadowsRouted: 1 } }],
   ['schattenboxen', { run: { shadowsRouted: 2 } }, { run: { shadowsRouted: 3 } }],
