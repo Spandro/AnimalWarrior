@@ -80,7 +80,7 @@ Ausschnitte genau wie in `docs/neue-gegner-bilder.md`. Startwerte:
 | fuchs | gegner2 | 0,75 | lope | 0,04 |
 | igel | gegner2 | 0,5 | scurry | 0,03 |
 | dachs | gegner2 | 0,7 | trot | 0,04 |
-| kreuzotter | gegner2 | 0,45 | slither (neu) | 0,03 |
+| kreuzotter | gegner2 | 0,55 (beim Ansehen von 0,45 erhöht) | slither (neu) | 0,03 |
 | uhu | gegner2 | 0,9 | fly | 0 |
 | luchs | gegner2 | 1,1 | lope | 0,05 |
 
