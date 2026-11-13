@@ -590,3 +590,16 @@ test('survivor: abandonRun während der Kartenwahl verwirft die Karten; nach End
   assertEqual(run.state, 'lost');
   assertEqual(run.events, [{ type: 'death' }], 'zweiter Aufruf fügt nichts hinzu');
 });
+
+test('survivor: dyingLeft ignoriert das Debug-timeScale: 1,0 s Echtzeit, Welt nur mit DYING.timeScale', () => {
+  const run = dyingRun({ timeScale: 4 });
+  const w = run.world, died = w.time;
+  stepRun(run, 0.3, NONE);
+  assertEqual(run.state, 'dying');
+  assertClose(w.time - died, 0.3 * DYING.timeScale, 1e-9);
+  stepRun(run, 0.69, NONE);
+  assertEqual(run.state, 'dying');
+  stepRun(run, 0.02, NONE);
+  assertEqual(run.state, 'lost');
+  assertClose(w.time - died, DYING.duration * DYING.timeScale, 1e-9);
+});

@@ -209,14 +209,14 @@ export function startGame({
   let endTimer = 0, ended = false, presented = false;
   /** Meldet das Ende einmal, nach `delay` ms; Filter und Deckelement verschwinden vor dem Ergebnisbildschirm. */
   function finish(delay) {
-    if (ended) return;
+    if (ended || stopped) return;
     ended = true;
     presented = dyingAt !== null || victoryAt !== null;
     keys.clear();
     pointer.reset();
+    if (presented) guardInput(INPUT_GUARD_MS);
     endTimer = setTimeout(() => {
       deathOverlay.hide();
-      if (presented) guardInput(INPUT_GUARD_MS);
       onEnd?.(getSummary(run), { facts: getFacts(run), earlyIds: [...early] });
     }, delay);
   }

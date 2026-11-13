@@ -550,7 +550,7 @@ body[data-screen="game"] .toasts { top: auto; bottom: 64px; }
   position: absolute; inset: 0; z-index: 40; pointer-events: none;
   display: flex; align-items: center; justify-content: center; text-align: center;
 }
-.death-overlay[hidden], .death-text[hidden] { display: none; }
+#ui > .death-overlay[hidden], .death-text[hidden] { display: none; }
 .death-dark { position: absolute; inset: 0; background: #000; opacity: 0; }
 .death-text { position: relative; padding: 0 24px; max-width: 32rem; animation: death-text-in 0.8s ease-out both; }
 .death-title {
@@ -567,7 +567,7 @@ body[data-screen="game"] .toasts { top: auto; bottom: 64px; }
 @keyframes death-text-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes victory-glow { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .fx-vignette.low-health { animation: none; opacity: 0.4; }
+  .fx-vignette.low-health { animation: none; opacity: 0.4 !important; }
   .death-text { animation: none; }
 }
 

@@ -244,10 +244,16 @@ function createFigureBody(scene, animalId, classId) {
   const clones = [];
   const cloneYaw = new WeakMap();
   let yaw = 0;
-  // Die Materialien gehören dieser Figur (buildCharacter legt sie je Aufruf neu an); Klone nutzen shadowMat.
+  // buildCharacter teilt seine Materialien über einen Zwischenspeicher (character.js) mit allen anderen Figuren; damit
+  // Aufblitzen und Ausblenden nur diesen Helden treffen, bekommt er eigene Kopien (Klone nutzen shadowMat).
   /** @type {THREE.MeshStandardMaterial[]} */
   const ownMaterials = [];
-  figure.traverse((o) => { if (o.isMesh && !ownMaterials.includes(o.material)) ownMaterials.push(o.material); });
+  const copies = new Map();
+  figure.traverse((o) => {
+    if (!o.isMesh) return;
+    if (!copies.has(o.material)) { const c = o.material.clone(); copies.set(o.material, c); ownMaterials.push(c); }
+    o.material = copies.get(o.material);
+  });
   const baseEmissive = new Map(ownMaterials.map((m) => [m, m.emissive.getHex()]));
   let lookFlash = false, lookOpacity = 1;
 
@@ -274,7 +280,11 @@ function createFigureBody(scene, animalId, classId) {
       }
       if (opacity !== lookOpacity) {
         lookOpacity = opacity;
-        for (const m of ownMaterials) { m.transparent = opacity < 1; m.opacity = opacity; m.needsUpdate = true; }
+        for (const m of ownMaterials) {
+          const flip = m.transparent !== opacity < 1;
+          m.transparent = opacity < 1; m.opacity = opacity;
+          if (flip) m.needsUpdate = true;
+        }
       }
       figure.visible = visible;
     },
@@ -296,6 +306,7 @@ function createFigureBody(scene, animalId, classId) {
     dispose() {
       scene.remove(figure, ...clones);
       shadowMat.dispose();
+      for (const m of ownMaterials) m.dispose();
     },
   };
 }
