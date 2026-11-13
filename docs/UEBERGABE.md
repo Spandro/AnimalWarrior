@@ -2,7 +2,7 @@
 
 Diese Datei ist für die nächste Sitzung gedacht, falls die laufende abbricht. Sie wird an jedem Pausenpunkt aktualisiert.
 
-Zuletzt aktualisiert: 2026-11-13, während der Klärung von Paket 3 (Taverne), das vor Paket 2 entworfen wird. Klärungsstand steht in Abschnitt 2 unter Paket 3. Nächster Schritt: offene Vorschläge bestätigen lassen, Ansätze vorlegen, Spec schreiben.
+Zuletzt aktualisiert: 2026-11-13, Sicherungspunkt bei 86 % Wochenlimit während Paket 3 (Taverne, wird vor Paket 2 entworfen). Spec-Entwurf liegt unter `docs/superpowers/specs/2026-11-13-taverne-design.md` (noch nicht freigegeben). Nächster Schritt: Gegenlesen durch einen frischen Prüfer, offene Fragen an den Auftraggeber, Spec zur Freigabe vorlegen, dann Plan.
 
 ## 1. Was fertig ist
 
@@ -76,7 +76,7 @@ Reihenfolge wie vereinbart; jedes Paket bekommt eigenen Entwurf, Spec und Plan.
 - Beute kommt in eine **gemeinsame Truhe** für alle Helden (wie das Gold); gespeichert werden nur Kennungen, Werte stehen in den Daten.
 - Beute bekommt **gemalte Symbole** je Gegenstand (Bogen mit etwa 24 Stück; Beschreibungen für den Bildgenerator liefern).
 
-Als Vorschlag vorgelegt, Antwort steht aus: Auszahlung im Schnitt 90–95 % des Einsatzes; Einsätze 10/50/100/500; „Höher oder tiefer“ höchstens fünfmal verdoppeln; Wirtstiere an den Tischen; Beute zeigt Seltenheit und Werte („wirkt im Abenteuer-Modus“), Doppelte werden für Gold verkauft; fünf Duo-Fähigkeiten legt der Entwurf fest; zwei bis drei Taverne-Erfolge. Danach: Ansätze vorlegen (Menü-Taverne mit Spielbildschirmen vs. begehbare 3D-Taverne vs. gemaltes Wimmelbild mit Tippflächen; Empfehlung Menü-Taverne), dann Spec.
+Vom Auftraggeber bestätigt („Passt so“): Auszahlung im Schnitt 90–95 % des Einsatzes; Einsätze 10/50/100/500; höchstens fünf Schritte bei „Höher oder tiefer“; Wirtstiere an den Tischen; Beute zeigt Seltenheit und Werte („wirkt im Abenteuer-Modus“), Doppelte werden für Gold verkauft; Duo-Fähigkeiten legt der Entwurf fest; einige Taverne-Erfolge. Ansatz gewählt: **A – Taverne als Menü** (gemalte Gaststube als Hintergrund, je Spiel ein Bildschirm). Der Entwurf ändert eine Sache gegenüber der Auswahl: „Höher oder tiefer“ zahlt nach Risiko statt immer doppelt (sonst ausnutzbar) – das muss der Auftraggeber bei der Freigabe ausdrücklich sehen.
 
 **Paket 4 – Abenteuer-Modus mit Story:** Der zweite Modus (in Richtung Action-Rollenspiel: Level durchlaufen, Erfahrung, Ausrüstung mit Werten). Neuer Wunsch: ein Held für alle Modi. Das widerspricht der früheren Wahl „getrennter Fortschritt je Modus" und muss beim Entwurf neu geklärt werden. Namen für Ausrüstung sollen lustig sein („Helm der mäßigen Zuversicht", „Stiefel des übereilten Rückzugs").
 
