@@ -45,6 +45,18 @@ export function abilityParams(id, level, heroStats) {
 }
 
 /**
+ * Richtung vom Helden zum nächsten anvisierbaren Gegner innerhalb der Zielreichweite params[aim.key] + aim.extra
+ * (Abstand von der Heldenmitte zum Rand des Gegners).
+ * @param {World} world
+ * @param {AbilityParams} params
+ * @param {import('../data/abilities.js').AbilityAim} aim
+ * @returns {{ x: number, z: number }|null} Einheitsvektor, null ohne Gegner in Reichweite
+ */
+export function aimDirection(world, params, aim) {
+  return aimTowardsNearest(createContext(world), params, aim);
+}
+
+/**
  * Führt eine Fähigkeit sofort aus. Ohne aim gilt target aus den Daten; mit aim kommen Richtung bzw. Zielpunkt von dort.
  * @param {World} world
  * @param {string} abilityId
@@ -104,6 +116,15 @@ function nearestEnemy(ctx, x, z, range, exclude) {
     if (d2 < bestD2) { best = e; bestD2 = d2; }
   }
   return best;
+}
+
+/** Einheitsvektor zum nächsten anvisierbaren Gegner in Zielreichweite (Mitte zu Rand), sonst null. */
+function aimTowardsNearest(ctx, p, aim) {
+  const h = ctx.world.hero;
+  const e = nearestEnemy(ctx, h.x, h.z, (p[aim.key] || 0) + aim.extra);
+  if (!e) return null;
+  const dx = e.x - h.x, dz = e.z - h.z, d = Math.hypot(dx, dz);
+  return d < EPS ? null : { x: dx / d, z: dz / d };
 }
 
 /** Gegner im Umkreis range des Helden mit den meisten Nachbarn innerhalb von radius. */
@@ -168,6 +189,9 @@ function resolveTarget(ctx, def, p, aim) {
     x = enemy.x; z = enemy.z;
   } else if (aim) {
     x = aim.x; z = aim.z;
+  } else if (def.target === 'facing' && def.aim) {
+    const dir = aimTowardsNearest(ctx, p, def.aim);
+    if (dir) return { x: h.x + dir.x, z: h.z + dir.z, dirX: dir.x, dirZ: dir.z, enemy: null };
   }
   const dx = x - h.x, dz = z - h.z, d = Math.hypot(dx, dz);
   const dirX = d < EPS ? h.facing.x : dx / d, dirZ = d < EPS ? h.facing.z : dz / d;

@@ -5,7 +5,8 @@ import {
   billboardOrientation, spriteGeometry, spriteWidth, spriteMaterial, shadowMaterial, composeSprite, spriteMotion,
 } from './sprites.js';
 import { CLASSES } from '../data/classes.js';
-import { HERO_SPRITES, BILLBOARD } from '../data/sprites.js';
+import { HERO_SPRITES, BILLBOARD, AIM_TURN_DURATION } from '../data/sprites.js';
+import { ABILITIES } from '../data/abilities.js';
 
 /** Dauer der Hiebanimation in Weltsekunden. */
 const ATTACK_DURATION = 0.35;
@@ -49,6 +50,8 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
   const tracker = createTracker();
   const position = new THREE.Vector3();
   let attackAt = -Infinity;
+  /** Blickseite (-1/1) zum Ziel der letzten zielenden Fähigkeit und bis wann sie gilt (nur Darstellung). */
+  let aimSide = 0, aimUntil = -Infinity;
   let speed = 0, lastX = NaN, lastZ = NaN, lastT = NaN, lastRenderT = NaN;
 
   /**
@@ -59,6 +62,10 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
   function handle(events, world) {
     for (const e of events) {
       if (e.type === 'cast' && e.abilityId === startAbility) attackAt = world.time;
+      if (e.type === 'cast' && ABILITIES[e.abilityId]?.aim && Math.abs(e.dirX) >= BILLBOARD.flipHysteresis) {
+        aimSide = Math.sign(e.dirX);
+        aimUntil = world.time + AIM_TURN_DURATION;
+      }
     }
   }
 
@@ -85,7 +92,7 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
 
     const since = t - attackAt;
     body.update({
-      position, facing: hero.facing, speed, time: t, frameDt,
+      position, facing: hero.facing, aimSide: t < aimUntil ? aimSide : 0, speed, time: t, frameDt,
       attackT: since >= 0 && since < ATTACK_DURATION ? since / ATTACK_DURATION : undefined,
       visible: !(world.time < hero.invulnerableUntil && Math.floor(t * BLINK_HZ) % 2),
     });
@@ -110,7 +117,7 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
 }
 
 /**
- * @typedef {{ position: THREE.Vector3, facing: { x: number, z: number }, speed: number, time: number,
+ * @typedef {{ position: THREE.Vector3, facing: { x: number, z: number }, aimSide?: number, speed: number, time: number,
  *   frameDt: number, attackT?: number, visible: boolean }} BodyInput
  */
 
@@ -151,8 +158,9 @@ function createSpriteBody(scene, animalId, classId, sprites, camera) {
 
   return {
     /** @param {BodyInput} input */
-    update({ position, facing, speed, time, attackT, visible }) {
-      if (facing.x > BILLBOARD.flipHysteresis) face = 1;
+    update({ position, facing, aimSide, speed, time, attackT, visible }) {
+      if (aimSide) face = aimSide;
+      else if (facing.x > BILLBOARD.flipHysteresis) face = 1;
       else if (facing.x < -BILLBOARD.flipHysteresis) face = -1;
       const m = spriteMotion(def.motion, { speed, time, attackT });
       composeSprite(figure.matrix, orient, position.x, 0, position.z, width, height, face, m, def.footOffset);

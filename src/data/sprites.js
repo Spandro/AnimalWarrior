@@ -74,6 +74,9 @@ export const IDLE = { freq: 0.45, bob: 0.015, stretch: 0.018 };
 /** Ausfall beim Angriff: Weg nach vorn (m), Neigung nach vorn (rad). */
 export const ATTACK = { lunge: 0.18, tilt: 0.22 };
 
+/** Wie lange (s) der Held nach dem Einsatz einer zielenden Fähigkeit zum Ziel blickt, bevor er wieder in Laufrichtung schaut. */
+export const AIM_TURN_DURATION = 0.3;
+
 /** Hoppeln: Rückneigung beim Fallen als Anteil der Vorneigung beim Steigen. */
 export const HOP_BACK_LEAN = 0.5;
 

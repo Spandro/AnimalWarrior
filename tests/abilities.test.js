@@ -1,6 +1,6 @@
 import { test, assertEqual, assertClose, assertTrue } from './runner.js';
 import { createWorld, stepWorld, spawnEnemy, enemyTarget, applyStatus } from '../src/core/world.js';
-import { abilityParams, castAbility } from '../src/core/abilities.js';
+import { abilityParams, castAbility, aimDirection } from '../src/core/abilities.js';
 import { obstaclesNear } from '../src/core/terrain.js';
 import { computeStats } from '../src/core/stats.js';
 import { ABILITIES } from '../src/data/abilities.js';
@@ -36,7 +36,7 @@ function run(w, seconds, dt = 0.05) {
 
 test('abilities: arc trifft vorn in Reichweite, nicht hinten und nicht zu weit', () => {
   const w = newWorld();
-  const front = dummy(w, 2, 0), back = dummy(w, -2, 0), far = dummy(w, 5, 0);
+  const front = dummy(w, 2, 0), back = dummy(w, -3, 0), far = dummy(w, 5, 0); // hinten weiter weg als vorn, sonst zielt der Hieb nach hinten
   castAbility(w, 'schwerthieb', 1);
   assertEqual(front.hp, 1000 - 12);
   assertTrue(!damaged(back) && !damaged(far));
@@ -297,4 +297,120 @@ test('abilities: jede Fähigkeit hat einen Namen und eine Beschreibung', () => {
     assertTrue(typeof def.name === 'string' && def.name.trim() !== '', def.id);
     assertTrue(typeof def.description === 'string' && def.description.trim() !== '', def.id);
   }
+});
+
+// ---------------------------------------------------------------- Auto-Zielen
+
+const castEvent = (w) => w.events.find((e) => e.type === 'cast');
+
+test('abilities: Schwerthieb zielt auf die Ratte hinter dem Helden und trifft sie', () => {
+  const w = newWorld();
+  const rat = dummy(w, -2, 0);
+  castAbility(w, 'schwerthieb', 1);
+  assertTrue(damaged(rat));
+  assertClose(castEvent(w).dirX, -1, 1e-9);
+});
+
+test('abilities: Schwerthieb ignoriert Gegner außerhalb der Zielreichweite (Radius + 1,5)', () => {
+  const w = newWorld();
+  const rat = dummy(w, -6, 0);
+  castAbility(w, 'schwerthieb', 1);
+  assertTrue(!damaged(rat));
+  assertClose(castEvent(w).dirX, 1, 1e-9);
+});
+
+test('abilities: Zielreichweite misst von Mitte zu Rand des Gegners', () => {
+  // Reichweite 2,6 + 1,5 = 4,1; Ratte (Radius r) bei x = -(4,1 + r - 0,05) ist drin, bei -(4,1 + r + 0,05) nicht
+  const r = ENEMIES.ratte.radius;
+  const inside = newWorld();
+  dummy(inside, -(4.1 + r - 0.05), 0);
+  castAbility(inside, 'schwerthieb', 1);
+  assertClose(castEvent(inside).dirX, -1, 1e-9);
+  const outside = newWorld();
+  dummy(outside, -(4.1 + r + 0.05), 0);
+  castAbility(outside, 'schwerthieb', 1);
+  assertClose(castEvent(outside).dirX, 1, 1e-9);
+});
+
+test('abilities: Zielwahl nimmt den nächsten von zwei Gegnern', () => {
+  const w = newWorld();
+  dummy(w, 0, 3);
+  dummy(w, -2, 0);
+  castAbility(w, 'schwerthieb', 1);
+  assertClose(castEvent(w).dirX, -1, 1e-9);
+  assertClose(castEvent(w).dirZ, 0, 1e-9);
+});
+
+test('abilities: unantastbarer Gegner wird nicht anvisiert', () => {
+  const w = newWorld();
+  const shadow = dummy(w, -1, 0);
+  shadow.untargetable = true;
+  dummy(w, 0, 3);
+  castAbility(w, 'schwerthieb', 1);
+  assertClose(castEvent(w).dirX, 0, 1e-9);
+  assertClose(castEvent(w).dirZ, 1, 1e-9);
+});
+
+test('abilities: Klingenfächer zielt auf die Ratte bei (0, 5), die mittlere Klinge fliegt dorthin', () => {
+  const w = newWorld();
+  dummy(w, 0, 5);
+  castAbility(w, 'klingenfaecher', 1);
+  assertClose(castEvent(w).dirX, 0, 1e-9);
+  assertClose(castEvent(w).dirZ, 1, 1e-9);
+  const mid = w.projectiles[Math.floor(w.projectiles.length / 2)];
+  assertClose(mid.dirX, 0, 1e-9);
+  assertClose(mid.dirZ, 1, 1e-9);
+});
+
+test('abilities: Erdspalter reicht je nach Stufe weiter, Zielreichweite = Länge + 1,5', () => {
+  const w3 = newWorld();
+  dummy(w3, 0, -13); // außerhalb der Linie (12 + Radius), aber in Zielreichweite 13,5
+  castAbility(w3, 'erdspalter', 3);
+  assertClose(castEvent(w3).dirZ, -1, 1e-9);
+  const w1 = newWorld();
+  dummy(w1, 0, -11);
+  castAbility(w1, 'erdspalter', 1);
+  assertClose(castEvent(w1).dirX, 1, 1e-9);
+});
+
+test('abilities: mitgegebener Zielpunkt schlägt die automatische Zielwahl', () => {
+  const w = newWorld();
+  dummy(w, -2, 0);
+  castAbility(w, 'schwerthieb', 1, { x: 0, z: 5 });
+  assertClose(castEvent(w).dirX, 0, 1e-9);
+  assertClose(castEvent(w).dirZ, 1, 1e-9);
+});
+
+test('abilities: aimDirection liefert null in leerer Welt und lässt hero.facing unverändert', () => {
+  const w = newWorld();
+  assertEqual(aimDirection(w, abilityParams('schwerthieb', 1, w.hero.stats), ABILITIES.schwerthieb.aim), null);
+  dummy(w, -2, 0);
+  const d = aimDirection(w, abilityParams('schwerthieb', 1, w.hero.stats), ABILITIES.schwerthieb.aim);
+  assertClose(d.x, -1, 1e-9);
+  castAbility(w, 'schwerthieb', 1);
+  assertEqual([w.hero.facing.x, w.hero.facing.z], [1, 0]);
+});
+
+test('abilities: Schwerthieb Stufe 5 schlägt zum Ziel und zusätzlich in die Gegenrichtung', () => {
+  const w = newWorld();
+  const aimed = dummy(w, 0, 2), opposite = dummy(w, 0, -2), side = dummy(w, 2, 0);
+  castAbility(w, 'schwerthieb', 5);
+  assertTrue(damaged(aimed) && damaged(opposite) && !damaged(side));
+});
+
+test('abilities: Klingenfächer Stufe 5 deckt 360° ab und zentriert sich auf das Ziel', () => {
+  const w = newWorld();
+  dummy(w, 0, 5);
+  castAbility(w, 'klingenfaecher', 5);
+  assertEqual(w.projectiles.length, 9);
+  assertClose(castEvent(w).dirZ, 1, 1e-9);
+  assertTrue(w.projectiles.some((p) => Math.abs(p.dirX) < 1e-9 && Math.abs(p.dirZ - 1) < 1e-9));
+});
+
+test('abilities: nur die fünf facing-Fähigkeiten haben ein aim-Feld', () => {
+  const withAim = Object.values(ABILITIES).filter((d) => d.aim).map((d) => d.id).sort();
+  assertEqual(withAim, ['erdspalter', 'klingenfaecher', 'schildstoss', 'schwerthieb', 'wurfdolche']);
+  for (const d of Object.values(ABILITIES)) assertEqual(!!d.aim, d.target === 'facing', d.id);
+  assertEqual(ABILITIES.wurfdolche.aim, { key: 'range', extra: 0 });
+  assertEqual(ABILITIES.erdspalter.aim, { key: 'length', extra: 1.5 });
 });

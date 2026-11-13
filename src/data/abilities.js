@@ -2,7 +2,9 @@
  * @typedef {'arc'|'ring'|'line'|'projectile'|'chain'|'zone'|'orbit'|'buff'|'summon'} AbilityShape
  * @typedef {'facing'|'nearest'|'densest'|'self'} AbilityTarget
  * @typedef {{ key: string, add?: number, mul?: number }} LevelChange
+ * @typedef {{ key: string, extra: number }} AbilityAim Zielreichweite einer facing-Fähigkeit: params[key] + extra
  * @typedef {{ id: string, name: string, description: string, classId: string, shape: AbilityShape, trigger: 'auto', target: AbilityTarget,
+ *   aim?: AbilityAim,
  *   base: Record<string, number>, levels: LevelChange[][] }} AbilityDef
  *
  * Bedeutung der Werte in `base` (je nach Form):
@@ -16,6 +18,9 @@
  * - delay, duration, tickDamage, tickInterval: Zonen (Aufschlag nach delay, danach duration Sekunden lang Ticks)
  * - orbitSpeed (rad/s), hitInterval: Umlauf; damagePct: Schadensbonus der Stärkung
  */
+
+/** Zusatz zur Zielreichweite von Nahkampf-Fähigkeiten (m): der Held zielt etwas über die Trefferfläche hinaus. */
+const AIM_MELEE_EXTRA = 1.5;
 
 /** Maße, die mit stats.area skalieren. Winkel, Anzahlen, Tempo und Reichweiten skalieren nicht. */
 export const AREA_KEYS = ['radius', 'length', 'width', 'explosion', 'orbitRadius', 'lureRadius', 'explodeRadius'];
@@ -56,6 +61,7 @@ function ability({ damageKey = 'damage', perk3, perk5, ...def }) {
 export const ABILITIES = {
   schwerthieb: ability({
     id: 'schwerthieb', name: 'Ordentlich Draufhauen', description: 'Ein breiter Hieb nach vorn. Diplomatie wird überschätzt.', classId: 'krieger', shape: 'arc', target: 'facing',
+    aim: { key: 'radius', extra: AIM_MELEE_EXTRA },
     base: { damage: 12, cooldown: 1.0, radius: 2.6, angle: 110, swings: 1, knockback: 0, stun: 0 },
     perk3: [{ key: 'angle', add: 40 }],
     perk5: [{ key: 'swings', add: 1 }],
@@ -68,6 +74,7 @@ export const ABILITIES = {
   }),
   schildstoss: ability({
     id: 'schildstoss', name: 'Bitte Abstand halten', description: 'Stößt Gegner vor dir zurück. Höflich, aber bestimmt.', classId: 'krieger', shape: 'arc', target: 'facing',
+    aim: { key: 'radius', extra: AIM_MELEE_EXTRA },
     base: { damage: 5, cooldown: 4.0, radius: 2.2, angle: 90, swings: 1, knockback: 5, stun: 0 },
     perk3: [{ key: 'knockback', add: 3 }],
     perk5: [{ key: 'stun', add: 1 }],
@@ -80,6 +87,7 @@ export const ABILITIES = {
   }),
   erdspalter: ability({
     id: 'erdspalter', name: 'Gartenumgraber', description: 'Reißt einen langen Graben nach vorn und trifft alles darin. Der Rasen nimmt es persönlich.', classId: 'krieger', shape: 'line', target: 'facing',
+    aim: { key: 'length', extra: AIM_MELEE_EXTRA },
     base: { damage: 18, cooldown: 5.0, length: 9, width: 1.6 },
     perk3: [{ key: 'length', add: 3 }],
     perk5: [{ key: 'width', add: 0.8 }],
@@ -116,6 +124,7 @@ export const ABILITIES = {
   }),
   wurfdolche: ability({
     id: 'wurfdolche', name: 'Spitze Bemerkungen', description: 'Durchschlagende Dolche nach vorn. Kritik, die ankommt.', classId: 'dieb', shape: 'projectile', target: 'facing',
+    aim: { key: 'range', extra: 0 },
     base: { damage: 7, cooldown: 0.6, speed: 18, pierce: 2, range: 12, count: 1, spread: 10, explosion: 0, size: 0.25 },
     perk3: [{ key: 'count', add: 1 }],
     perk5: [{ key: 'pierce', add: 3 }],
@@ -134,6 +143,7 @@ export const ABILITIES = {
   }),
   klingenfaecher: ability({
     id: 'klingenfaecher', name: 'Besteckschublade', description: 'Wirft mehrere Dolche im Fächer. Einfach mal alles raus.', classId: 'dieb', shape: 'projectile', target: 'facing',
+    aim: { key: 'range', extra: 0 },
     base: { damage: 6, cooldown: 2.5, count: 5, spread: 60, speed: 16, range: 9, pierce: 1, explosion: 0, size: 0.25 },
     perk3: [{ key: 'count', add: 2 }],
     perk5: [{ key: 'count', add: 2 }, { key: 'spread', add: 300 }],
