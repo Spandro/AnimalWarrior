@@ -198,7 +198,9 @@ Bei der Steuerung hat der Auftraggeber „hochkant mit einem Daumen" gewählt; d
 
 **Umgebung**
 
-- Die Bilder sind noch nicht geliefert. Der Einbau wird jetzt mit Rückfall auf die 3D-Umgebung gebaut und getestet; die Ausschnitte misst der Bau nach Lieferung aus und trägt sie in die Daten ein.
+- Die Bilder sind am 2026-11-13 geliefert worden und liegen unter `assets/umgebung/`: `boden.webp` (Grasfläche von oben), `objekte.webp` (Bogen auf weißem Hintergrund: Laubbaum, Tanne, Birke; großer und kleiner Fels, Busch, Baumstumpf, Farn; Blumen, Pilze, Truhe zu, Truhe offen, Goldmünze, Heiltrank, blauer Kristall). Der Bau misst die Ausschnitte aus und trägt sie in die Daten ein; der Rückfall auf die 3D-Umgebung bleibt für den Fall, dass ein Bild nicht lädt.
+- Zusätzlich geliefert: `szenen.webp`, sechs gemalte Landschaftsbilder in einem Raster (Waldweg, Steinbrücke am Fluss, Höhle, Wasserfall, Baum auf der Wiese, Teich mit Schilf). Sie sind von der Seite gemalt und taugen nicht als Spielfeld. Entscheidung des Entwurfs: Sie werden als Hintergrund der Menüs genutzt (Hauptmenü: Baum auf der Wiese; Heldenauswahl und -erstellung: Waldweg; Modusauswahl: Steinbrücke; Dauerboni: Höhle; Erfolge: Wasserfall; Einstellungen: Teich), abgedunkelt und weichgezeichnet, damit Text lesbar bleibt. Für Paket 2 sind sie als Titelbilder möglicher Welten vorgemerkt.
+- Der Boden wird beim Laden an den Kanten überblendet, falls das gelieferte Bild nicht nahtlos kachelt.
 - „Hinter einem Baum" heißt: Der Baum steht näher an der Kamera als der Held und sein Bild überdeckt den Helden auf dem Bildschirm.
 
 ## 12. Was dem Bau überlassen bleibt
