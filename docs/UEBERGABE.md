@@ -84,12 +84,15 @@ Vom Auftraggeber bestätigt („Passt so“): Auszahlung im Schnitt 90–95 % de
 
 - **Paket „Neue Gegner und wechselnde Bosse“ (eigene Sitzung, läuft parallel zur Taverne):** Wünsche geklärt
   (2026-11-13), Spec `docs/superpowers/specs/2026-11-13-neue-gegner-und-bosse-design.md` **freigegeben**, Plan
-  `docs/superpowers/plans/2026-11-13-neue-gegner-und-bosse.md` (neun Aufgaben) geschrieben, **Freigabe steht aus**.
-  Sicherungspunkt bei 88 % Wochen- und 87 % 5-Stunden-Limit; noch kein Code gebaut.
+  `docs/superpowers/plans/2026-11-13-neue-gegner-und-bosse.md` (neun Aufgaben) **freigegeben**; Ausführung „sparsam“
+  (inline, `superpowers:executing-plans`, am Ende ein frischer Prüfer), Protokoll in
+  `.superpowers/sdd/2026-11-13-neue-gegner-und-bosse/progress.md`. **Aufgabe 1 und 2 fertig** (`34201ed`, `3b3aad9`,
+  346 Tests grün). Bis Aufgabe 3–5 laufen Igel, Kreuzotter und Luchs nur hinterher (Rückfall `chase`). Sicherungspunkt bei
+  92 % 5-Stunden-Limit (frei ab 23:10 Uhr am 13.11.); weiter mit Aufgabe 3.
   Entschieden: sechs neue Gegner (Igel rollt sich ein, Kreuzotter vergiftet, Luchs springt an; Fuchs, Dachs, Uhu mit
   vorhandenen Kampfweisen), je Durchgang drei verschiedene Bosse zufällig aus Bär, Rothirsch, Riesenkeiler, Wisent, jeder
   neue Boss mit eigenem Nah- und Fernangriff, zehn neue Erfolge, „Bärenhunger“ wird „insgesamt zwei Bären“. Bilder:
-  `docs/neue-gegner-bilder.md`. Nächster Schritt: Freigabe des Plans und Wahl der Ausführung, dann Bau ab Aufgabe 1.
+  `docs/neue-gegner-bilder.md`.
 - Getroffene Gegner blitzen nicht auf (Trefferereignisse tragen keine Gegnerkennung)
 - Balancing ist ungespielt: Wer still steht, stirbt sehr schnell; 15 Minuten hat noch niemand am Stück gespielt
 - Ton hat noch niemand gehört
