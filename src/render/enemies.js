@@ -204,7 +204,7 @@ const wingParts = (s) => [
   ['sphere', 0x15151a, [s * 0.66, -0.01, -0.06], [0.16, 0.025, 0.13]],
 ];
 
-/** Fassungsvermögen je Gegnertyp: 300 reguläre insgesamt plus ausgenommene Elite; Bären sind Bosse. */
+/** Fassungsvermögen je Gegnertyp: 300 reguläre insgesamt plus ausgenommene Elite; Bosse haben eigene kleine Vorräte. */
 /** 3D-Ersatz für Tiere ohne eigene Form: Kennung → Form aus ENEMY_PARTS. */
 const FALLBACK_SHAPE = {
   fuchs: 'wolf', luchs: 'wolf', dachs: 'wildschwein', keiler: 'wildschwein', igel: 'ratte', kreuzotter: 'ratte',

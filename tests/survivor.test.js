@@ -1,6 +1,6 @@
 import { test, assertEqual, assertClose, assertTrue } from './runner.js';
-import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary, displayTime, abandonRun, skipDying } from '../src/modes/survivor.js';
-import { spawnRadius, hpMul, BOSS_HP_MUL, MAX_ENEMIES, DEFAULT_VIEW, DYING, unlockMinute, weights } from '../src/data/waves.js';
+import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary, displayTime, abandonRun, skipDying, bossOrder } from '../src/modes/survivor.js';
+import { spawnRadius, hpMul, BOSS_HP_MUL, MAX_ENEMIES, DEFAULT_VIEW, DYING, unlockMinute, weights, BOSS_POOL } from '../src/data/waves.js';
 import { createWorld, stepWorld, spawnEnemy, damageEnemy } from '../src/core/world.js';
 import { obstaclesNear, obstaclesInCell } from '../src/core/terrain.js';
 import { ENEMIES, ELITE, DROPS, BOSS, BOSS_MOVES, VENOM, POUNCE } from '../src/data/enemies.js';
@@ -136,28 +136,31 @@ test('survivor: bei 120 s existiert ein Elite-Gegner mit Typ-hp × hpMul(2) × 8
   assertEqual(elites[0].maxHp, ENEMIES[elites[0].type].hp * hpMul(2) * ELITE.hpMul);
 });
 
-test('survivor: bei 300 s und 600 s erscheint je ein Bär, der zweite mit 2,5-fachem Leben', () => {
+test('survivor: bei 300 s und 600 s erscheint je ein Boss der Folge, der zweite mit 2,5-fachem Leben', () => {
   const run = immortal(newRun());
   const w = run.world;
+  const order = bossOrder(SEED);
   w.time = 299.9;
   stepRun(run, 0.2, NONE);
-  assertEqual(ofType(run.events, 'bossSpawn'), [{ type: 'bossSpawn', index: 0 }]);
+  assertEqual(ofType(run.events, 'bossSpawn'), [{ type: 'bossSpawn', index: 0, enemyType: order[0] }]);
   w.time = 599.9;
   stepRun(run, 0.2, NONE);
-  assertEqual(ofType(run.events, 'bossSpawn'), [{ type: 'bossSpawn', index: 1 }]);
-  const bears = w.enemies.filter((e) => e.boss);
-  assertEqual(bears.map((b) => b.maxHp), [ENEMIES.baer.hp * BOSS_HP_MUL[0], ENEMIES.baer.hp * BOSS_HP_MUL[1]]);
-  assertEqual(bears.map((b) => b.type), ['baer', 'baer']);
+  assertEqual(ofType(run.events, 'bossSpawn'), [{ type: 'bossSpawn', index: 1, enemyType: order[1] }]);
+  const bosses = w.enemies.filter((e) => e.boss);
+  assertEqual(bosses.map((b) => b.maxHp), [ENEMIES[order[0]].hp * BOSS_HP_MUL[0], ENEMIES[order[1]].hp * BOSS_HP_MUL[1]]);
+  assertEqual(bosses.map((b) => b.type), order.slice(0, 2));
 });
 
-test('survivor: bei 900 s dritter Bär, danach kein weiterer Gegner; sein Tod → won', () => {
+test('survivor: bei 900 s dritter Boss, danach kein weiterer Gegner; sein Tod → won', () => {
   const run = immortal(newRun());
   const w = run.world;
+  const third = bossOrder(SEED)[2];
   w.time = 899.9;
   stepRun(run, 0.2, NONE);
   const spawns = ofType(run.events, 'bossSpawn');
-  assertEqual(spawns[spawns.length - 1], { type: 'bossSpawn', index: 2 });
-  const last = w.enemies.filter((e) => e.boss).find((b) => b.maxHp === ENEMIES.baer.hp * BOSS_HP_MUL[2]);
+  assertEqual(spawns[spawns.length - 1], { type: 'bossSpawn', index: 2, enemyType: third });
+  const last = w.enemies.filter((e) => e.boss).find((b) => b.maxHp === ENEMIES[third].hp * BOSS_HP_MUL[2]);
+  assertEqual(last.type, third);
   assertTrue(!!last);
   const maxId = Math.max(...w.enemies.map((e) => e.id));
   play(run, 20);
@@ -832,4 +835,42 @@ test('survivor: Keiler stürmt dreimal, jeder Ansturm neu angekündigt und neu a
     const to = Math.hypot(w.hero.x - t.x, w.hero.z - t.z);
     assertTrue((t.dirX * (w.hero.x - t.x) + t.dirZ * (w.hero.z - t.z)) / to > 0.99, 'nicht auf den Helden ausgerichtet');
   }
+});
+
+// --- Wechselnde Bosse ---
+
+test('survivor: bossOrder liefert drei verschiedene Bosse aus dem Pool, gleich bei gleichem Seed', () => {
+  assertEqual(BOSS_POOL, ['baer', 'hirsch', 'keiler', 'wisent']);
+  const seen = [new Set(), new Set(), new Set()];
+  for (let s = 1; s <= 200; s++) {
+    const o = bossOrder(s);
+    assertEqual(o.length, 3);
+    assertEqual(new Set(o).size, 3);
+    for (const b of o) assertTrue(BOSS_POOL.includes(b), b);
+    assertEqual(bossOrder(s), o);
+    o.forEach((b, i) => seen[i].add(b));
+  }
+  for (const set of seen) assertEqual(set.size, BOSS_POOL.length);
+});
+
+test('survivor: Bossauswahl verbraucht world.rng nicht', () => {
+  const run = createSurvivorRun({ seed: 77, animalId: 'hase', classId: 'krieger' });
+  const fresh = createWorld({ seed: 77, animalId: 'hase', classId: 'krieger' });
+  assertEqual(run.world.rng.next(), fresh.rng.next());
+  assertEqual(run.spawn.bossOrder, bossOrder(77));
+});
+
+test('survivor: Tod des letzten Bosses gewinnt auch, wenn er kein Bär ist', () => {
+  let seed = SEED;
+  while ((bossOrder(seed)[2] === 'baer' || obstaclesNear(seed, 0, 0, 16).length) && seed < SEED + 500) seed++;
+  assertTrue(bossOrder(seed)[2] !== 'baer', 'kein Seed mit anderem Endboss');
+  const run = immortal(newRun({ seed }));
+  const w = run.world;
+  w.time = 899.9;
+  stepRun(run, 0.2, NONE);
+  const last = run.spawn.finalBoss;
+  assertEqual(last.type, bossOrder(seed)[2]);
+  damageEnemy(w, last, { amount: 1e9, crit: false }, 'x');
+  stepRun(run, 0.05, NONE);
+  assertEqual(run.state, 'won');
 });

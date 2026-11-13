@@ -51,7 +51,7 @@ export function renderResult(c, props, app) {
   const again = el('button', { class: 'btn btn-primary', type: 'button', onclick: () => app.startRun(heroId) }, 'Nochmal');
   c.append(
     screenHeader(summary.won ? 'Sieg' : 'Niederlage',
-      summary.won ? 'Der Bär ist besiegt – die Wildnis gehört dir.' : 'Diesmal hat die Wildnis gewonnen.'),
+      summary.won ? 'Der letzte Boss ist besiegt – die Wildnis gehört dir.' : 'Diesmal hat die Wildnis gewonnen.'),
     hero ? el('p', { class: 'hero-badge' }, el('strong', { text: hero.name }), ' – ', heroLine(hero)) : null,
     el('dl', { class: 'result-stats' },
       stat('Überlebenszeit', clock(Math.min(summary.time, RUN_DURATION)),

@@ -4,7 +4,7 @@ Ein Actionspiel für den Browser mit Draufsicht: Wähle ein Tier (Hase, Ente, Wa
 
 ## Was es gibt
 
-- **Wellen-Modus:** Gegner kommen von allen Seiten, du levelst mit neuen Fähigkeiten und Boni. Bei Minute 5, 10 und 15 erscheint ein Bär als Boss; dazwischen taucht dein eigener Schatten auf, den man vertreiben, aber nie besiegen kann.
+- **Wellen-Modus:** Gegner kommen von allen Seiten, du levelst mit neuen Fähigkeiten und Boni. Bei Minute 5, 10 und 15 erscheint je ein anderer Boss (Bär, Rothirsch, Riesenkeiler oder Wisent); dazwischen taucht dein eigener Schatten auf, den man vertreiben, aber nie besiegen kann.
 - **Kisten auf der Karte:** verstreute Truhen mit Gold, Heilung oder einer Gratis-Aufwertung. Ein Pfeil am Bildrand zeigt zur nächsten.
 - **Am Handy spielbar:** hochkant mit einem Daumen, mit Pause-Knopf in Daumenreichweite.
 - **Dauerboni:** Gold aus den Durchgängen kaufst du im Hauptmenü in dauerhafte Verbesserungen um.

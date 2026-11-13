@@ -14,7 +14,7 @@ export const DEATH_LINES = [
 
 /** @type {string[]} */
 export const VICTORY_LINES = [
-  'Der Bär ist platt, der Tag gerettet.',
+  'Die Bosse sind platt, der Tag gerettet.',
   'Sieht so aus, als hättest du gewonnen.',
   'Die Ratten verlangen eine Revanche.',
   'Fünfzehn Minuten, null Ausreden.',

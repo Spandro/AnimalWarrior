@@ -172,7 +172,7 @@ export function renderMode(c, props, app) {
         onclick: () => app.startRun(hero.id),
       },
       el('span', { class: 'card-title', text: 'Wellen-Modus' }),
-      el('span', { class: 'card-text', text: `Überlebe ${minutes} Minuten gegen immer stärkere Wellen und besiege am Ende den Bären.` }),
+      el('span', { class: 'card-text', text: `Überlebe ${minutes} Minuten gegen immer stärkere Wellen und besiege die Bosse.` }),
       el('span', { class: 'card-text muted', text: `Beste Zeit: ${formatTime(hero.survivor.bestTime)}` }),
       el('span', { class: 'card-action', text: 'Los geht’s →' })),
       el('button', { class: 'card mode-card locked', type: 'button', disabled: true, 'aria-describedby': 'adventure-soon' },
