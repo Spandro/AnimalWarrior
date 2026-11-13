@@ -83,11 +83,13 @@ Vom Auftraggeber bestätigt („Passt so“): Auszahlung im Schnitt 90–95 % de
 **Weitere offene Wünsche und Ideen**
 
 - **Paket „Neue Gegner und wechselnde Bosse“ (eigene Sitzung, läuft parallel zur Taverne):** Wünsche geklärt
-  (2026-11-13), Spec-Entwurf `docs/superpowers/specs/2026-11-13-neue-gegner-und-bosse-design.md`, **Freigabe steht aus**.
+  (2026-11-13), Spec `docs/superpowers/specs/2026-11-13-neue-gegner-und-bosse-design.md` **freigegeben**, Plan
+  `docs/superpowers/plans/2026-11-13-neue-gegner-und-bosse.md` (neun Aufgaben) geschrieben, **Freigabe steht aus**.
+  Sicherungspunkt bei 88 % Wochen- und 87 % 5-Stunden-Limit; noch kein Code gebaut.
   Entschieden: sechs neue Gegner (Igel rollt sich ein, Kreuzotter vergiftet, Luchs springt an; Fuchs, Dachs, Uhu mit
   vorhandenen Kampfweisen), je Durchgang drei verschiedene Bosse zufällig aus Bär, Rothirsch, Riesenkeiler, Wisent, jeder
   neue Boss mit eigenem Nah- und Fernangriff, zehn neue Erfolge, „Bärenhunger“ wird „insgesamt zwei Bären“. Bilder:
-  `docs/neue-gegner-bilder.md`. Nächster Schritt: Freigabe der Spec, dann Plan unter `docs/superpowers/plans/`.
+  `docs/neue-gegner-bilder.md`. Nächster Schritt: Freigabe des Plans und Wahl der Ausführung, dann Bau ab Aufgabe 1.
 - Getroffene Gegner blitzen nicht auf (Trefferereignisse tragen keine Gegnerkennung)
 - Balancing ist ungespielt: Wer still steht, stirbt sehr schnell; 15 Minuten hat noch niemand am Stück gespielt
 - Ton hat noch niemand gehört
