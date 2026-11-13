@@ -553,7 +553,7 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
         case 'shadowAppear': case 'shadowVanish': shadowSmoke(e); break;
         case 'shadowFlee': shadowSmoke(e, 0.5); break;
         case 'heroHit':
-          vignette.hit(0.45 + (e.amount / hero.stats.maxHp) * 4);
+          if (!e.poison) vignette.hit(0.45 + (e.amount / hero.stats.maxHp) * 4);
           break;
         case 'heal':
           if (e.amount >= 1) numbers.show('+' + Math.round(e.amount), hero.x, 1.8, hero.z, 'heal');

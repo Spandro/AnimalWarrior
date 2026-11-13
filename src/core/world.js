@@ -7,7 +7,7 @@ import { stepAbilities } from './abilities.js';
 import { CLASSES } from '../data/classes.js';
 import { bonusModifiers } from '../data/bonuses.js';
 import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, CONTACT_TOLERANCE, HERO_RADIUS, SEPARATION_CELL, MAX_ENEMIES,
-  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS, CURL } from '../data/enemies.js';
+  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS, CURL, SLITHER, VENOM } from '../data/enemies.js';
 import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
 
 /**
@@ -16,7 +16,9 @@ import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
  * @typedef {{ id: string, level: number, cooldownLeft: number }} HeroAbility
  * @typedef {{ modifiers: Modifier[], timeLeft: number, abilityId?: string }} Buff
  * @typedef {{ x: number, z: number, facing: {x:number,z:number}, hp: number, stats: Stats, modifiers: Modifier[],
- *   abilities: HeroAbility[], buffs: Buff[], radius: number, invulnerableUntil: number, animalId: string, classId: string }} Hero
+ *   abilities: HeroAbility[], buffs: Buff[], radius: number, invulnerableUntil: number,
+ *   poison: { until: number, dps: number, nextTick: number } | null, animalId: string, classId: string }} Hero
+ *   `poison`: Gift der Kreuzotter (VENOM), nur im Lauf.
  * @typedef {{ id: number, type: string, x: number, z: number, hp: number, maxHp: number, radius: number, speed: number,
  *   damage: number, elite: boolean, boss: boolean, flying: boolean, behavior: string, slowUntil: number, slowFactor: number,
  *   confusedUntil: number, stunnedUntil: number, contactReadyAt: number, hitReadyAt: Record<string, number>, ai: object,
@@ -86,16 +88,12 @@ const BEHAVIORS = {
 
   /** Nähert sich mit seitlichem Versatz, der regelmäßig die Seite wechselt. */
   strafe(world, enemy, dt) {
-    const ai = enemy.ai, t = world.time;
-    if (!ai.side) { ai.side = enemy.id % 2 ? 1 : -1; ai.switchAt = t + STRAFE.switchInterval; }
-    if (t >= ai.switchAt) { ai.side = -ai.side; ai.switchAt = t + STRAFE.switchInterval; }
-    const to = towards(enemy, enemyTarget(world, enemy));
-    if (to.d === 0) return;
-    const step = enemySpeed(world, enemy) * dt;
-    if (to.d <= step) { moveDir(enemy, to.x, to.z, to.d); return; }
-    const lx = -to.z * ai.side * STRAFE.lateral, lz = to.x * ai.side * STRAFE.lateral;
-    const len = Math.hypot(to.x + lx, to.z + lz);
-    moveDir(enemy, (to.x + lx) / len, (to.z + lz) / len, step);
+    approachSideways(world, enemy, dt, STRAFE);
+  },
+
+  /** Kreuzotter: wie strafe, nur enger gewunden. */
+  slither(world, enemy, dt) {
+    approachSideways(world, enemy, dt, SLITHER);
   },
 
   /** Hält Abstand und schießt auf den Helden. */
@@ -145,6 +143,20 @@ const BEHAVIORS = {
     }
   },
 };
+
+/** Nähert sich mit seitlichem Versatz (Anteil `c.lateral`), Seitenwechsel alle `c.switchInterval` s. */
+function approachSideways(world, enemy, dt, c) {
+  const ai = enemy.ai, t = world.time;
+  if (!ai.side) { ai.side = enemy.id % 2 ? 1 : -1; ai.switchAt = t + c.switchInterval; }
+  if (t >= ai.switchAt) { ai.side = -ai.side; ai.switchAt = t + c.switchInterval; }
+  const to = towards(enemy, enemyTarget(world, enemy));
+  if (to.d === 0) return;
+  const step = enemySpeed(world, enemy) * dt;
+  if (to.d <= step) { moveDir(enemy, to.x, to.z, to.d); return; }
+  const lx = -to.z * ai.side * c.lateral, lz = to.x * ai.side * c.lateral;
+  const len = Math.hypot(to.x + lx, to.z + lz);
+  moveDir(enemy, (to.x + lx) / len, (to.z + lz) / len, step);
+}
 
 /**
  * Hält `c.minRange`–`c.maxRange` Abstand zum Ziel und feuert alle `c.fireInterval` s `count` Geschosse auf den
@@ -367,7 +379,7 @@ export function createWorld({ seed, animalId, classId, modifiers = [] }) {
       x: 0, z: 0, facing: { x: 1, z: 0 },
       hp: stats.maxHp, stats, modifiers: [...modifiers],
       abilities: [{ id: CLASSES[classId].startAbility, level: 1, cooldownLeft: 0 }],
-      buffs: [], radius: HERO_RADIUS, invulnerableUntil: 0, animalId, classId,
+      buffs: [], radius: HERO_RADIUS, invulnerableUntil: 0, poison: null, animalId, classId,
     },
     enemies: [], projectiles: [], enemyProjectiles: [], zones: [], orbitals: [], summons: [], pickups: [], events: [],
     run: { level: 1, xp: 0, kills: 0, gold: 0, bonuses: {}, damageByAbility: {}, revivesLeft: 0 },
@@ -517,18 +529,46 @@ function startShadowFlee(world, enemy) {
 
 /**
  * Schaden am Helden über Ausweichen und Rüstung.
+ * Gifttreffer (`poison`) tragen im Ereignis `heroHit` das Feld `poison: true`.
  * @param {World} world
  * @param {number} rawAmount
+ * @param {{ poison?: boolean }} [opts]
+ * @returns {boolean} ob Schaden ankam
  */
-export function damageHero(world, rawAmount) {
+export function damageHero(world, rawAmount, { poison = false } = {}) {
   const hero = world.hero;
-  if (world.time < hero.invulnerableUntil) return;
+  if (world.time < hero.invulnerableUntil) return false;
   const res = resolveHit(world.rng,
     { baseDamage: rawAmount, damage: 1, critChance: 0, critDamage: 1 },
     { armor: hero.stats.armor, dodge: hero.stats.dodge });
-  if (res.dodged) { world.events.push({ type: 'dodge' }); return; }
+  if (res.dodged) { world.events.push({ type: 'dodge' }); return false; }
   hero.hp -= res.amount;
-  world.events.push({ type: 'heroHit', amount: res.amount });
+  world.events.push(poison ? { type: 'heroHit', amount: res.amount, poison: true } : { type: 'heroHit', amount: res.amount });
+  return true;
+}
+
+/** Ein durchgekommener Otterbiss vergiftet (oder frischt das Gift auf); der Tick-Takt eines laufenden Gifts bleibt. */
+function poisonHero(world, enemy) {
+  const hero = world.hero, t = world.time;
+  const dps = VENOM.dpsMul * enemy.damage;
+  if (hero.poison) {
+    hero.poison.until = t + VENOM.duration;
+    hero.poison.dps = Math.max(hero.poison.dps, dps);
+  } else {
+    hero.poison = { until: t + VENOM.duration, dps, nextTick: t + VENOM.tick };
+  }
+}
+
+/** Gift-Ticks bis zur aktuellen Zeit; nach dem letzten Tick ist das Gift weg. */
+function stepPoison(world) {
+  const hero = world.hero, p = hero.poison;
+  if (!p) return;
+  const end = p.until + 1e-9;
+  while (p.nextTick <= end && world.time >= p.nextTick) {
+    p.nextTick += VENOM.tick;
+    damageHero(world, p.dps * VENOM.tick, { poison: true });
+  }
+  if (p.nextTick > end) hero.poison = null;
 }
 
 function pushOutOfObstacles(world, e) {
@@ -662,9 +702,10 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
     const min = e.radius + hero.radius + CONTACT_TOLERANCE;
     if (dx * dx + dz * dz <= min * min && world.time >= e.contactReadyAt) {
       e.contactReadyAt = world.time + CONTACT_INTERVAL;
-      damageHero(world, e.damage);
+      if (damageHero(world, e.damage) && ENEMIES[e.type]?.venom) poisonHero(world, e);
     }
   }
+  stepPoison(world);
 
   if (!inert) collectPickups(world);
 }

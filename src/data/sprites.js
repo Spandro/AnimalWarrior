@@ -122,6 +122,9 @@ export const MOTION = {
 /** Treffer am Helden: Dauer (ms) und Farbfaktor (RGB, multipliziert das Bild) des roten Aufblitzens. */
 export const HERO_FLASH = { ms: 120, color: [1, 0.22, 0.22] };
 
+/** Vergifteter Held (Kreuzotter): Farbfaktor (RGB) seines Bildes, solange das Gift wirkt; das Aufblitzen hat Vorrang. */
+export const HERO_POISON_TINT = [0.62, 1, 0.55];
+
 /** Kamerawackeln bei einem Treffer: Ausschlag in Welteinheiten und Dauer in Sekunden. */
 export const SHAKE = { amount: 0.08, seconds: 0.15 };
 

@@ -310,6 +310,7 @@ function checkOutcome(run) {
       world.run.revivesLeft--;
       hero.hp = hero.stats.maxHp * REVIVE.hpFraction;
       hero.invulnerableUntil = world.time + REVIVE.invulnerable;
+      hero.poison = null;
       for (const e of world.enemies) {
         if ((e.x - hero.x) ** 2 + (e.z - hero.z) ** 2 <= REVIVE.pushRadius ** 2) knockback(world, e, REVIVE.pushDistance);
       }

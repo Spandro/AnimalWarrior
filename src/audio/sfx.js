@@ -12,6 +12,15 @@ import { SFX, SFX_LIMITS, volumeToGain } from '../data/sfx.js';
  * @param {Record<string, number>} [limits] Höchstzahl je Sekunde je Typ
  * @returns {boolean}
  */
+/**
+ * Klang zu einem Spielereignis (Kennung in SFX) oder null für keinen.
+ * @param {{ type: string, poison?: boolean }} e
+ * @returns {string|null}
+ */
+export function eventSound(e) {
+  return e.type === 'heroHit' && e.poison ? null : e.type;
+}
+
 export function shouldPlay(type, nowMs, lastPlayedMs, limits = SFX_LIMITS) {
   if (!Object.hasOwn(SFX, type)) return false;
   const perSecond = Object.hasOwn(limits, type) ? limits[type] : 0;
@@ -110,7 +119,10 @@ export function createSfx({ AudioContextClass = globalThis.AudioContext || globa
     },
     handle(events) {
       if (!ctx) return;
-      for (const e of events) play(e.type);
+      for (const e of events) {
+        const type = eventSound(e);
+        if (type) play(type);
+      }
     },
     play,
     resume() {

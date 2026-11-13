@@ -56,9 +56,10 @@ export const SLITHER = { lateral: 0.8, switchInterval: 0.6 };
 
 /**
  * Gift der Kreuzotter: ein durchgekommener Biss vergiftet `duration` s; alle `tick` s verliert der Held
- * `dpsMul` × Schaden der Otter × `tick` Leben. Ein neuer Biss frischt die Dauer auf, stapelt aber nicht.
+ * `dpsMul` × Schaden der Otter × `tick` Leben (gerundet wie jeder Treffer, daher ganze Sekunden: 3 je Tick bei
+ * Schaden 6). Ein neuer Biss frischt die Dauer auf, stapelt aber nicht.
  */
-export const VENOM = { duration: 4, tick: 0.5, dpsMul: 0.5 };
+export const VENOM = { duration: 4, tick: 1, dpsMul: 0.5 };
 
 /**
  * Igel: nimmt er Schaden, rollt er sich `duration` s ein, nimmt dann nur `damageTaken` des Schadens und rollt mit

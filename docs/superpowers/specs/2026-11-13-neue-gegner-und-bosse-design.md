@@ -51,8 +51,9 @@ Betäubung und Verwirrung wirken wie bei allen. Darstellung: Das Bild dreht sich
 **Kreuzotter – `slither` (Schlängeln) und Gift.** Bewegung wie `strafe`, aber mit eigenen Zahlen `SLITHER`
 (Seitenanteil 0,8, Seitenwechsel alle 0,6 s), damit sie sich sichtbar windet. Das Feld `venom: true` in der
 Gegnerdefinition macht ihren Berührungstreffer giftig: Zusätzlich zum normalen Treffer ist der Held `VENOM.duration`
-= 4 s vergiftet und verliert alle `VENOM.tick` = 0,5 s `VENOM.dpsMul` × Schaden der Otter × `VENOM.tick` Leben
-(Startwert `dpsMul` 0,5, also bei Schaden 6: 1,5 je Halbsekunde, 12 insgesamt). Ein neuer Biss setzt die Restdauer
+= 4 s vergiftet und verliert alle `VENOM.tick` = 1 s `VENOM.dpsMul` × Schaden der Otter × `VENOM.tick` Leben
+(Startwert `dpsMul` 0,5, also bei Schaden 6: 3 je Sekunde, 12 insgesamt; beim Bau von 0,5 s auf 1 s geändert, weil
+jeder Treffer auf ganze Zahlen gerundet wird und 1,5 sonst 2 ergäbe). Ein neuer Biss setzt die Restdauer
 wieder auf 4 s und übernimmt den höheren Giftschaden; Gift stapelt sich nicht. Gifttreffer laufen über `damageHero`
 (Rüstung, Ausweichen, Unverwundbarkeit gelten), tragen im Ereignis `heroHit` das Feld `poison: true` und lösen
 **kein** rotes Aufblitzen, kein Kamerawackeln und keinen Trefferton aus. Solange der Held vergiftet ist, ist sein Bild grünlich getönt

@@ -3,7 +3,7 @@ import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary,
 import { spawnRadius, hpMul, BOSS_HP_MUL, MAX_ENEMIES, DEFAULT_VIEW, DYING, unlockMinute, weights } from '../src/data/waves.js';
 import { createWorld, stepWorld, spawnEnemy, damageEnemy } from '../src/core/world.js';
 import { obstaclesNear, obstaclesInCell } from '../src/core/terrain.js';
-import { ENEMIES, ELITE, DROPS, BOSS } from '../src/data/enemies.js';
+import { ENEMIES, ELITE, DROPS, BOSS, VENOM } from '../src/data/enemies.js';
 
 const NONE = { moveX: 0, moveZ: 0 };
 function clearSeed() {
@@ -618,4 +618,74 @@ test('survivor: dyingLeft ignoriert das Debug-timeScale: 1,0 s Echtzeit, Welt nu
   stepRun(run, 0.02, NONE);
   assertEqual(run.state, 'lost');
   assertClose(w.time - died, DYING.duration * DYING.timeScale, 1e-9);
+});
+
+// --- Kreuzotter (Schlängeln, Gift) ---
+
+/** Lässt die Otter einmal am Helden zubeißen und nimmt sie dann weg; liefert die Welt. */
+function bitten(w) {
+  spawnEnemy(w, 'kreuzotter', w.hero.x + 0.9, w.hero.z);
+  stepWorld(w, 0.05, NONE);
+  w.enemies = w.enemies.filter((e) => e.type !== 'kreuzotter');
+  return w;
+}
+const poisonHits = (events) => events.filter((e) => e.type === 'heroHit' && e.poison);
+
+test('survivor: Otterbiss vergiftet: 4 Ticks zu je 0,5 × Schaden je Sekunde', () => {
+  const w = bitten(behaviorWorld());
+  assertTrue(!!w.hero.poison, 'nicht vergiftet');
+  const ticks = [];
+  simulate(w, 5, 0.05, () => ticks.push(...poisonHits(w.events)));
+  assertEqual(ticks.length, VENOM.duration / VENOM.tick);
+  assertEqual(ticks.length, 4);
+  for (const h of ticks) assertClose(h.amount, VENOM.dpsMul * ENEMIES.kreuzotter.damage * VENOM.tick, 1e-9);
+  assertEqual(w.hero.poison, null);
+});
+
+test('survivor: neuer Biss frischt das Gift auf, stapelt aber nicht', () => {
+  const w = bitten(behaviorWorld());
+  const times = [];
+  simulate(w, 2, 0.05, () => { if (poisonHits(w.events).length) times.push(w.time); });
+  bitten(w);
+  const second = w.time;
+  simulate(w, 6, 0.05, () => { if (poisonHits(w.events).length) times.push(w.time); });
+  for (let i = 1; i < times.length; i++) assertTrue(times[i] - times[i - 1] > VENOM.tick - 0.06, `Ticks zu dicht bei ${times[i]}`);
+  const last = times[times.length - 1];
+  assertTrue(last <= second + VENOM.duration + 1e-6 && last > second + VENOM.duration - VENOM.tick - 0.1, `letzter Tick ${last - second}`);
+});
+
+test('survivor: ausgewichener oder abgeprallter Biss vergiftet nicht', () => {
+  const w = behaviorWorld();
+  w.hero.invulnerableUntil = Infinity;
+  bitten(w);
+  assertEqual(w.hero.poison, null);
+  const w2 = behaviorWorld();
+  w2.hero.stats.dodge = 1;
+  bitten(w2);
+  assertEqual(w2.hero.poison, null);
+});
+
+test('survivor: Wiederbelebung hebt Gift auf', () => {
+  const run = newRun({ revive: true });
+  const w = run.world;
+  w.hero.poison = { until: w.time + 100, dps: 1e6, nextTick: w.time + 0.01 };
+  stepRun(run, 0.05, NONE);
+  assertEqual(ofType(run.events, 'revive').length, 1);
+  assertEqual(run.state, 'playing');
+  assertEqual(w.hero.poison, null);
+});
+
+test('survivor: Kreuzotter windet sich und wechselt die Seite alle 0,6 s', () => {
+  const w = behaviorWorld();
+  const otter = spawnEnemy(w, 'kreuzotter', 20, 0);
+  let lastSide = 0, switches = 0, px = otter.x, pz = otter.z;
+  simulate(w, 3, 0.05, () => {
+    const mx = otter.x - px, mz = otter.z - pz;
+    const tx = w.hero.x - px, tz = w.hero.z - pz;
+    const side = Math.sign(tx * mz - tz * mx);
+    if (side && lastSide && side !== lastSide) switches++;
+    if (side) lastSide = side;
+    px = otter.x; pz = otter.z;
+  });
+  assertTrue(switches >= 4 && switches <= 6, `${switches} Seitenwechsel`);
 });
