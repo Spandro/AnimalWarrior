@@ -2,7 +2,7 @@
 
 Diese Datei ist für die nächste Sitzung gedacht, falls die laufende abbricht. Sie wird an jedem Pausenpunkt aktualisiert.
 
-Zuletzt aktualisiert: 2026-11-13 während Paket 3 (Taverne, wird vor Paket 2 entworfen). Spec `docs/superpowers/specs/2026-11-13-taverne-design.md` ist **freigegeben**; Plan `docs/superpowers/plans/2026-11-13-taverne.md` (acht Aufgaben) liegt zur Freigabe vor. Nächster Schritt: Freigabe des Plans, danach Bau mit Subagenten.
+Zuletzt aktualisiert: 2026-11-13 während Paket 3 (Taverne, wird vor Paket 2 entworfen). Spec `docs/superpowers/specs/2026-11-13-taverne-design.md` ist **freigegeben**; Plan `docs/superpowers/plans/2026-11-13-taverne.md` (acht Aufgaben) ist **freigegeben**. Nächster Schritt: Bau mit Subagenten (je Aufgabe Bauer und Prüfer), nicht gleichzeitig mit dem Paket „Neue Gegner“ im selben Ordner. Vorher beim Auftraggeber nachfragen, ob die Wirte Dachs und Fuchs bleiben oder zu Biber und Otter werden (Vorschlag, unbeantwortet).
 
 ## 1. Was fertig ist
 
@@ -68,7 +68,7 @@ Reihenfolge wie vereinbart; jedes Paket bekommt eigenen Entwurf, Spec und Plan.
 
 **Paket 3 – Taverne:** Eigener Punkt in der Modusauswahl. Minispiele und Glücksspiel, bei denen man mit dem gesammelten Gold um Beute spielt – auch Ausrüstung und Waffen für den Abenteuer-Modus. Dort ist außerdem ein weiterer Held für viel Gold freischaltbar, vorerst geschwärzt dargestellt: ein Kombo-Team aus Giraffe und Erdmännchen. Nur Spielgold, kein echtes Geld.
 
-*Spec freigegeben am 2026-11-13* (`docs/superpowers/specs/2026-11-13-taverne-design.md`, einschließlich „Höher oder tiefer“ mit Faktor nach Risiko). Plan: `docs/superpowers/plans/2026-11-13-taverne.md`, Freigabe steht aus. Die Beschreibungen für den Bildgenerator (Gaststube, Wirte, Beute-Bogen, Duo) stehen in der Spec, Anhang A. Hinweis: Das parallele Paket „Neue Gegner“ plant Fuchs und Dachs als Gegner, die in der Taverne Wirte sind. Ob das so bleibt, klärt der Auftraggeber. Beide Pakete ändern Erfolge und Bildbögen und werden nacheinander gebaut. Vom Auftraggeber entschieden:
+*Spec freigegeben am 2026-11-13* (`docs/superpowers/specs/2026-11-13-taverne-design.md`, einschließlich „Höher oder tiefer“ mit Faktor nach Risiko). Plan: `docs/superpowers/plans/2026-11-13-taverne.md`, freigegeben am 2026-11-13. Die Beschreibungen für den Bildgenerator (Gaststube, Wirte, Beute-Bogen, Duo) stehen in der Spec, Anhang A. Hinweis: Das parallele Paket „Neue Gegner“ plant Fuchs und Dachs als Gegner, die in der Taverne Wirte sind. Ob das so bleibt, klärt der Auftraggeber. Beide Pakete ändern Erfolge und Bildbögen und werden nacheinander gebaut. Vom Auftraggeber entschieden:
 
 - Gewinne sind vor allem Gold; Ausrüstung und Waffen selten, aber lustig. Später kommt evtl. noch mehr, was man mit Gold kaufen kann.
 - Drei Spiele, alle glücksbasiert: Würfelbecher, Glücksrad, Höher oder tiefer.
