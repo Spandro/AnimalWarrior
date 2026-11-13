@@ -166,7 +166,7 @@ export function renderMode(c, props, app) {
     screenHeader('Modus wählen'),
     el('p', { class: 'hero-badge' },
       el('strong', { text: hero.name }), ' – ', heroLine(hero)),
-    el('div', { class: 'cards cards-2' },
+    el('div', { class: 'cards cards-3' },
       el('button', {
         class: 'card mode-card', type: 'button',
         onclick: () => app.startRun(hero.id),
@@ -175,6 +175,13 @@ export function renderMode(c, props, app) {
       el('span', { class: 'card-text', text: `Überlebe ${minutes} Minuten gegen immer stärkere Wellen und besiege die Bosse.` }),
       el('span', { class: 'card-text muted', text: `Beste Zeit: ${formatTime(hero.survivor.bestTime)}` }),
       el('span', { class: 'card-action', text: 'Los geht’s →' })),
+      el('button', {
+        class: 'card mode-card', type: 'button',
+        onclick: () => app.screens.show('tavern', { heroId: hero.id }),
+      },
+      el('span', { class: 'card-title', text: 'Taverne' }),
+      el('span', { class: 'card-text', text: 'Würfel, Rad und Karten. Das Haus gewinnt meistens.' }),
+      el('span', { class: 'card-action', text: 'Zum Tresen →' })),
       el('button', { class: 'card mode-card locked', type: 'button', disabled: true, 'aria-describedby': 'adventure-soon' },
         el('span', { class: 'card-title', text: 'Abenteuer-Modus' }),
         el('span', { class: 'card-text', text: 'Eine Reise durch Wald und Dorf mit Aufgaben und Ausrüstung.' }),

@@ -6,15 +6,17 @@ import { renderSettings } from './settings.js';
 import { renderCreateAnimal, renderCreateClass, renderCreateName } from './heroCreate.js';
 import { renderResult } from './result.js';
 import { renderAchievements } from './achievements.js';
+import { renderTavern, renderChest, probeImage } from './tavern.js';
+import { TAVERN_IMAGES } from '../data/tavern.js';
 import { MENU_SCENES, SCENE_CELLS } from '../data/environment.js';
 
 /**
- * @typedef {'main'|'heroes'|'createAnimal'|'createClass'|'createName'|'mode'|'game'|'result'|'metaShop'|'settings'|'achievements'} ScreenName
+ * @typedef {'main'|'heroes'|'createAnimal'|'createClass'|'createName'|'mode'|'game'|'result'|'metaShop'|'settings'|'achievements'|'tavern'|'tavernChest'|'tavernDice'|'tavernWheel'|'tavernHiLo'} ScreenName
  * @typedef {(container: HTMLElement, props: Record<string, any>, app: any) => (void | (() => void))} ScreenBuilder
  *   baut den Bildschirm in `container`; die optionale Rückgabe räumt beim Verlassen auf.
  */
 
-/** @type {Record<ScreenName, ScreenBuilder>} */
+/** @type {Partial<Record<ScreenName, ScreenBuilder>>} */
 const BUILDERS = {
   main: renderMain,
   heroes: renderHeroes,
@@ -28,6 +30,9 @@ const BUILDERS = {
   metaShop: renderMetaShop,
   settings: renderSettings,
   achievements: renderAchievements,
+  tavern: renderTavern,
+  tavernChest: renderChest,
+  // tavernDice, tavernWheel und tavernHiLo trägt Aufgabe 7 ein.
 };
 
 /**
@@ -37,6 +42,11 @@ const BUILDERS = {
  * @param {string} name Bildschirm
  */
 function setScene(root, name) {
+  if (name.startsWith('tavern')) {
+    setTavernRoom(root);
+    return;
+  }
+  root.style.removeProperty('--room-image');
   const scene = MENU_SCENES[name];
   const cell = scene ? SCENE_CELLS[scene] : null;
   if (!cell) {
@@ -48,9 +58,23 @@ function setScene(root, name) {
 }
 
 /**
+ * Die Gaststube hinter allen Taverne-Bildschirmen: `data-scene="gaststube"` schaltet den dunklen Holzverlauf ein
+ * (styles.css), das gemalte Bild kommt dazu, sobald die Datei da ist. Fehlt sie, bleibt der Verlauf.
+ * @param {HTMLElement} root Menüebene
+ */
+function setTavernRoom(root) {
+  root.dataset.scene = 'gaststube';
+  root.style.removeProperty('--scene-pos');
+  const url = TAVERN_IMAGES.room;
+  probeImage(url).then((img) => {
+    if (img && root.dataset.scene === 'gaststube') root.style.setProperty('--room-image', `url('${url}')`);
+  });
+}
+
+/**
  * @param {HTMLElement} root Menüebene
  * @param {any} app App-Objekt aus main.js (Spielstand, Aktionen, gemeinsamer Renderer)
- * @returns {{ show(name: ScreenName, props?: Record<string, any>): void, current(): ScreenName | null, props(): Record<string, any> }}
+ * @returns {{ show(name: ScreenName, props?: Record<string, any>): void, has(name: string): boolean, current(): ScreenName | null, props(): Record<string, any> }}
  */
 export function createScreens(root, app) {
   /** @type {ScreenName | null} */
@@ -82,7 +106,7 @@ export function createScreens(root, app) {
     }
   }
 
-  return { show, current: () => currentName, props: () => currentProps };
+  return { show, has: (name) => Object.hasOwn(BUILDERS, name), current: () => currentName, props: () => currentProps };
 }
 
 const NOTICE_TIMEOUT = 7000;

@@ -225,8 +225,9 @@ p { margin: 0; }
   background: rgba(0, 0, 0, 0.2); border: 1px solid var(--line-soft);
   overflow-wrap: anywhere;
 }
-.cards-2 { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+.cards-2, .cards-3 { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
 .mode-card { min-height: 170px; }
+@media (max-width: 700px) { .cards-3 .mode-card { min-height: 0; } }
 
 .panel {
   padding: 16px; border-radius: 14px; border: 1px solid var(--line);
@@ -666,3 +667,111 @@ body[data-screen="game"] .toasts { top: auto; bottom: calc(var(--safe-bottom) + 
 }
 .chest-hint[hidden] { display: none; }
 #ui > .chest-hint { pointer-events: none; }
+
+/* ---------------------------------------------------------------- Taverne */
+
+/*
+ * Gaststube hinter allen Taverne-Bildschirmen (`data-scene="gaststube"` setzt screens.js). Der dunkle Holzverlauf
+ * liegt ganz unten und bleibt sichtbar, wenn `gaststube.webp` fehlt; `--room-image` setzt screens.js erst, wenn das
+ * Bild geladen ist. Darüber ein dunkler Verlauf, damit der Text lesbar bleibt.
+ */
+#menu[data-scene="gaststube"]::before {
+  background-image:
+    linear-gradient(180deg, rgba(26, 15, 8, 0.7), rgba(14, 8, 4, 0.88)),
+    var(--room-image, none),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.08) 0 2px, transparent 2px 46px),
+    linear-gradient(180deg, #4a2f19 0%, #2f1d0f 55%, #1f130a 100%);
+  background-size: auto, cover, auto, auto;
+  background-position: center;
+  background-repeat: no-repeat, no-repeat, repeat, no-repeat;
+}
+
+.tavern-body { display: flex; flex-direction: column; gap: 14px; }
+.cards-tavern { grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); }
+.table-card { flex-direction: row; align-items: center; gap: 14px; min-height: 88px; box-sizing: border-box; }
+.table-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.table-host { font-size: 0.9rem; }
+.badge-new { color: #2a1c0a; background: var(--accent-hi); border-color: var(--accent-hi); font-weight: 700; }
+
+.host-portrait {
+  flex: none; box-sizing: border-box; width: 64px; height: 64px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 35% 30%, #6a4a2a, #3a2514); border: 2px solid var(--accent);
+  background-repeat: no-repeat; overflow: hidden;
+}
+.host-initial { font-family: var(--serif); font-size: 1.8rem; font-weight: 600; color: var(--accent-hi); }
+.host-portrait.host-image { background-color: #f4ecd8; }
+
+.stable-card {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: center;
+  padding: 16px; border-radius: 14px; border: 2px solid var(--line);
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+}
+.stable-card:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.stable-text { display: flex; flex-direction: column; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.stable-text h2 { margin: 0; font-size: 1.35rem; }
+.stable-text p { margin: 0; }
+.stable-buy { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.stable-missing { font-size: 0.9rem; }
+
+.duo-figure { width: 110px; height: 132px; display: flex; align-items: center; justify-content: center; }
+.duo-figure svg { width: 100%; height: 100%; }
+.duo-figure canvas { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+/* Gesperrt: schwarzer Umriss, mit hellem Saum, damit er sich vom Hintergrund abhebt. */
+.duo-black { filter: brightness(0) drop-shadow(0 0 1px rgba(240, 228, 198, 0.85)); }
+
+/* Truhe: Raster mit Seltenheitsrahmen */
+.chest-grid {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;
+}
+@media (min-width: 560px) { .chest-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); max-width: 620px; } }
+.chest-slot { min-width: 0; }
+.chest-tile {
+  appearance: none; font: inherit; color: var(--text); cursor: pointer;
+  position: relative; box-sizing: border-box; width: 100%; aspect-ratio: 1; min-height: 44px; padding: 6px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 12px; border: 3px solid var(--rarity, var(--line));
+  background: linear-gradient(180deg, #3a2a18, #251a0e);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+button.chest-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45), 0 0 0 2px color-mix(in srgb, var(--rarity) 40%, transparent); }
+.chest-empty { cursor: default; border: 2px dashed #3a3a34; background: linear-gradient(180deg, #151210, #0b0a08); box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.8); }
+.chest-new {
+  position: absolute; top: -8px; right: -6px; padding: 1px 8px; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 800; color: #2a1c0a; background: var(--accent-hi); border: 1px solid #a27a24;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.chest-empty-text { margin: 0; }
+
+.loot-icon {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 100%; height: 100%; max-width: 100%; max-height: 100%;
+  background-repeat: no-repeat;
+}
+.loot-icon .loot-fallback { width: 74%; height: 74%; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }
+.loot-unknown { font-family: var(--serif); font-size: 1.8rem; font-weight: 700; color: #4a4840; }
+.loot-small { width: 64px; height: 64px; }
+.loot-large { width: 112px; height: 112px; align-self: center; }
+/* Bild vom Auftraggeber hat weißen Grund: auf eine helle Kachel legen. */
+.loot-icon.loot-image { background-color: #f4ecd8; border-radius: 8px; }
+
+.item-detail { display: flex; flex-direction: column; gap: 8px; border-color: var(--rarity, var(--line)); }
+.item-detail h2 { margin: 0; font-size: 1.4rem; text-align: center; }
+.item-detail p { margin: 0; }
+.item-detail .loot-large { background-color: #251a0e; border-radius: 14px; border: 3px solid var(--rarity); }
+.item-detail .loot-large.loot-image { background-color: #f4ecd8; }
+.item-kind { text-align: center; color: var(--rarity); font-weight: 700; }
+.item-mods { margin: 4px 0 0; padding: 0; list-style: none; text-align: center; font-weight: 600; }
+.item-mods li::before { content: '✦ '; color: var(--leaf); font-weight: 400; }
+.item-line { text-align: center; font-style: italic; }
+.item-hint { text-align: center; font-size: 0.9rem; }
+.item-detail .dialog-buttons { justify-content: center; margin-top: 8px; }
+
+@media (max-width: 520px) {
+  .stable-card { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; }
+  .stable-buy { justify-content: center; }
+  .table-card { padding: 12px 14px; }
+}

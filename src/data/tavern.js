@@ -84,5 +84,17 @@ export const HOSTS = {
   },
 };
 
+/**
+ * Bilder der Taverne, relativ zu index.html. Fehlt eine Datei, zeigt die Oberfläche Ersatz.
+ * `rects`: Ausschnitt je Wirt im Bogen `wirte.webp` als `{ x, y, w, h }` in Pixeln, `null` heißt noch nicht
+ * ausgemessen (dann Ersatz). `loot`: Bogen der 24 Gegenstände im Raster, Reihenfolge wie `ITEMS[...].icon`.
+ */
+export const TAVERN_IMAGES = {
+  room: 'assets/taverne/gaststube.webp',
+  hosts: { sheet: 'assets/taverne/wirte.webp', rects: { affe: null, elster: null } },
+  loot: { sheet: 'assets/taverne/beute.webp', cols: 6, rows: 4 },
+  duo: 'assets/figuren/duo.webp',
+};
+
 /** Welcher Wirt welchen Tisch betreut. */
 export const TABLE_HOST = { dice: 'affe', wheel: 'elster', hilo: 'affe' };

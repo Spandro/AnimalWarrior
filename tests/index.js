@@ -24,3 +24,4 @@ import './items.test.js';
 import './tavern.test.js';
 import './roster.test.js';
 import './tavernSave.test.js';
+import './tavernText.test.js';
