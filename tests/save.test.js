@@ -306,6 +306,8 @@ test('save: validate lehnt unbekannte Erfolge, negative oder gebrochene Zähler 
   const s = defaultSave();
   const withStats = (o) => ({ ...s, stats: { ...s.stats, ...o } });
   assertTrue(validate({ ...s, achievements: { pazifist: 5 } }).ok);
+  assertTrue(validate({ ...s, achievements: { baerenhunger: 5, grosswildjaeger: 6, nachteule: 7 } }).ok);
+  assertTrue(validate(withStats({ kills: { fuchs: 3, igel: 1, dachs: 2, kreuzotter: 4, uhu: 1, luchs: 1, hirsch: 1, keiler: 1, wisent: 1 } })).ok);
   assertEqual(validate({ ...s, achievements: { gibtEsNicht: 5 } }).ok, false);
   assertEqual(validate({ ...s, achievements: { pazifist: 'gestern' } }).ok, false);
   assertEqual(validate({ ...s, achievements: { pazifist: -1 } }).ok, false);
