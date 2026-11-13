@@ -1,6 +1,9 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { chestsNear } from '../core/chests.js';
 import { MAP_CHESTS } from '../data/chests.js';
+import { ENV_SPRITES } from '../data/environment.js';
+import { BILLBOARD } from '../data/sprites.js';
+import { billboardOrientation, spriteGeometry, spriteWidth, spriteMaterial, shadowMaterial } from './sprites.js';
 
 const BODY = { w: 1.0, h: 0.58, d: 0.64 };
 const LID = { h: 0.32 };
@@ -10,17 +13,22 @@ const LID_OPEN = -1.95;
 
 /**
  * Zeichnet die Kisten der Karte im Umkreis des Helden: geschlossen oder, wenn `world.openedChests` sie enthält,
- * mit hochgeklapptem Deckel. Eine einfache Holzkiste aus Quadern; Geometrien und Materialien entstehen einmal,
- * je Kiste nur ein paar Meshes beim Betreten des Umkreises. `sprites` ist für die gemalten Bilder reserviert.
+ * offen. Mit geladenen Umgebungsbildern (`env.ok`) sind es die gemalten Truhen, sonst eine einfache Holzkiste
+ * aus Quadern. Geometrien und Materialien entstehen einmal, je Kiste nur ein paar Meshes beim Betreten des
+ * Umkreises.
  * @param {THREE.Scene} scene
  * @param {number} seed Startwert der Welt (`world.seed`)
  * @param {import('./sprites.js').SpriteSheets} [sprites]
+ * @param {{ env?: import('./environment.js').Environment, camera?: THREE.Camera }} [options]
  * @returns {{ sync(world: import('../core/world.js').World): void, dispose(): void }}
  */
-export function createChestView(scene, seed, sprites) {
+export function createChestView(scene, seed, sprites, { env, camera } = {}) {
   const root = new THREE.Group();
   root.name = 'chests';
   scene.add(root);
+
+  const painted = !!env?.ok;
+  if (painted) return paintedChests(scene, root, seed, env, camera);
 
   const wood = new THREE.MeshStandardMaterial({ color: 0x9a6431, roughness: 0.85 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x4d321a, roughness: 0.8 });
@@ -112,6 +120,86 @@ export function createChestView(scene, seed, sprites) {
     shown.clear();
     for (const g of geometries) g.dispose();
     for (const m of materials) m.dispose();
+  }
+
+  return { sync, dispose };
+}
+
+/**
+ * Gemalte Truhen: je Kiste eine Bildtafel mit weichem Bodenschatten, die beim Öffnen vom geschlossenen
+ * auf das offene Bild wechselt. Die beiden Geometrien entstehen einmal.
+ * @param {THREE.Scene} scene
+ * @param {THREE.Group} root
+ * @param {number} seed
+ * @param {import('./environment.js').Environment} env
+ * @param {THREE.Camera} [camera]
+ */
+function paintedChests(scene, root, seed, env, camera) {
+  const orient = billboardOrientation(camera);
+  const material = spriteMaterial(env.objects);
+  const blobMat = shadowMaterial();
+  const blobGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+
+  /** Geometrie und Weltmaße je Zustand. */
+  const look = {};
+  for (const [state, id] of [['zu', 'truhe-zu'], ['offen', 'truhe-offen']]) {
+    const def = ENV_SPRITES[id];
+    const geo = spriteGeometry(def, env.sizes.objekte);
+    look[state] = { geo, width: spriteWidth(def), height: def.heightM, foot: def.footOffset };
+  }
+
+  function build(chest) {
+    const group = new THREE.Group();
+    const shadow = new THREE.Mesh(blobGeo, blobMat);
+    shadow.position.set(chest.x, 0.02, chest.z);
+    shadow.scale.set(look.zu.width * BILLBOARD.shadowWidth * 2, 1, look.zu.width * BILLBOARD.shadowDepth * 2);
+    const panel = new THREE.Mesh(look.zu.geo, material);
+    panel.quaternion.copy(orient.quaternion);
+    group.add(shadow, panel);
+    return { group, panel, chest, open: null };
+  }
+
+  function setOpen(entry, open) {
+    if (entry.open === open) return;
+    entry.open = open;
+    const l = open ? look.offen : look.zu;
+    entry.panel.geometry = l.geo;
+    entry.panel.scale.set(l.width, l.height, 1);
+    entry.panel.position.set(entry.chest.x + orient.foot.x * l.foot, 0, entry.chest.z + orient.foot.z * l.foot);
+  }
+
+  /** @type {Map<string, ReturnType<typeof build>>} */
+  const shown = new Map();
+  const seen = new Set();
+
+  /** @param {import('../core/world.js').World} world */
+  function sync(world) {
+    const hero = world.hero;
+    seen.clear();
+    for (const chest of chestsNear(seed, hero.x, hero.z, MAP_CHESTS.viewRange)) {
+      seen.add(chest.id);
+      let entry = shown.get(chest.id);
+      if (!entry) {
+        entry = build(chest);
+        shown.set(chest.id, entry);
+        root.add(entry.group);
+      }
+      setOpen(entry, world.openedChests.has(chest.id));
+    }
+    for (const [id, entry] of shown) {
+      if (seen.has(id)) continue;
+      root.remove(entry.group);
+      shown.delete(id);
+    }
+  }
+
+  function dispose() {
+    scene.remove(root);
+    shown.clear();
+    for (const l of Object.values(look)) l.geo.dispose();
+    blobGeo.dispose();
+    blobMat.dispose();
+    material.dispose();
   }
 
   return { sync, dispose };

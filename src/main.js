@@ -6,6 +6,7 @@
 import { isWebGLAvailable, createRenderer } from './render/renderer.js';
 import { initialQuality } from './render/quality.js';
 import { loadSpriteSheets } from './render/sprites.js';
+import { loadEnvironment } from './render/environment.js';
 import { startGame } from './game.js';
 import { createStore, addHero, deleteHero, settleRun, STORAGE_KEY } from './save/store.js';
 import { applyRunToStats, evaluateAchievements, evaluateStored, unlockStored, unlock } from './core/achievements.js';
@@ -45,8 +46,8 @@ if (!isWebGLAvailable()) {
 } else if (params.get('autostart') === '1' || stress) {
   const quality = params.get('quality') === 'low' ? 'low' : 'high';
   document.body.dataset.screen = 'game';
-  loadSpriteSheets().then((sprites) => startGame({
-    canvas, uiLayer, seed: AUTOSTART_SEED, quality, timeScale, debug, stress, autopick, sprites, sfx: createUnlockedSfx(70),
+  Promise.all([loadSpriteSheets(), loadEnvironment()]).then(([sprites, env]) => startGame({
+    canvas, uiLayer, seed: AUTOSTART_SEED, quality, timeScale, debug, stress, autopick, sprites, env, sfx: createUnlockedSfx(70),
     animalId: Object.hasOwn(ANIMALS, params.get('animal')) ? params.get('animal') : 'hase',
     classId: Object.hasOwn(CLASSES, params.get('class')) ? params.get('class') : 'krieger',
     // Ohne Menüs gibt es keinen Spielstand: nur melden, nichts speichern.
@@ -110,6 +111,12 @@ function startApp() {
      * @type {Promise<import('./render/sprites.js').SpriteSheets>}
      */
     sprites: loadSpriteSheets(),
+    /**
+     * Gemalte Umgebung (Boden, Bäume, Deko, Truhen, Aufsammelbares), einmal beim Start geladen.
+     * Schlägt das Laden fehl, `ok: false` (bisherige 3D-Darstellung).
+     * @type {Promise<import('./render/environment.js').Environment>}
+     */
+    environment: loadEnvironment(),
     /** Merkmal des zuletzt angeforderten Durchgangs, solange er auf die Figuren wartet. */
     pendingRun: null,
     showNotice,
@@ -182,13 +189,13 @@ function startApp() {
       app.screens.show('game');
       const token = {};
       app.pendingRun = token;
-      app.sprites.then((sprites) => {
+      Promise.all([app.sprites, app.environment]).then(([sprites, env]) => {
         // Inzwischen abgebrochen oder durch einen neueren Start ersetzt.
         if (app.pendingRun !== token) return;
         app.pendingRun = null;
         app.run = startGame({
           canvas, uiLayer, view: app.view, animalId: hero.animal, classId: hero.class,
-          seed: Date.now(), quality: app.quality, timeScale, debug, autopick, sprites, sfx: app.sfx,
+          seed: Date.now(), quality: app.quality, timeScale, debug, autopick, sprites, env, sfx: app.sfx,
           modifiers: metaModifiers(app.save), revive: hasRevive(app.save),
           achievements: { getSave: () => app.save, notify: (id) => app.announceAchievement(id) },
           onEnd: (summary, extra) => app.finishRun(heroId, summary, extra),

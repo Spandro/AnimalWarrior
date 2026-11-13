@@ -46,7 +46,25 @@ body[data-screen="game"] #menu { display: none; }
   line-height: 1.45;
 }
 
+/*
+ * Gemaltes Landschaftsbild hinter den Menüs: ein Feld aus dem 3 × 2-Raster von `szenen.webp`
+ * (`--scene-pos` setzt screens.js). Etwas größer als 300 % × 200 %, damit die weißen Stege zwischen
+ * den Feldern außerhalb des Bildes liegen; darüber ein dunkler Verlauf, damit der Text lesbar bleibt.
+ * Fehlt das Bild, bleibt der Verlauf von `#menu` sichtbar.
+ */
+#menu[data-scene]::before {
+  content: ''; position: fixed; inset: -10px; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(180deg, rgba(22, 30, 22, 0.74), rgba(16, 20, 16, 0.9)),
+    url('assets/umgebung/szenen.webp');
+  background-size: auto, 318% 212%;
+  background-position: center, var(--scene-pos, 50% 50%);
+  background-repeat: no-repeat;
+  filter: blur(2px);
+}
+
 .screen {
+  position: relative; z-index: 1;
   box-sizing: border-box;
   max-width: 1080px; min-height: 100%;
   margin: 0 auto;

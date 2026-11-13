@@ -147,7 +147,7 @@ function bleedColors(img, rings) {
 }
 
 /** @param {string} url @returns {Promise<HTMLImageElement>} */
-function loadImage(url) {
+export function loadImage(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.decoding = 'async';
@@ -158,11 +158,60 @@ function loadImage(url) {
 }
 
 /**
- * Lädt beide Bildbögen, entfernt den Hintergrund und legt je Bogen eine Textur (sRGB, Mipmaps, linear
- * gefiltert) und ein 2D-Canvas (für die Menüvorschau) an. Wirft nie: schlägt etwas fehl, `ok: false`.
- * Die Texturen sind DataTextures aus den Rohpixeln statt CanvasTextures: ein Canvas speichert
- * vormultipliert und verliert dabei die Farben durchsichtiger Pixel, was in den Mipmaps einen dunklen
- * Saum ergäbe.
+ * Pixel eines geladenen Bildes samt Canvas, auf dem es liegt.
+ * @param {HTMLImageElement} image
+ * @returns {ImageDataLike & { canvas: HTMLCanvasElement }}
+ */
+export function imageDataOf(image) {
+  const W = image.naturalWidth, H = image.naturalHeight;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(image, 0, 0);
+  const data = ctx.getImageData(0, 0, W, H);
+  return Object.assign(data, { canvas });
+}
+
+/**
+ * Textur aus Rohpixeln (sRGB, Mipmaps, linear gefiltert). DataTexture statt CanvasTexture: ein Canvas
+ * speichert vormultipliert und verliert dabei die Farben durchsichtiger Pixel, was in den Mipmaps einen
+ * dunklen Saum ergäbe. Die Zeilen werden umgedreht, denn v = 0 ist unten (wie bei Bildtexturen mit flipY).
+ * @param {ImageDataLike} img
+ * @returns {THREE.DataTexture}
+ */
+export function dataTexture(img) {
+  const { width: W, height: H } = img;
+  const flipped = new Uint8Array(W * H * 4);
+  const row = W * 4;
+  for (let y = 0; y < H; y++) flipped.set(img.data.subarray(y * row, (y + 1) * row), (H - 1 - y) * row);
+  const tex = new THREE.DataTexture(flipped, W, H, THREE.RGBAFormat, THREE.UnsignedByteType);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/**
+ * Ein Bildbogen: Hintergrund entfernen, Flecken tilgen, Farben auffüllen, Textur und Canvas anlegen.
+ * @param {HTMLImageElement} image
+ * @returns {{ texture: THREE.DataTexture, canvas: HTMLCanvasElement, size: { width: number, height: number } }}
+ */
+export function prepareSheet(image) {
+  const imageData = imageDataOf(image);
+  const { canvas } = imageData;
+  removeBackground(imageData, BACKGROUND);
+  removeSpecks(imageData, BACKGROUND.minSpeck);
+  bleedColors(imageData, BACKGROUND.bleed);
+  canvas.getContext('2d').putImageData(imageData, 0, 0);
+  return { texture: dataTexture(imageData), canvas, size: { width: imageData.width, height: imageData.height } };
+}
+
+/**
+ * Lädt beide Bildbögen, entfernt den Hintergrund und legt je Bogen eine Textur und ein 2D-Canvas
+ * (für die Menüvorschau) an. Wirft nie: schlägt etwas fehl, `ok: false`.
  * @returns {Promise<SpriteSheets>}
  */
 export async function loadSpriteSheets() {
@@ -171,32 +220,10 @@ export async function loadSpriteSheets() {
     const entries = Object.entries(SHEETS);
     const images = await Promise.all(entries.map(([, url]) => loadImage(url)));
     entries.forEach(([id], k) => {
-      const image = images[k];
-      const W = image.naturalWidth, H = image.naturalHeight;
-      const canvas = document.createElement('canvas');
-      canvas.width = W; canvas.height = H;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      ctx.drawImage(image, 0, 0);
-      const imageData = ctx.getImageData(0, 0, W, H);
-      removeBackground(imageData, BACKGROUND);
-      removeSpecks(imageData, BACKGROUND.minSpeck);
-      bleedColors(imageData, BACKGROUND.bleed);
-      ctx.putImageData(imageData, 0, 0);
-
-      // Zeilen umdrehen: v = 0 ist unten, wie bei Bildtexturen mit flipY.
-      const flipped = new Uint8Array(W * H * 4);
-      const row = W * 4;
-      for (let y = 0; y < H; y++) flipped.set(imageData.data.subarray(y * row, (y + 1) * row), (H - 1 - y) * row);
-      const tex = new THREE.DataTexture(flipped, W, H, THREE.RGBAFormat, THREE.UnsignedByteType);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.generateMipmaps = true;
-      tex.minFilter = THREE.LinearMipmapLinearFilter;
-      tex.magFilter = THREE.LinearFilter;
-      tex.anisotropy = 4;
-      tex.needsUpdate = true;
-      result.textures[id] = tex;
-      result.sizes[id] = { width: W, height: H };
-      result.canvases[id] = canvas;
+      const sheet = prepareSheet(images[k]);
+      result.textures[id] = sheet.texture;
+      result.sizes[id] = sheet.size;
+      result.canvases[id] = sheet.canvas;
     });
     result.ok = true;
   } catch (e) {

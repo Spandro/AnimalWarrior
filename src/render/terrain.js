@@ -1,13 +1,27 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { obstaclesNear } from '../core/terrain.js';
+import { obstacleSprite, decoInCell, occludesHero } from '../core/environment.js';
 import { createRng } from '../core/rng.js';
 import { TERRAIN_CELL } from '../data/terrain.js';
+import { ENV_SPRITES, GROUND } from '../data/environment.js';
+import { BILLBOARD } from '../data/sprites.js';
+import { billboardOrientation, spriteUv, spriteWidth, spriteMaterial, shadowMaterial } from './sprites.js';
 
 /** Zellen in jede Richtung um die Heldenzelle, die gebaut bleiben. */
 const VIEW_CELLS = 3;
 const TILE_SEGMENTS = 12;
 /** Wiederholungen der Grastextur je Zelle (4 m je Kachel). */
 const GRASS_REPEAT = TERRAIN_CELL / 4;
+
+/** Gemalte Bäume und Felsen: Bildhöhe mal Hindernisradius geteilt durch diesen Normradius. */
+const SPRITE_SCALE_RADIUS = { tree: 0.75, 'fels-gross': 1.25, 'fels-klein': 0.95 };
+/** Deckkraft eines Baumes, der den Helden verdeckt, und die Zeit (s) für das Überblenden. */
+const PAINTED_FADE_OPACITY = 0.35;
+const PAINTED_FADE_SECONDS = 0.2;
+/** Nur Bäume so nah am Helden können ihn überhaupt verdecken; weiter entfernte werden nicht geprüft. */
+const OCCLUSION_RANGE = 14;
+/** Höhe des Punktes am Helden, der frei sichtbar bleiben soll (m). */
+const HERO_POINT_HEIGHT = 1.1;
 
 const GRASS_LUSH = new THREE.Color(0x5d7040);
 const GRASS_DRY = new THREE.Color(0x8a8a55);
@@ -111,17 +125,36 @@ function makeRockGeometry(variant) {
 /**
  * Bodenkacheln und Hindernisse um den Helden. Hindernisse kommen aus `obstaclesNear`, also genau
  * die Kreise der Kollision: Stammfuß und Felsgrundfläche haben etwa den Hindernisradius.
+ *
+ * Mit geladenen Umgebungsbildern (`env.ok`) sind Boden, Bäume, Felsen und Deko gemalt; sonst bleibt
+ * alles bei den 3D-Formen.
  * @param {THREE.Scene} scene
  * @param {number} seed Geländestartwert
- * @returns {{ update(x: number, z: number): void, dispose(): void }}
+ * @param {{ env?: import('./environment.js').Environment, camera?: THREE.Camera }} [options]
+ * @returns {{ update(x: number, z: number, dt?: number): void, dispose(): void }}
  */
-export function createTerrainView(scene, seed) {
+export function createTerrainView(scene, seed, { env, camera } = {}) {
   const root = new THREE.Group();
   root.name = 'terrain';
   scene.add(root);
 
-  const grassTex = makeGrassTexture();
-  const groundMat = new THREE.MeshStandardMaterial({ map: grassTex, vertexColors: true, roughness: 1, metalness: 0 });
+  const painted = !!env?.ok;
+  const orient = painted ? billboardOrientation(camera) : null;
+
+  let grassTex, groundMat;
+  if (painted) {
+    grassTex = env.ground;
+    grassTex.repeat.set(TERRAIN_CELL / GROUND.tileM, TERRAIN_CELL / GROUND.tileM);
+    groundMat = new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1, metalness: 0 });
+  } else {
+    grassTex = makeGrassTexture();
+    groundMat = new THREE.MeshStandardMaterial({ map: grassTex, vertexColors: true, roughness: 1, metalness: 0 });
+  }
+  const spriteMat = painted ? spriteMaterial(env.objects) : null;
+  const blobMat = painted ? shadowMaterial() : null;
+  const blobGeo = painted ? new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2) : null;
+  /** Durchscheinende Gegenstücke je Baum entstehen erst beim ersten Ausblenden. */
+  const fadeMats = [];
 
   const trunkGeo = new THREE.CylinderGeometry(0.42, 1, 1, 9).translate(0, 0.5, 0);
   const coneGeo = new THREE.ConeGeometry(1, 1, 9).translate(0, 0.5, 0);
@@ -151,6 +184,13 @@ export function createTerrainView(scene, seed) {
     const geo = new THREE.PlaneGeometry(TERRAIN_CELL, TERRAIN_CELL, TILE_SEGMENTS, TILE_SEGMENTS);
     geo.rotateX(-Math.PI / 2);
     const ox = (cx + 0.5) * TERRAIN_CELL, oz = (cz + 0.5) * TERRAIN_CELL;
+    if (painted) {
+      // Gemalter Boden: die Farbe steckt im Bild, die Schattierung kommt weiter vom Licht.
+      const mesh = new THREE.Mesh(geo, groundMat);
+      mesh.position.set(ox, 0, oz);
+      mesh.receiveShadow = true;
+      return mesh;
+    }
     const pos = geo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
     const c = new THREE.Color();
@@ -170,6 +210,93 @@ export function createTerrainView(scene, seed) {
     mesh.receiveShadow = true;
     return mesh;
   }
+
+  // ------------------------------------------------ Gemalte Umgebung
+
+  const _v = new THREE.Vector3();
+
+  /** Weltmaße eines gemalten Hindernisses: Bildhöhe mal Radius geteilt durch den Normradius der Art. */
+  function paintedSize(id, radius, kind) {
+    const def = ENV_SPRITES[id];
+    const norm = SPRITE_SCALE_RADIUS[kind === 'tree' ? 'tree' : id] || 1;
+    const k = radius / norm;
+    return { def, width: spriteWidth(def) * k, height: def.heightM * k, foot: def.footOffset * k };
+  }
+
+  /**
+   * Eine aufrechte Bildtafel am Boden: Rechteck in der festen Billboard-Ebene, Unterkante auf y = 0,
+   * Standpunkt über der Bodenposition (wie bei Helden und Gegnern).
+   */
+  function paintedPanel(id, x, z, width, height, foot, mirror = false) {
+    const def = ENV_SPRITES[id];
+    const geo = new THREE.PlaneGeometry(width, height).translate(0, height / 2, 0);
+    const { u0, v0, u1, v1 } = spriteUv(def, env.sizes.objekte);
+    const uv = geo.attributes.uv;
+    for (let i = 0; i < uv.count; i++) {
+      const left = uv.getX(i) < 0.5;
+      uv.setXY(i, (left !== mirror) ? u0 : u1, uv.getY(i) < 0.5 ? v0 : v1);
+    }
+    const mesh = new THREE.Mesh(geo, spriteMat);
+    mesh.quaternion.copy(orient.quaternion);
+    mesh.position.set(x + orient.foot.x * foot, 0, z + orient.foot.z * foot);
+    return mesh;
+  }
+
+  /** Weicher Bodenschatten unter einem gemalten Gegenstand. */
+  function paintedShadow(x, z, width) {
+    const s = new THREE.Mesh(blobGeo, blobMat);
+    s.position.set(x, 0.02, z);
+    s.scale.set(width * BILLBOARD.shadowWidth * 2, 1, width * BILLBOARD.shadowDepth * 2);
+    return s;
+  }
+
+  /** Baum oder Fels als Bild samt Bodenschatten. */
+  function paintedObstacle(o) {
+    const id = obstacleSprite(o);
+    const { width, height, foot } = paintedSize(id, o.radius, o.kind);
+    const group = new THREE.Group();
+    const panel = paintedPanel(id, o.x, o.z, width, height, foot);
+    group.add(paintedShadow(o.x, o.z, width), panel);
+    return { group, panel, record: { x: o.x, z: o.z, width, height, panel, fade: 0, mat: null } };
+  }
+
+  /** Alle Deko einer Zelle in einem einzigen Netz, damit die Bildrate nicht an Zeichenaufrufen hängt. */
+  function paintedDeco(cx, cz) {
+    const list = decoInCell(seed, cx, cz);
+    if (list.length === 0) return null;
+    const count = list.length;
+    const positions = new Float32Array(count * 4 * 3);
+    const uvs = new Float32Array(count * 4 * 2);
+    const index = new Uint16Array(count * 6);
+    const up = _v.set(0, 1, 0).applyQuaternion(orient.quaternion).clone();
+    const right = orient.right;
+    list.forEach((d, i) => {
+      const def = ENV_SPRITES[d.id];
+      const w = spriteWidth(def), h = def.heightM, fo = def.footOffset;
+      const bx = d.x + orient.foot.x * fo, bz = d.z + orient.foot.z * fo;
+      const corners = [[-0.5, 0], [0.5, 0], [-0.5, 1], [0.5, 1]];
+      const { u0, v0, u1, v1 } = spriteUv(def, env.sizes.objekte);
+      corners.forEach(([sx, sy], c) => {
+        const o3 = (i * 4 + c) * 3;
+        positions[o3] = bx + right.x * sx * w + up.x * sy * h;
+        positions[o3 + 1] = up.y * sy * h;
+        positions[o3 + 2] = bz + right.z * sx * w + up.z * sy * h;
+        const o2 = (i * 4 + c) * 2;
+        uvs[o2] = (sx < 0) !== d.mirror ? u0 : u1;
+        uvs[o2 + 1] = sy > 0 ? v1 : v0;
+      });
+      const b = i * 4;
+      index.set([b, b + 1, b + 2, b + 2, b + 1, b + 3], i * 6);
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geo.setIndex(new THREE.BufferAttribute(index, 1));
+    geo.computeBoundingSphere();
+    return new THREE.Mesh(geo, spriteMat);
+  }
+
+  // ------------------------------------------------ 3D-Ersatzdarstellung
 
   /** @returns {{ group: THREE.Group, record: TreeRecord }} */
   function tree(o, h) {
@@ -225,12 +352,20 @@ export function createTerrainView(scene, seed) {
     const group = new THREE.Group();
     const ground = groundTile(cx, cz);
     group.add(ground);
+    const geos = [ground.geometry];
     const half = TERRAIN_CELL / 2;
     const near = obstaclesNear(seed, (cx + 0.5) * TERRAIN_CELL, (cz + 0.5) * TERRAIN_CELL, half * Math.SQRT2);
     const trees = [];
     for (const o of near) {
       // Nur Hindernisse, deren Mittelpunkt in dieser Zelle liegt; Nachbarn baut deren Zelle.
       if (Math.floor(o.x / TERRAIN_CELL) !== cx || Math.floor(o.z / TERRAIN_CELL) !== cz) continue;
+      if (painted) {
+        const p = paintedObstacle(o);
+        group.add(p.group);
+        geos.push(p.panel.geometry);
+        if (o.kind === 'tree') trees.push(p.record);
+        continue;
+      }
       const h = hash2(seed, Math.round(o.x * 100), Math.round(o.z * 100));
       if (o.kind === 'tree') {
         const t = tree(o, h);
@@ -240,22 +375,79 @@ export function createTerrainView(scene, seed) {
         group.add(rock(o, h));
       }
     }
+    if (painted) {
+      const deco = paintedDeco(cx, cz);
+      if (deco) { group.add(deco); geos.push(deco.geometry); }
+    }
     root.add(group);
-    return { group, groundGeo: ground.geometry, trees };
+    return { group, geos, trees };
   }
 
   function removeTile(key) {
     const t = tiles.get(key);
     root.remove(t.group);
-    t.groundGeo.dispose();
+    for (const g of t.geos) g.dispose();
     tiles.delete(key);
+  }
+
+  const _p = new THREE.Vector3(), _hero = new THREE.Vector3();
+
+  /**
+   * Gemalte Bäume, die den Helden auf dem Bildschirm überdecken und näher an der Kamera stehen,
+   * werden weich durchscheinend. Geprüft wird über `occludesHero` mit den Bildschirmrechtecken;
+   * weit entfernte Bäume können den Helden nicht verdecken und bleiben ungeprüft.
+   */
+  function fadePaintedTrees(x, z, dt) {
+    if (!camera) return;
+    _hero.set(x, HERO_POINT_HEIGHT, z).project(camera);
+    const heroPoint = { x: _hero.x, y: -_hero.y };
+    const heroDepth = _hero.z;
+    const step = dt > 0 ? Math.min(1, dt / PAINTED_FADE_SECONDS) : 1;
+    for (const tile of tiles.values()) {
+      for (const t of tile.trees) {
+        let target = 0;
+        if (Math.abs(t.x - x) < OCCLUSION_RANGE && Math.abs(t.z - z) < OCCLUSION_RANGE) {
+          const half = t.width / 2;
+          _p.set(t.x - half, 0, t.z).project(camera);
+          const left = _p.x, bottom = -_p.y, depth = _p.z;
+          _p.set(t.x + half, t.height, t.z).project(camera);
+          const rect = { x: Math.min(left, _p.x), y: Math.min(bottom, -_p.y), w: Math.abs(_p.x - left), h: Math.abs(-_p.y - bottom) };
+          if (occludesHero(rect, heroPoint, depth < heroDepth)) target = 1;
+        }
+        if (t.fade === target) continue;
+        t.fade += (target - t.fade) * step;
+        if (Math.abs(t.fade - target) < 0.01) t.fade = target;
+        applyFade(t);
+      }
+    }
+  }
+
+  /** Setzt die Deckkraft eines Baumes; das durchscheinende Material entsteht erst, wenn es gebraucht wird. */
+  function applyFade(t) {
+    if (t.fade <= 0) {
+      if (t.mat) t.panel.material = spriteMat;
+      return;
+    }
+    if (!t.mat) {
+      // Durchscheinend wird echt gemischt: die Alpha-Schwelle des deckenden Materials würde beim
+      // Abblenden jedes Pixel verwerfen (Deckkraft 0,35 liegt unter der Schwelle 0,4).
+      t.mat = spriteMat.clone();
+      t.mat.transparent = true;
+      t.mat.alphaToCoverage = false;
+      t.mat.alphaTest = 0.05;
+      t.mat.depthWrite = false;
+      fadeMats.push(t.mat);
+    }
+    t.mat.opacity = 1 - t.fade * (1 - PAINTED_FADE_OPACITY);
+    t.panel.material = t.mat;
   }
 
   /**
    * Baut Zellen im Umkreis von VIEW_CELLS um (x,z), entfernt weiter entfernte und blendet
    * Baumkronen zwischen Kamera und (x,z) aus. Jedes Bild mit der Heldenposition aufrufen.
+   * @param {number} x @param {number} z @param {number} [dt] vergangene Zeit (s) für das Überblenden
    */
-  function update(x, z) {
+  function update(x, z, dt = 0) {
     const cx = Math.floor(x / TERRAIN_CELL), cz = Math.floor(z / TERRAIN_CELL);
     if (cx !== lastCx || cz !== lastCz) {
       lastCx = cx; lastCz = cz;
@@ -270,14 +462,20 @@ export function createTerrainView(scene, seed) {
         }
       }
     }
-    fadeCanopies(x, z);
+    if (painted) fadePaintedTrees(x, z, dt);
+    else fadeCanopies(x, z);
   }
 
   function dispose() {
     for (const key of [...tiles.keys()]) removeTile(key);
     scene.remove(root);
-    grassTex.dispose();
+    // Die gemalten Texturen gehören der App (einmal geladen) und bleiben für den nächsten Durchgang.
+    if (!painted) grassTex.dispose();
     groundMat.dispose();
+    spriteMat?.dispose();
+    blobMat?.dispose();
+    blobGeo?.dispose();
+    for (const m of fadeMats) m.dispose();
     trunkGeo.dispose();
     coneGeo.dispose();
     for (const g of rockGeos) g.dispose();

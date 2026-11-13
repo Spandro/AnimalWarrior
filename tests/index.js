@@ -19,3 +19,4 @@ import './achievements.test.js';
 import './deathSequence.test.js';
 import './chests.test.js';
 import './cameraFit.test.js';
+import './environment.test.js';

@@ -46,6 +46,7 @@ const FPS_WINDOW = 5;
  *   animalId: string, classId: string, seed: number, quality?: 'high'|'low', timeScale?: number,
  *   modifiers?: import('./data/animals.js').Modifier[], revive?: boolean, sfx?: { handle(events: object[]): void },
  *   debug?: boolean, stress?: boolean, autopick?: boolean, sprites?: import('./render/sprites.js').SpriteSheets,
+ *   env?: import('./render/environment.js').Environment,
  *   achievements?: { getSave: () => import('./save/schema.js').Save, notify: (id: string) => void },
  *   onEnd?: (summary: Summary, extra: { facts: import('./data/achievements.js').RunFacts, earlyIds: string[] }) => void }} options
  *   `view` ist der gemeinsame Renderer der App (sonst wird einer für `canvas` angelegt). `sprites` sind die
@@ -59,7 +60,7 @@ const FPS_WINDOW = 5;
  */
 export function startGame({
   canvas, uiLayer, view, animalId, classId, seed, quality = 'high', timeScale = 1, modifiers = [], revive = false,
-  debug = false, stress = false, autopick = false, sprites, sfx, achievements, onEnd,
+  debug = false, stress = false, autopick = false, sprites, env, sfx, achievements, onEnd,
 }) {
   if (!view) view = createRenderer(canvas, { quality });
   else view.setQuality(quality);
@@ -68,9 +69,9 @@ export function startGame({
 
   const run = createSurvivorRun({ seed, animalId, classId, modifiers, revive, timeScale });
   const world = run.world;
-  const terrain = createTerrainView(view.scene, world.seed);
-  const enemyView = createEnemyView(view.scene, { sprites, camera: view.camera });
-  const chestView = createChestView(view.scene, world.seed, sprites);
+  const terrain = createTerrainView(view.scene, world.seed, { env, camera: view.camera });
+  const enemyView = createEnemyView(view.scene, { sprites, camera: view.camera, env });
+  const chestView = createChestView(view.scene, world.seed, sprites, { env, camera: view.camera });
   const heroView = createHeroView(view.scene, animalId, classId, { sprites, camera: view.camera });
   const effects = createEffects(view.scene, uiLayer, { quality, camera: view.camera });
   const hud = createHud(uiLayer, { onPause: () => togglePause() });
@@ -332,7 +333,7 @@ export function startGame({
     heroView.sync(world, alpha);
     const p = heroView.position;
     view.setTarget(p.x, p.z);
-    terrain.update(p.x, p.z);
+    terrain.update(p.x, p.z, dt);
     enemyView.sync(world, alpha);
     chestView.sync(world);
     effects.update(run.state === 'dying' ? dt * DYING.timeScale : run.state === 'levelup' || run.state === 'paused' ? 0 : dt, p);

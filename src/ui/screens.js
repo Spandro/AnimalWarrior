@@ -6,6 +6,7 @@ import { renderSettings } from './settings.js';
 import { renderCreateAnimal, renderCreateClass, renderCreateName } from './heroCreate.js';
 import { renderResult } from './result.js';
 import { renderAchievements } from './achievements.js';
+import { MENU_SCENES, SCENE_CELLS } from '../data/environment.js';
 
 /**
  * @typedef {'main'|'heroes'|'createAnimal'|'createClass'|'createName'|'mode'|'game'|'result'|'metaShop'|'settings'|'achievements'} ScreenName
@@ -30,6 +31,23 @@ const BUILDERS = {
 };
 
 /**
+ * Legt das Landschaftsbild hinter einen Bildschirm: `data-scene` schaltet es ein, `--scene-pos`
+ * wählt das Feld im 3 × 2-Raster von `szenen.webp` (Spalte 0–2 → 0/50/100 %, Zeile 0–1 → 0/100 %).
+ * @param {HTMLElement} root Menüebene
+ * @param {string} name Bildschirm
+ */
+function setScene(root, name) {
+  const scene = MENU_SCENES[name];
+  const cell = scene ? SCENE_CELLS[scene] : null;
+  if (!cell) {
+    delete root.dataset.scene;
+    return;
+  }
+  root.dataset.scene = scene;
+  root.style.setProperty('--scene-pos', `${cell.col * 50}% ${cell.row * 100}%`);
+}
+
+/**
  * @param {HTMLElement} root Menüebene
  * @param {any} app App-Objekt aus main.js (Spielstand, Aktionen, gemeinsamer Renderer)
  * @returns {{ show(name: ScreenName, props?: Record<string, any>): void, current(): ScreenName | null, props(): Record<string, any> }}
@@ -51,6 +69,7 @@ export function createScreens(root, app) {
     currentName = name;
     currentProps = props;
     document.body.dataset.screen = name;
+    setScene(root, name);
     const container = el('section', { class: `screen screen-${name}` });
     root.append(container);
     cleanup = build(container, props, app) || null;

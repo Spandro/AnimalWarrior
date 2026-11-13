@@ -3,6 +3,7 @@ import { ENEMIES } from '../data/enemies.js';
 import { ABILITIES } from '../data/abilities.js';
 import { ENEMY_SPRITES, HERO_SPRITES, CROW_FLIGHT_HEIGHT, BILLBOARD } from '../data/sprites.js';
 import { SHADOW } from '../data/shadow.js';
+import { ENV_SPRITES } from '../data/environment.js';
 import {
   billboardOrientation, spriteGeometry, spriteWidth, spriteMaterial, shadowMaterial, composeSprite, spriteMotion,
 } from './sprites.js';
@@ -278,10 +279,12 @@ function createPool(scene, geometry, material, capacity, { grow = true, castShad
 /**
  * Mit geladenen Bildbögen (`sprites.ok`) sind die Gegner gemalte Bildtafeln, sonst die 3D-Formen oben.
  * @param {THREE.Scene} scene
- * @param {{ sprites?: import('./sprites.js').SpriteSheets, camera?: THREE.Camera }} [options]
+ * @param {{ sprites?: import('./sprites.js').SpriteSheets, camera?: THREE.Camera,
+ *   env?: import('./environment.js').Environment }} [options]
+ *   `env`: geladene Umgebungsbilder; damit ist auch das Aufsammelbare gemalt.
  * @returns {{ sync(world: import('../core/world.js').World, alpha: number): void, dispose(): void }}
  */
-export function createEnemyView(scene, { sprites, camera } = {}) {
+export function createEnemyView(scene, { sprites, camera, env } = {}) {
   const root = new THREE.Group();
   root.name = 'enemies';
   scene.add(root);
@@ -397,24 +400,42 @@ export function createEnemyView(scene, { sprites, camera } = {}) {
   const otherDisc = createPool(root, discGeo, decalMat(0x9a9aa0, 0.35), 16);
   const meteorRock = createPool(root, geo(new THREE.IcosahedronGeometry(1, 1)), glowMat(0xffb050), 16);
 
-  // Aufsammelbares
-  const pickupMat = mat(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.1 }));
-  const xpPool = createPool(root, geo(new THREE.OctahedronGeometry(1, 0)),
-    mat(new THREE.MeshStandardMaterial({ color: 0x6fd0f0, emissive: 0x1d7aa8, emissiveIntensity: 1, roughness: 0.3 })), 512);
-  const goldPool = createPool(root, geo(new THREE.CylinderGeometry(1, 1, 0.16, 16).rotateX(HALF_PI)),
-    mat(new THREE.MeshStandardMaterial({ color: 0xe6b432, emissive: 0x6a4500, emissiveIntensity: 0.8, roughness: 0.35, metalness: 0.7 })), 64);
-  const potionPool = createPool(root, geo(mergeParts([
-    ['sphere', 0xc0343c, [0, 0.2, 0], [0.17, 0.17, 0.17]],
-    ['sphere', 0xf3a0a0, [0.06, 0.26, 0.09], [0.04, 0.04, 0.04]],
-    ['cyl', 0xddd6c8, [0, 0.4, 0], [0.06, 0.13, 0.06]],
-    ['cyl', 0x8a6a42, [0, 0.49, 0], [0.068, 0.06, 0.068]],
-  ])), pickupMat, 16, { castShadow: true });
-  const chestPool = createPool(root, geo(mergeParts([
-    ['box', 0x6e4a2b, [0, 0.25, 0], [0.8, 0.5, 0.55]],
-    ['box', 0x84592f, [0, 0.56, 0], [0.84, 0.14, 0.6]],
-    ...both((s) => ['box', 0xd4a640, [s * 0.25, 0.33, 0], [0.08, 0.62, 0.62]]),
-    ['box', 0xeac860, [0, 0.42, 0.3], [0.13, 0.15, 0.05]],
-  ])), pickupMat, 8, { castShadow: true });
+  // Aufsammelbares: gemalt, wenn die Umgebungsbilder geladen sind, sonst die 3D-Formen.
+  const paintedPickups = !!env?.ok;
+  /** Weltmaße je Bild (nur gemalt). */
+  const pickupSize = {};
+  let xpPool, goldPool, potionPool, chestPool;
+  if (paintedPickups) {
+    if (!orient) orient = billboardOrientation(camera);
+    const envMat = mat(spriteMaterial(env.objects));
+    const pool = (kind, id, capacity) => {
+      const def = ENV_SPRITES[id];
+      pickupSize[kind] = { def, width: spriteWidth(def), height: def.heightM };
+      return createPool(root, geo(spriteGeometry(def, env.sizes.objekte)), envMat, capacity, { grow: false });
+    };
+    xpPool = pool('xp', 'kristall', 512);
+    goldPool = pool('gold', 'muenze', 64);
+    potionPool = pool('potion', 'trank', 16);
+    chestPool = pool('chest', 'truhe-zu', 8);
+  } else {
+    const pickupMat = mat(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.1 }));
+    xpPool = createPool(root, geo(new THREE.OctahedronGeometry(1, 0)),
+      mat(new THREE.MeshStandardMaterial({ color: 0x6fd0f0, emissive: 0x1d7aa8, emissiveIntensity: 1, roughness: 0.3 })), 512);
+    goldPool = createPool(root, geo(new THREE.CylinderGeometry(1, 1, 0.16, 16).rotateX(HALF_PI)),
+      mat(new THREE.MeshStandardMaterial({ color: 0xe6b432, emissive: 0x6a4500, emissiveIntensity: 0.8, roughness: 0.35, metalness: 0.7 })), 64);
+    potionPool = createPool(root, geo(mergeParts([
+      ['sphere', 0xc0343c, [0, 0.2, 0], [0.17, 0.17, 0.17]],
+      ['sphere', 0xf3a0a0, [0.06, 0.26, 0.09], [0.04, 0.04, 0.04]],
+      ['cyl', 0xddd6c8, [0, 0.4, 0], [0.06, 0.13, 0.06]],
+      ['cyl', 0x8a6a42, [0, 0.49, 0], [0.068, 0.06, 0.068]],
+    ])), pickupMat, 16, { castShadow: true });
+    chestPool = createPool(root, geo(mergeParts([
+      ['box', 0x6e4a2b, [0, 0.25, 0], [0.8, 0.5, 0.55]],
+      ['box', 0x84592f, [0, 0.56, 0], [0.84, 0.14, 0.6]],
+      ...both((s) => ['box', 0xd4a640, [s * 0.25, 0.33, 0], [0.08, 0.62, 0.62]]),
+      ['box', 0xeac860, [0, 0.42, 0.3], [0.13, 0.15, 0.05]],
+    ])), pickupMat, 8, { castShadow: true });
+  }
 
   const allPools = [
     ...Object.values(enemyPools), ...enemyExtras, blobs, eliteHalo, shadowAura, fireCore, fireHalo, daggers, daggerTrail,
@@ -652,7 +673,27 @@ export function createEnemyView(scene, { sprites, camera } = {}) {
     }
   }
 
+  /** Gemaltes Aufsammelbares: Bildtafel, die sanft auf und ab schwebt. */
+  const pickupMotion = { offsetY: 0, tilt: 0, scaleX: 1, scaleY: 1, lunge: 0 };
+  const pickupPools = () => ({ xp: xpPool, gold: goldPool, potion: potionPool, chest: chestPool });
+
+  function drawPaintedPickups(world, t) {
+    const hero = world.hero;
+    const pools = pickupPools();
+    for (const pk of world.pickups) {
+      const dx = pk.x - hero.x, dz = pk.z - hero.z;
+      if (dx * dx + dz * dz > CULL_DISTANCE * CULL_DISTANCE) continue;
+      const size = pickupSize[pk.kind], pool = pools[pk.kind];
+      if (!size || !pool) continue;
+      // Größere Erfahrungssplitter wachsen leicht mit ihrem Wert, wie bei den 3D-Formen.
+      const k = pk.kind === 'xp' ? Math.min(1.5, 0.85 + 0.18 * Math.log2(Math.max(1, pk.value))) : 1;
+      pickupMotion.offsetY = 0.05 * (Math.sin(t * 3 + phaseOf(pk)) + 1);
+      pool.push(composeSprite(m, orient, pk.x, 0, pk.z, size.width * k, size.height * k, 1, pickupMotion, size.def.footOffset * k));
+    }
+  }
+
   function drawPickups(world, t) {
+    if (paintedPickups) { drawPaintedPickups(world, t); return; }
     const hero = world.hero;
     for (const pk of world.pickups) {
       const dx = pk.x - hero.x, dz = pk.z - hero.z;
