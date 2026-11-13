@@ -31,8 +31,10 @@ Es wird nichts installiert und nichts gebaut. Der Browser lädt das Spiel aber n
 Auf einem Mac oder unter Linux:
 
 ```bash
-python3 -m http.server 8080
+python3 tools/serve.py 8080
 ```
+
+Dieser Server verbietet jedes Zwischenspeichern. Ohne das merkt sich der Browser die Module und zeigt nach einer Änderung weiter den alten Stand.
 
 Unter Windows:
 

@@ -2,7 +2,7 @@
 
 Diese Datei ist für die nächste Sitzung gedacht, falls die laufende abbricht. Sie wird an jedem Pausenpunkt aktualisiert.
 
-Zuletzt aktualisiert: 2026-11-13, Pausenpunkt nach Aufgabe 4 von Paket 1. Nächster Schritt: Aufgabe 5.
+Zuletzt aktualisiert: 2026-11-13, Pausenpunkt nach Aufgabe 7 von Paket 1. Nächster Schritt: Befunde der Gesamtprüfung abarbeiten, dann Paket 2 entwerfen.
 
 ## 1. Was fertig ist
 
@@ -28,18 +28,33 @@ Zuletzt aktualisiert: 2026-11-13, Pausenpunkt nach Aufgabe 4 von Paket 1. Nächs
 | 2 | Auto-Zielen für Krieger und Dieb (`aim`-Feld in `src/data/abilities.js`) | fertig, geprüft, Commit `1b478d3` |
 | 3 | Rotes Aufblitzen, Sterbephase (`dying`), Sieg-Moment | fertig, geprüft, Commits `d373e8a` und `ddf560c` |
 | 4 | Kisten auf der Karte, Pfeil, Erfolg „Schatzsucher" (`src/core/chests.js`) | fertig, geprüft, Commit `e678d53` |
-| 5 | Handy-Oberfläche: Anzeige hochkant, Pause-Knopf, Kamera, große Knöpfe | offen |
-| 6 | Gemalte Umgebung (`assets/umgebung/`), gemalte Kisten und Aufsammelbares, Menü-Hintergründe | offen |
-| 7 | Abschlussprüfung, README | offen |
-| danach | Gesamtprüfung über Paket 1, eine Korrekturrunde | offen |
+| 5 | Handy-Oberfläche: Anzeige hochkant, Pause-Knopf, Kamera, große Knöpfe | fertig, geprüft, Commit `9ca9220` |
+| 6 | Gemalte Umgebung (`assets/umgebung/`), gemalte Kisten und Aufsammelbares, Menü-Hintergründe | fertig, geprüft, Commit `6509808` |
+| 7 | Abschlussprüfung, README | fertig, Commit `b0597e9` |
+| danach | Gesamtprüfung über Paket 1, eine Korrekturrunde | läuft/offen |
 
-Teststand nach Aufgabe 4: 326 Tests grün (`tests.html`).
+Teststand nach Aufgabe 7: 339 Tests grün (`tests.html`).
+
+**Was in Aufgabe 5 bis 7 dazugekommen ist**
+
+- Hochkant rückt die Kamera zurück, bis links und rechts zusammen 9 Einheiten sichtbar sind
+  (`src/render/cameraFit.js`, Zahlen in `CAMERA_FIT` in `src/data/sprites.js`). Quer bleibt Abstand 15.
+- Spielanzeige hochkant: oberer Block, untere Leiste mit Fähigkeiten und Pause-Knopf, Ränder mit
+  `env(safe-area-inset-*)`, Knöpfe am Handy mindestens 44 px, Level-up-Karten und Dialoge über die Breite.
+- Ohne Spielstand starten Fingergeräte in niedriger Qualität (`src/render/quality.js`).
+- Gemalte Umgebung aus `assets/umgebung/`: Boden gekachelt (8 m, Ränder verblendet), drei Baumarten,
+  zwei Felsen, Deko je Zelle, Truhen, Münze, Trank, Kristall; Menü-Hintergründe aus `szenen.webp`.
+  Daten in `src/data/environment.js`, Rechnungen in `src/core/environment.js`, Laden in
+  `src/render/environment.js`.
+- Ein Baum vor dem Helden blendet weich auf 35 % Deckkraft.
+- `.claude/launch.json` startet den Server jetzt mit `python3` (macOS); die PowerShell-Variante
+  heißt `animalwarrior-windows`.
 
 ## 2. Was noch fehlt (vom Auftraggeber gewünscht, noch nicht entworfen)
 
 Reihenfolge wie vereinbart; jedes Paket bekommt eigenen Entwurf, Spec und Plan.
 
-**Paket 2 – Mehr Welten:** Nach einem Boss geht es auf eine neue Karte mit neuen Tieren (Idee des Auftraggebers: z. B. Unterwasserwelt). Dafür braucht er wieder Beschreibungen für den Bildgenerator. Die sechs Landschaftsbilder in `assets/umgebung/szenen.webp` (Waldweg, Steinbrücke, Höhle, Wasserfall, Baum auf der Wiese, Teich) sind als Titelbilder möglicher Welten vorgemerkt.
+**Paket 2 – Mehr Welten:** Nach einem Boss geht es auf eine neue Karte mit neuen Tieren (Idee des Auftraggebers: z. B. Unterwasserwelt). Dafür braucht er wieder Beschreibungen für den Bildgenerator. Die sechs Landschaftsbilder in `assets/umgebung/szenen.webp` (Waldweg, Steinbrücke, Höhle, Wasserfall, Baum auf der Wiese, Teich) stehen seit Aufgabe 6 als Hintergrund hinter den Menüs und sind weiter als Titelbilder möglicher Welten vorgemerkt.
 
 **Paket 3 – Taverne:** Eigener Punkt in der Modusauswahl. Minispiele und Glücksspiel, bei denen man mit dem gesammelten Gold um Beute spielt – auch Ausrüstung und Waffen für den Abenteuer-Modus. Dort ist außerdem ein weiterer Held für viel Gold freischaltbar, vorerst geschwärzt dargestellt: ein Kombo-Team aus Giraffe und Erdmännchen. Nur Spielgold, kein echtes Geld.
 
@@ -54,7 +69,13 @@ Reihenfolge wie vereinbart; jedes Paket bekommt eigenen Entwurf, Spec und Plan.
 
 ## 3. Lokal starten und testen
 
-Kein Node.js, kein Build. Server:
+Kein Node.js, kein Build. Server auf dem Mac oder unter Linux:
+
+```bash
+python3 tools/serve.py 8080
+```
+
+Unter Windows:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/serve.ps1 -Port 8080
@@ -62,7 +83,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/serve.ps1 -Port 8080
 
 - Spiel: `http://localhost:8080/`
 - Tests: `http://localhost:8080/tests.html`, Ergebnis in `window.__testResults` (`failed === 0` heißt bestanden), `?filter=<text>` grenzt ein
-- In Claude Code startet `preview_start` mit dem Namen `animalwarrior` denselben Server (`.claude/launch.json`)
+- **Achtung:** Hält der Browser trotzdem alte Module fest (Testlauf meldet „does not provide an export named …"), hilft ein Wechsel zwischen `localhost` und `127.0.0.1` – das sind getrennte Zwischenspeicher
+- In Claude Code startet `preview_start` mit dem Namen `animalwarrior` denselben Server (`.claude/launch.json`); `animalwarrior-windows` ist die PowerShell-Variante
 - Schalter zum Ausprobieren stehen in `README.md` (`?debug=1`, `?speed=`, `?autostart=1`, `?animal=`, `?class=`, `?autopick=1`, `?stress=1`, `?quality=low`, Tasten K und L)
 
 ## 4. Regeln im Code (gelten für alles Weitere)
@@ -93,16 +115,26 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/serve.ps1 -Port 8080
 
 ## 7. Fortsetzen von Paket 1
 
-1. Aufgaben 1 bis 4 sind gebaut und geprüft. Weiter mit Aufgabe 5 (Auftrag im Plan, Abschnitt „Task 5").
+1. Alle sieben Aufgaben sind gebaut. Offen ist nur noch die Korrekturrunde nach der Gesamtprüfung
+   ab Commit `1e7ebd1`; die Befunde stehen im Arbeitsprotokoll (Abschnitt 6).
 2. Steht im `git log` ein Commit zu einer späteren Aufgabe, der hier nicht als geprüft vermerkt ist, fehlt dessen Prüfung.
-3. Danach Aufgaben 6 und 7, dann eine Gesamtprüfung ab Commit `1e7ebd1`.
-4. Entscheidungen, die im Plan nicht stehen:
+3. Entscheidungen, die im Plan nicht stehen (die vollständige Liste mit Begründung steht im
+   Arbeitsprotokoll unter „Ruling:"):
    - Kisten werden im Zustand `dying` nicht geöffnet.
-   - Passt die Kameraregel für Querformat nicht zur echten Brennweite, bleibt quer der Abstand 15; die Mindestbreite gilt dann nur hochkant.
+   - „Mindestens 9 Einheiten sichtbar" aus der Spec heißt 9 Einheiten Gesamtbreite, also 4,5 zu
+     jeder Seite. Die Lesart „9 je Seite" bräuchte Abstand 47 statt 23,5 und machte den Helden
+     winzig. Quer bleibt es bei Abstand 15.
    - Der Plantest „Erdspalter Stufe 3 trifft Ratte bei (0, −13)" war falsch; geprüft wird dort nur die Zielrichtung.
+   - Die reinen Funktionen der Umgebung liegen in `src/core/environment.js` (wie bei Gelände und Kisten),
+     nicht in der Datendatei.
+   - Die Deko einer Zelle liegt in einem zusammengefassten Netz statt in Instanzen je Art.
 
 ## 8. Zurückgestellte Kleinigkeiten (bekannt, nicht dringend)
 
+- Die Bodenkachel (8 m) wiederholt sich im Bild etwa dreimal und ist als Muster erkennbar; harte Nähte gibt es keine
+- Der Bodenschatten unter Truhen und Felsen ist sehr dezent, die Deko eher sparsam gesät
+- Der Pause-Knopf liegt unter den Überlagerungen; im Pausenfenster führt nur „Weiter" oder Esc zurück
+- Auf dem Ergebnisbildschirm kann eine Erfolgs-Einblendung die Überschrift verdecken (schon vor Paket 1 so)
 - Anzeige der Bildrate im Stresstest fängt Zeigerereignisse ab
 - Gehen sowohl „Finger hoch" als auch „Erfassung verloren" verloren, läuft der Held bis zur nächsten Pause weiter (sehr selten)
 - Kein automatischer Test für die Anbindung der Zeigerereignisse

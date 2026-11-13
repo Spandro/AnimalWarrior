@@ -1,6 +1,6 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { SHAKE, CAMERA_FIT } from '../data/sprites.js';
-import { cameraDistanceFor } from './cameraFit.js';
+import { cameraDistanceFor, visibleHalfWidth } from './cameraFit.js';
 
 /** Kameraneigung über dem Boden (Höhenwinkel) in Grad. */
 const CAMERA_TILT_DEG = CAMERA_FIT.tiltDeg;
@@ -50,8 +50,9 @@ export function createRenderer(canvas, { quality = 'high' } = {}) {
   const tilt = THREE.MathUtils.degToRad(CAMERA_TILT_DEG);
   // Abstand zum Zielpunkt; `resize` setzt ihn je nach Seitenverhältnis neu (hochkant weiter weg).
   const cameraOffset = new THREE.Vector3();
-  const setDistance = (d) => cameraOffset.set(0, Math.sin(tilt) * d, Math.cos(tilt) * d);
-  setDistance(CAMERA_FIT.landscapeDistance);
+  let distance = CAMERA_FIT.landscapeDistance;
+  const setDistance = (d) => { distance = d; cameraOffset.set(0, Math.sin(tilt) * d, Math.cos(tilt) * d); };
+  setDistance(distance);
   const target = new THREE.Vector3();
 
   // Umgebungslicht als Himmel/Boden-Verlauf: kühles Himmelslicht von oben, grünlich-erdiges Streulicht von unten.
@@ -90,9 +91,26 @@ export function createRenderer(canvas, { quality = 'high' } = {}) {
   const dir = new THREE.Vector3();
 
   /**
+   * Weite des sichtbaren Bodens in z-Richtung an der Bildmitte: `ndcY` = 1 ist die Oberkante
+   * (vom Helden weg, −z), −1 die Unterkante (zur Kamera hin, +z). Zurück kommt der Abstand zum
+   * Zielpunkt, nicht die Richtung.
+   * @param {number} ndcY
+   */
+  function groundReach(ndcY) {
+    ndc.set(0, ndcY, 0.5).unproject(camera);
+    dir.copy(ndc).sub(camera.position).normalize();
+    const t = dir.y < -1e-6 ? Math.min(-camera.position.y / dir.y, camera.far) : camera.far;
+    return Math.abs(camera.position.z + dir.z * t - target.z);
+  }
+
+  /**
    * Passt Zeichenfläche und Kamera an die Canvas-Größe an.
-   * @returns {{ halfW: number, halfH: number }} größte halbe Ausdehnung des sichtbaren Bodens
-   *   um den Zielpunkt in x (halfW) und z (halfH); das sichtbare Trapez liegt vollständig darin.
+   * @returns {{ halfW: number, halfH: number, visible: { halfW: number, front: number, back: number } }}
+   *   `halfW`/`halfH`: größte halbe Ausdehnung des sichtbaren Bodens um den Zielpunkt in x und z; das
+   *   sichtbare Trapez liegt vollständig darin (so erscheinen Gegner sicher außerhalb des Bildes).
+   *   `visible`: was auf Höhe des Zielpunktes wirklich zu sehen ist – seitlich `halfW`, nach vorn (−z,
+   *   Bildoberkante) `front`, nach hinten (+z, Bildunterkante) `back`. Die beiden sind sehr verschieden,
+   *   weil die Kamera schräg steht.
    */
   function resize() {
     const w = Math.max(1, canvas.clientWidth || window.innerWidth);
@@ -121,7 +139,12 @@ export function createRenderer(canvas, { quality = 'high' } = {}) {
     sc.left = -extent; sc.right = extent; sc.top = extent; sc.bottom = -extent;
     sc.updateProjectionMatrix();
 
-    return { halfW, halfH };
+    const visible = {
+      halfW: visibleHalfWidth(distance, camera.aspect, CAMERA_FOV, CAMERA_TILT_DEG),
+      front: groundReach(1),
+      back: groundReach(-1),
+    };
+    return { halfW, halfH, visible };
   }
 
   // Kamerawackeln: abklingender Ausschlag aus Sinusrauschen der Echtzeit, nur für den Zeichenaufruf auf die Kamera

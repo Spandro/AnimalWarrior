@@ -54,6 +54,12 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
   let attackAt = -Infinity;
   /** Blickseite (-1/1) zum Ziel der letzten zielenden Fähigkeit und bis wann sie gilt (nur Darstellung). */
   let aimSide = 0, aimUntil = -Infinity;
+  /**
+   * Volle Zielrichtung derselben Fähigkeit und bis wann sie gilt. Die gemalte Tafel kann nur nach links
+   * oder rechts kippen, die 3D-Figur dreht sich dagegen in jede Richtung – auch gerade nach oben oder unten.
+   */
+  const aimDir = { x: 0, z: 0 };
+  let aimDirUntil = -Infinity;
   let speed = 0, lastX = NaN, lastZ = NaN, lastT = NaN, lastRenderT = NaN;
   /** Treffer-Aufblitzen (Echtzeit in ms) und Sterbezustand (Neigung und Deckkraft, 0…1). */
   let flashUntil = -Infinity, dyingTilt = 0, opacity = 1, dying = false;
@@ -66,9 +72,14 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
   function handle(events, world) {
     for (const e of events) {
       if (e.type === 'cast' && e.abilityId === startAbility) attackAt = world.time;
-      if (e.type === 'cast' && ABILITIES[e.abilityId]?.aim && Math.abs(e.dirX) >= BILLBOARD.flipHysteresis) {
-        aimSide = Math.sign(e.dirX);
-        aimUntil = world.time + AIM_TURN_DURATION;
+      if (e.type === 'cast' && ABILITIES[e.abilityId]?.aim) {
+        aimDir.x = e.dirX; aimDir.z = e.dirZ;
+        aimDirUntil = world.time + AIM_TURN_DURATION;
+        // Die Tafel kippt nur, wenn das Ziel deutlich zur Seite liegt; sonst bliebe sie zappelig.
+        if (Math.abs(e.dirX) >= BILLBOARD.flipHysteresis) {
+          aimSide = Math.sign(e.dirX);
+          aimUntil = world.time + AIM_TURN_DURATION;
+        }
       }
     }
   }
@@ -96,7 +107,8 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
 
     const since = t - attackAt;
     body.update({
-      position, facing: hero.facing, aimSide: t < aimUntil ? aimSide : 0, speed, time: t, frameDt,
+      position, facing: hero.facing, aimSide: t < aimUntil ? aimSide : 0,
+      aim: t < aimDirUntil ? aimDir : null, speed, time: t, frameDt,
       attackT: since >= 0 && since < ATTACK_DURATION ? since / ATTACK_DURATION : undefined,
       visible: dying || !(world.time < hero.invulnerableUntil && Math.floor(t * BLINK_HZ) % 2),
       flash: performance.now() < flashUntil, dyingTilt, opacity,
@@ -131,9 +143,22 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
 }
 
 /**
- * @typedef {{ position: THREE.Vector3, facing: { x: number, z: number }, aimSide?: number, speed: number, time: number,
+ * @typedef {{ position: THREE.Vector3, facing: { x: number, z: number }, aimSide?: number,
+ *   aim?: { x: number, z: number } | null, speed: number, time: number,
  *   frameDt: number, attackT?: number, visible: boolean }} BodyInput
  */
+
+/**
+ * Richtung, in die die Figur schaut, als Drehwinkel um die Hochachse: die Zielrichtung der letzten
+ * zielenden Fähigkeit, solange es eine gibt, sonst die Laufrichtung. Rein, damit prüfbar.
+ * @param {{ x: number, z: number }} facing
+ * @param {{ x: number, z: number } | null} [aim]
+ * @returns {number} Bogenmaß
+ */
+export function lookYaw(facing, aim) {
+  const d = aim && (aim.x !== 0 || aim.z !== 0) ? aim : facing;
+  return Math.atan2(d.x, d.z);
+}
 
 /** Gemalter Held: eine Bildtafel mit Bodenschatten; Klone als dunkle Kopien derselben Tafel. */
 function createSpriteBody(scene, animalId, classId, sprites, camera) {
@@ -267,8 +292,8 @@ function createFigureBody(scene, animalId, classId) {
 
   return {
     /** @param {BodyInput} input */
-    update({ position, facing, speed, time, frameDt, attackT, visible, flash, dyingTilt, opacity }) {
-      const target = Math.atan2(facing.x, facing.z);
+    update({ position, facing, aim, speed, time, frameDt, attackT, visible, flash, dyingTilt, opacity }) {
+      const target = lookYaw(facing, aim);
       yaw = wrapAngle(yaw + wrapAngle(target - yaw) * Math.min(1, TURN_RATE * frameDt * 60));
       animateCharacter(figure, { speed, time, attackT });
       figure.position.copy(position);

@@ -1,5 +1,6 @@
 import { test, assertEqual, assertClose, assertTrue } from './runner.js';
 import { removeBackground, spriteUv, spriteMotion } from '../src/render/sprites.js';
+import { lookYaw } from '../src/render/hero.js';
 import { HERO_SPRITES, ENEMY_SPRITES, MOTION, IDLE } from '../src/data/sprites.js';
 import { ENEMIES } from '../src/data/enemies.js';
 import { ANIMALS } from '../src/data/animals.js';
@@ -124,4 +125,16 @@ test('sprites: jede Heldenkombination und jeder Gegnertyp hat ein Bild', () => {
   };
   for (const a of Object.keys(ANIMALS)) for (const c of Object.keys(CLASSES)) check(`${a}-${c}`, HERO_SPRITES[`${a}-${c}`]);
   for (const type of Object.keys(ENEMIES)) check(type, ENEMY_SPRITES[type]);
+});
+
+test('hero: die Figur dreht sich beim Zielen in die Zielrichtung, sonst in die Laufrichtung', () => {
+  const lauf = { x: 1, z: 0 };
+  // Ohne Zielrichtung zählt die Laufrichtung.
+  assertClose(lookYaw(lauf, null), Math.atan2(1, 0));
+  assertClose(lookYaw({ x: 0, z: 1 }, null), 0);
+  // Mit Zielrichtung zählt sie, auch wenn der Held in eine andere Richtung läuft.
+  assertClose(lookYaw(lauf, { x: -1, z: 0 }), Math.atan2(-1, 0));
+  assertClose(lookYaw(lauf, { x: 0, z: -1 }), Math.atan2(0, -1));
+  // Eine Zielrichtung der Länge null zählt nicht.
+  assertClose(lookYaw(lauf, { x: 0, z: 0 }), Math.atan2(1, 0));
 });

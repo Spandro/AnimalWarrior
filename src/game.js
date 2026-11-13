@@ -86,9 +86,12 @@ export function startGame({
 
   // Fenstergröße oder Drehung geändert: Kamera und Sichtbereich neu setzen. Der Steuerkreis gehört zum
   // alten Bild und würde den Helden sonst weiterlaufen lassen, also wird er zurückgesetzt.
+  /** Was auf Heldenhöhe wirklich zu sehen ist; der Kistenpfeil richtet sich danach. */
+  let visibleGround = { halfW: 1, front: 1, back: 1 };
   function onResize() {
-    const { halfW, halfH } = view.resize();
+    const { halfW, halfH, visible } = view.resize();
     setView(run, halfW, halfH);
+    visibleGround = visible;
     pointer.reset();
   }
   window.addEventListener('resize', onResize);
@@ -338,7 +341,7 @@ export function startGame({
     chestView.sync(world);
     effects.update(run.state === 'dying' ? dt * DYING.timeScale : run.state === 'levelup' || run.state === 'paused' ? 0 : dt, p);
     hud.update(run);
-    chestHint.update(world, { halfW: run.view.halfW, halfH: run.view.halfH, width: uiLayer.clientWidth, height: uiLayer.clientHeight }, run.state);
+    chestHint.update(world, { ...visibleGround, width: uiLayer.clientWidth, height: uiLayer.clientHeight }, run.state);
     stick.update(pointer);
     view.render();
     if (stress) measureFps(now);

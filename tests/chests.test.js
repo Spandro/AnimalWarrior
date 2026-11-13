@@ -301,3 +301,20 @@ test('chestHint: alle Punkte liegen im Bild, auch rund um den Helden und mit eig
   const up = hintArrow({ x: 0, z: 0 }, { x: 0, z: -200 }, v);
   assertClose(up.y, 120);
 });
+
+test('chestHint: nach vorn und nach hinten ist unterschiedlich weit zu sehen', () => {
+  // Werte der Kamera hochkant (390 × 844, Abstand 23,5): seitlich 4,5 m, zur Bildoberkante
+  // (−z, vom Helden weg) 16,7 m, zur Bildunterkante (+z, zur Kamera hin) nur 9,2 m.
+  const v = { halfW: 4.5, front: 16.7, back: 9.2, width: 390, height: 844, margin: 28 };
+  assertEqual(hintArrow({ x: 0, z: 0 }, { x: 0, z: -12 }, v), null, '12 m nach vorn ist noch im Bild');
+  const hinten = hintArrow({ x: 0, z: 0 }, { x: 0, z: 11 }, v);
+  assertTrue(hinten !== null && Number.isFinite(hinten.x) && Number.isFinite(hinten.y),
+    '11 m nach hinten ist nicht mehr im Bild, da gehört ein Pfeil hin');
+  assertClose(hinten.angle, Math.PI / 2);
+  assertClose(hinten.y, v.height - v.margin);
+  const vorn = hintArrow({ x: 0, z: 0 }, { x: 0, z: -18 }, v);
+  assertTrue(vorn !== null && Number.isFinite(vorn.y), '18 m nach vorn ist draußen');
+  assertClose(vorn.y, v.margin);
+  // Ohne eigene Werte bleibt es bei der symmetrischen Angabe.
+  assertEqual(hintArrow({ x: 0, z: 0 }, { x: 0, z: 11 }, { ...v, front: undefined, back: undefined, halfH: 16.7 }), null);
+});
