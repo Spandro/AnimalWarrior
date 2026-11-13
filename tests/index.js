@@ -21,3 +21,4 @@ import './chests.test.js';
 import './cameraFit.test.js';
 import './environment.test.js';
 import './items.test.js';
+import './tavern.test.js';
