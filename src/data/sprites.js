@@ -2,7 +2,7 @@
 
 /**
  * @typedef {'hop'|'waddle'|'scurry'|'trot'|'fly'|'hopSlow'|'lope'|'lumber'} MotionId
- * @typedef {{ sheet: 'helden'|'gegner', x: number, y: number, w: number, h: number, heightM: number, motion: MotionId,
+ * @typedef {{ sheet: 'helden'|'gegner'|'gegner2'|'bosse', x: number, y: number, w: number, h: number, heightM: number, motion: MotionId,
  *   footOffset: number }} SpriteDef
  *   Pixelrechteck der Figur im Bogen (x, y von links oben; enge Umrandung plus 6 px Rand), Höhe in Weltmetern,
  *   footOffset: Höhe des Standpunkts (Mitte der Fußsohlen in der Schrägansicht) über der Bildunterkante in Metern
@@ -13,7 +13,24 @@
  */
 
 /** Bildbögen, relativ zu index.html. */
-export const SHEETS = { helden: 'assets/figuren/helden.webp', gegner: 'assets/figuren/gegner.webp' };
+export const SHEETS = {
+  helden: 'assets/figuren/helden.webp',
+  gegner: 'assets/figuren/gegner.webp',
+  gegner2: 'assets/figuren/gegner2.webp',
+  bosse: 'assets/figuren/bosse.webp',
+};
+
+/**
+ * Eingeschlossenes Papierweiß je Bogen: Startpunkte (x, y von links oben), von denen das Freistellen zusätzlich
+ * füllt, weil diese weißen Lücken ringsum vom Tier umschlossen sind (ausgemessen in `docs/neue-gegner-bilder.md`).
+ * @type {Record<string, Array<[number, number]>>}
+ */
+export const SHEET_HOLES = {
+  // Otter-Schlinge, unter dem Dachskinn, zweiter Otter-Schlitz
+  gegner2: [[290, 921], [753, 516], [172, 904]],
+  // zwischen den Hirschbeinen, zwischen den Wisent-Vorderbeinen, zwei Lücken im Hirschgeweih
+  bosse: [[198, 427], [302, 1011], [296, 165], [388, 127]],
+};
 
 /**
  * Hintergrundentfernung: Farbabstand zu Weiß (RGB, 0…441), unter `threshold` gilt als Hintergrund,

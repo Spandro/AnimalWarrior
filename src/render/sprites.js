@@ -1,6 +1,6 @@
 // Gemalte Figuren: Bildbögen laden, weißen Hintergrund entfernen, Texturen anlegen, Bewegung berechnen.
 import * as THREE from '../../vendor/three.module.min.js';
-import { SHEETS, BACKGROUND, BILLBOARD, MOTION, IDLE, ATTACK, MOTION_FULL_SPEED, HOP_BACK_LEAN } from '../data/sprites.js';
+import { SHEETS, SHEET_HOLES, BACKGROUND, BILLBOARD, MOTION, IDLE, ATTACK, MOTION_FULL_SPEED, HOP_BACK_LEAN } from '../data/sprites.js';
 
 /**
  * @typedef {{ width: number, height: number, data: Uint8ClampedArray|Uint8Array }} ImageDataLike
@@ -13,13 +13,15 @@ import { SHEETS, BACKGROUND, BILLBOARD, MOTION, IDLE, ATTACK, MOTION_FULL_SPEED,
  * Pixel, deren Farbabstand zu Weiß unter `threshold` liegt, und macht sie durchsichtig. Die Pixel am Rand
  * der Füllung (bis zu `BACKGROUND.featherRings` Pixel tief, Abstand unter `threshold + feather`) bekommen
  * eine Teildeckkraft proportional zu ihrem Abstand von Weiß; ihr Weißanteil wird herausgerechnet, damit
- * kein heller Saum bleibt. Nicht mit dem Rand verbundene Pixel bleiben unberührt (weiße Entenkörper).
+ * kein heller Saum bleibt. Nicht mit dem Rand verbundene Pixel bleiben unberührt (weiße Entenkörper), außer
+ * die Füllung beginnt zusätzlich an einem der `seeds` (eingeschlossenes Papierweiß, `SHEET_HOLES`).
  * Ändert `img.data` und gibt `img` zurück. Ohne DOM, daher testbar.
  * @param {ImageDataLike} img
  * @param {{ threshold: number, feather: number }} options Abstände im RGB-Raum (0…441)
+ * @param {Array<[number, number]>} [seeds] weitere Startpunkte (x, y) der Füllung
  * @returns {ImageDataLike}
  */
-export function removeBackground(img, { threshold, feather }) {
+export function removeBackground(img, { threshold, feather }, seeds = []) {
   const { width: W, height: H, data } = img;
   const n = W * H;
   const dist = new Float32Array(n);
@@ -34,6 +36,7 @@ export function removeBackground(img, { threshold, feather }) {
   const seed = (i) => { if (state[i] === 0 && dist[i] < threshold) { state[i] = 1; stack[sp++] = i; } };
   for (let x = 0; x < W; x++) { seed(x); seed((H - 1) * W + x); }
   for (let y = 0; y < H; y++) { seed(y * W); seed(y * W + W - 1); }
+  for (const [x, y] of seeds) if (x >= 0 && x < W && y >= 0 && y < H) seed(y * W + x);
   while (sp > 0) {
     const i = stack[--sp];
     const x = i % W;
@@ -197,12 +200,13 @@ export function dataTexture(img) {
 /**
  * Ein Bildbogen: Hintergrund entfernen, Flecken tilgen, Farben auffüllen, Textur und Canvas anlegen.
  * @param {HTMLImageElement} image
+ * @param {Array<[number, number]>} [holes] Startpunkte für eingeschlossenes Papierweiß
  * @returns {{ texture: THREE.DataTexture, canvas: HTMLCanvasElement, size: { width: number, height: number } }}
  */
-export function prepareSheet(image) {
+export function prepareSheet(image, holes = []) {
   const imageData = imageDataOf(image);
   const { canvas } = imageData;
-  removeBackground(imageData, BACKGROUND);
+  removeBackground(imageData, BACKGROUND, holes);
   removeSpecks(imageData, BACKGROUND.minSpeck);
   bleedColors(imageData, BACKGROUND.bleed);
   canvas.getContext('2d').putImageData(imageData, 0, 0);
@@ -220,7 +224,7 @@ export async function loadSpriteSheets() {
     const entries = Object.entries(SHEETS);
     const images = await Promise.all(entries.map(([, url]) => loadImage(url)));
     entries.forEach(([id], k) => {
-      const sheet = prepareSheet(images[k]);
+      const sheet = prepareSheet(images[k], SHEET_HOLES[id] || []);
       result.textures[id] = sheet.texture;
       result.sizes[id] = sheet.size;
       result.canvases[id] = sheet.canvas;

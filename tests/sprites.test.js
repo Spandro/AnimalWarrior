@@ -1,7 +1,7 @@
 import { test, assertEqual, assertClose, assertTrue } from './runner.js';
 import { removeBackground, spriteUv, spriteMotion } from '../src/render/sprites.js';
 import { lookYaw } from '../src/render/hero.js';
-import { HERO_SPRITES, ENEMY_SPRITES, MOTION, IDLE } from '../src/data/sprites.js';
+import { HERO_SPRITES, ENEMY_SPRITES, MOTION, IDLE, SHEETS, SHEET_HOLES } from '../src/data/sprites.js';
 import { ENEMIES } from '../src/data/enemies.js';
 import { ANIMALS } from '../src/data/animals.js';
 import { CLASSES } from '../src/data/classes.js';
@@ -36,6 +36,38 @@ test('sprites: removeBackground lässt ein eingeschlossenes weißes Pixel decken
   }), OPTS);
   assertEqual(alphaAt(img, 2, 2), 255);
   assertEqual(alphaAt(img, 0, 0), 0);
+});
+
+/** 12×12: dunkler Block 1…10 mit zwei eingeschlossenen weißen 2×2-Flächen A (3–4) und B (7–8). */
+function twoHoles() {
+  const hole = (v) => v >= 3 && v <= 4 ? 'A' : v >= 7 && v <= 8 ? 'B' : null;
+  return image(12, 12, (x, y) => {
+    if (x < 1 || x > 10 || y < 1 || y > 10) return null;
+    return hole(x) && hole(x) === hole(y) ? null : [40, 30, 20];
+  });
+}
+
+test('sprites: removeBackground entfernt eingeschlossenes Weiß nur mit Startpunkt', () => {
+  const img = removeBackground(twoHoles(), OPTS, [[3, 3]]);
+  for (const [x, y] of [[3, 3], [4, 3], [3, 4], [4, 4]]) assertEqual(alphaAt(img, x, y), 0, `A ${x},${y}`);
+  for (const [x, y] of [[7, 7], [8, 7], [7, 8], [8, 8]]) assertEqual(alphaAt(img, x, y), 255, `B ${x},${y}`);
+  assertEqual(alphaAt(img, 1, 1), 255);
+  assertEqual(alphaAt(img, 5, 5), 255);
+  const plain = removeBackground(twoHoles(), OPTS);
+  assertEqual([alphaAt(plain, 3, 3), alphaAt(plain, 7, 7)], [255, 255]);
+});
+
+test('sprites: Startpunkt auf dunklem Pixel ändert nichts', () => {
+  const img = removeBackground(twoHoles(), OPTS, [[1, 1]]);
+  assertEqual([alphaAt(img, 1, 1), alphaAt(img, 3, 3)], [255, 255]);
+});
+
+test('sprites: SHEET_HOLES enthält die sieben Punkte aus der Bilder-Doku', () => {
+  assertEqual(SHEET_HOLES, {
+    gegner2: [[290, 921], [753, 516], [172, 904]],
+    bosse: [[198, 427], [302, 1011], [296, 165], [388, 127]],
+  });
+  for (const id of Object.keys(SHEET_HOLES)) assertTrue(!!SHEETS[id], `Bogen ${id} fehlt in SHEETS`);
 });
 
 test('sprites: removeBackground gibt hellgrauen Randpixeln eine Teildeckkraft', () => {
