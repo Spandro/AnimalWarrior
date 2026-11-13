@@ -14,6 +14,11 @@
   --focus: #f6d88a;
   --serif: Georgia, 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  /* Ränder, die das Gerät selbst belegt (Kamera-Insel, Hausbalken, abgerundete Ecken). */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
 }
 
 html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: var(--bg-deep); color: var(--text); font-family: var(--sans); }
@@ -44,7 +49,8 @@ body[data-screen="game"] #menu { display: none; }
 .screen {
   box-sizing: border-box;
   max-width: 1080px; min-height: 100%;
-  margin: 0 auto; padding: 28px 16px 32px;
+  margin: 0 auto;
+  padding: calc(28px + var(--safe-top)) calc(16px + var(--safe-right)) calc(32px + var(--safe-bottom)) calc(16px + var(--safe-left));
   display: flex; flex-direction: column; gap: 20px;
 }
 
@@ -80,6 +86,10 @@ p { margin: 0; }
 .btn-danger { border-color: rgba(180, 85, 60, 0.7); }
 .btn-danger:hover:not(:disabled) { background: var(--danger); border-color: #d77a5f; }
 .btn-small { min-height: 36px; padding: 6px 12px; font-size: 0.9rem; }
+/* Mit dem Finger bedient oder schmale Anzeige: auch kleine Knöpfe bleiben daumentauglich. */
+@media (pointer: coarse), (max-width: 700px) {
+  .btn-small { min-height: 44px; padding: 8px 14px; }
+}
 
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
@@ -222,7 +232,8 @@ p { margin: 0; }
 
 .dialog-backdrop {
   position: fixed; inset: 0; z-index: 20;
-  display: flex; align-items: center; justify-content: center; padding: 16px;
+  display: flex; align-items: center; justify-content: center;
+  padding: calc(16px + var(--safe-top)) calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left));
   background: rgba(8, 10, 8, 0.65);
 }
 .dialog {
@@ -237,7 +248,8 @@ p { margin: 0; }
 
 #notice {
   position: fixed; top: 0; left: 0; right: 0; z-index: 30;
-  padding: 10px 16px; text-align: center; font-weight: 600;
+  padding: calc(10px + var(--safe-top)) calc(16px + var(--safe-right)) 10px calc(16px + var(--safe-left));
+  text-align: center; font-weight: 600;
   background: #e6d3a0; color: #2b1f0b; border-bottom: 2px solid #b08a3c;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
@@ -249,10 +261,13 @@ p { margin: 0; }
 .hud {
   position: absolute; inset: 0;
   font-family: var(--sans); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-  --hud-top: calc(var(--notice-h, 0px) + 10px);
+  --hud-top: calc(var(--notice-h, 0px) + var(--safe-top) + 10px);
+  --hud-side: 12px;
+  --hud-bottom: calc(var(--safe-bottom) + 12px);
 }
 .hud-top {
-  position: absolute; top: var(--hud-top); left: 12px; right: 12px;
+  position: absolute; top: var(--hud-top);
+  left: calc(var(--hud-side) + var(--safe-left)); right: calc(var(--hud-side) + var(--safe-right));
   display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: 10px;
 }
 .hud-vitals { display: flex; flex-direction: column; gap: 5px; width: 100%; max-width: 300px; }
@@ -319,10 +334,27 @@ p { margin: 0; }
 }
 .hud-taunt[hidden] { display: none; }
 @keyframes hud-taunt-in { from { opacity: 0; transform: translateY(-4px) scale(0.96); } to { opacity: 1; transform: none; } }
-.hud-abilities {
-  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
-  margin: 0; padding: 0; list-style: none; display: flex; gap: 8px;
+/* Untere Leiste: Fähigkeiten in der Mitte, Pause-Knopf rechts in Daumenreichweite. */
+.hud-bottom {
+  position: absolute; bottom: var(--hud-bottom);
+  left: calc(var(--hud-side) + var(--safe-left)); right: calc(var(--hud-side) + var(--safe-right));
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 8px;
 }
+.hud-abilities {
+  grid-column: 2; justify-self: center;
+  margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+}
+.hud-pause {
+  grid-column: 3; justify-self: end; pointer-events: auto;
+  appearance: none; width: 48px; height: 48px; padding: 0; box-sizing: border-box; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 12px; border: 2px solid rgba(240, 228, 198, 0.55);
+  background: rgba(15, 18, 14, 0.62); color: var(--text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.hud-pause:hover { background: rgba(39, 51, 31, 0.85); border-color: var(--accent); }
+.hud-pause:active { transform: translateY(1px); }
+.hud-pause-icon { font-size: 1.1rem; letter-spacing: 1px; line-height: 1; }
 .hud-ability {
   position: relative; width: 40px; height: 40px; border-radius: 9px; box-sizing: border-box;
   display: flex; align-items: center; justify-content: center;
@@ -347,6 +379,23 @@ p { margin: 0; }
   .hud-taunt { font-size: 0.85rem; padding: 5px 10px; }
   .hud-ability { width: 34px; height: 34px; }
 }
+/* Hochkant (Handy): alles Wichtige oben in einem Block, Zähler klein daneben, Bedienung unten. */
+@media (orientation: portrait) {
+  .hud { --hud-side: 8px; }
+  .hud-top { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; }
+  .hud-vitals { grid-column: 1; grid-row: 1; max-width: none; }
+  .hud-timer { grid-column: 1; grid-row: 2; justify-self: start; font-size: 1.3rem; padding: 1px 10px; }
+  .hud-counters {
+    grid-column: 2; grid-row: 1 / span 2; align-self: start;
+    flex-direction: column; align-items: flex-end; gap: 4px; font-size: 0.85rem;
+  }
+  .hud-bosses { top: calc(var(--hud-top) + 96px); gap: 4px; }
+  .hud-boss-name { font-size: 0.95rem; }
+  .hud-taunt { font-size: 0.85rem; padding: 5px 10px; }
+  .hud-ability { width: 44px; height: 44px; }
+  .hud-ability-initials { font-size: 1rem; }
+  .hud-pause { width: 56px; height: 56px; }
+}
 /* Steuerkreuz für Finger und Maus: Ring am Ansatzpunkt, Knopf in Zugrichtung. */
 .stick-ring, .stick-knob {
   position: absolute; left: 0; top: 0; border-radius: 50%; pointer-events: none; will-change: transform;
@@ -356,7 +405,7 @@ p { margin: 0; }
 .stick-ring[hidden], .stick-knob[hidden] { display: none; }
 #ui > .stick-ring, #ui > .stick-knob { pointer-events: none; }
 .fps-readout {
-  position: absolute; left: 12px; bottom: 60px; pointer-events: none;
+  position: absolute; left: calc(12px + var(--safe-left)); bottom: calc(var(--safe-bottom) + 72px); pointer-events: none;
   font: 600 14px var(--sans); color: #fff; text-shadow: 0 1px 2px #000;
 }
 
@@ -365,7 +414,8 @@ p { margin: 0; }
 .overlay {
   position: absolute; inset: 0; z-index: 5; box-sizing: border-box;
   display: flex; align-items: center; justify-content: center;
-  padding: calc(var(--notice-h, 0px) + 16px) 16px 16px;
+  padding: calc(var(--notice-h, 0px) + var(--safe-top) + 16px) calc(16px + var(--safe-right))
+           calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left));
   background: rgba(8, 10, 8, 0.55); overflow-y: auto;
 }
 .overlay[hidden] { display: none; }
@@ -420,7 +470,14 @@ p { margin: 0; }
   .levelup-name { font-size: 1.1rem; padding-right: 0; }
   .levelup-text { font-size: 0.9rem; }
   .levelup-box { padding: 14px 10px; }
-  .overlay { padding-left: 8px; padding-right: 8px; }
+  .overlay { padding-left: calc(8px + var(--safe-left)); padding-right: calc(8px + var(--safe-right)); }
+}
+/* Hochkant füllen Level-up-Karten und Pausenfenster die Breite. */
+@media (orientation: portrait) {
+  .levelup-cards { grid-template-columns: minmax(0, 1fr); }
+  .levelup-box, .pause-box { max-width: none; }
+  .pause-box { margin: auto; max-width: 420px; }
+  .dialog { max-width: 420px; }
 }
 
 /* ---------------------------------------------------------------- Ergebnis */
@@ -474,6 +531,10 @@ fieldset.setting { box-sizing: border-box; }
 .setting-label { font-family: var(--serif); font-size: 1.15rem; padding: 0; }
 .setting-value { color: var(--accent-hi); font-weight: 700; font-variant-numeric: tabular-nums; }
 .slider { width: 100%; height: 32px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+@media (pointer: coarse), (max-width: 700px) {
+  .slider { height: 44px; }
+  .option { min-height: 44px; box-sizing: border-box; align-items: center; }
+}
 .option {
   display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer;
   border: 1px solid var(--line-soft); background: rgba(0, 0, 0, 0.15);
@@ -490,11 +551,12 @@ fieldset.setting { box-sizing: border-box; }
 /* Einblendung: im Spiel unten (oben liegen die Leisten, in der Mitte der Held), sonst oben unter der Meldungsleiste. */
 .toasts {
   position: fixed; left: 50%; transform: translateX(-50%); z-index: 15;
-  top: calc(var(--notice-h, 0px) + 12px);
+  top: calc(var(--notice-h, 0px) + var(--safe-top) + 12px);
   width: min(420px, calc(100% - 24px)); pointer-events: none;
   display: flex; flex-direction: column; align-items: stretch;
 }
-body[data-screen="game"] .toasts { top: auto; bottom: 64px; }
+/* Im Spiel über der unteren Leiste, damit sie Fähigkeiten und Pause nicht verdeckt. */
+body[data-screen="game"] .toasts { top: auto; bottom: calc(var(--safe-bottom) + 76px); }
 .toast {
   box-sizing: border-box; padding: 10px 14px; border-radius: 12px;
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: baseline;

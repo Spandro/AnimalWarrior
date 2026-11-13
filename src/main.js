@@ -4,6 +4,7 @@
 // Nur mit ?debug=1 (window.__debug, window.__app): ?speed=N (timeScale), ?stress=1 (300 Ratten,
 // Bildrate oben links), ?autopick=1 (Level-up-Karten automatisch), Tasten K (alle Gegner besiegen), L (ein Level).
 import { isWebGLAvailable, createRenderer } from './render/renderer.js';
+import { initialQuality } from './render/quality.js';
 import { loadSpriteSheets } from './render/sprites.js';
 import { startGame } from './game.js';
 import { createStore, addHero, deleteHero, settleRun, STORAGE_KEY } from './save/store.js';
@@ -55,23 +56,35 @@ if (!isWebGLAvailable()) {
   startApp();
 }
 
+/** Wird das Gerät hauptsächlich mit dem Finger bedient? Ohne matchMedia: nein. */
+function isTouchPrimary() {
+  try { return !!window.matchMedia?.('(pointer: coarse)').matches; } catch { return false; }
+}
+
 /**
- * Klangeffekte, die beim ersten Klick oder Tastendruck irgendwo in der Seite freigeschaltet werden
- * (Browser erlauben Ton erst nach einer Nutzeraktion); jede weitere Aktion weckt einen eingeschlafenen Kontext.
+ * Klangeffekte, die bei der ersten Berührung, dem ersten Klick oder Tastendruck irgendwo in der Seite
+ * freigeschaltet werden (Browser erlauben Ton erst nach einer Nutzeraktion); jede weitere Aktion weckt
+ * einen eingeschlafenen Kontext. Auf dem Handy kommt je nach Browser `pointerup`, `touchend` oder erst
+ * `click` an, deshalb hören wir auf alle.
  * @param {number} volume 0…100
  */
 function createUnlockedSfx(volume) {
   const sfx = createSfx();
   sfx.setVolume(volume);
   const unlock = () => sfx.resume();
-  window.addEventListener('pointerdown', unlock, true);
-  window.addEventListener('keydown', unlock, true);
+  for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) {
+    window.addEventListener(type, unlock, true);
+  }
   return sfx;
 }
 
 function startApp() {
   const store = createStore(safeStorage);
   const initial = store.load();
+  // Allererster Start ohne Spielstand: Fingergeräte beginnen sparsam. Danach gilt immer die Einstellung.
+  if (initial.status === 'empty') {
+    initial.data.settings.quality = initialQuality(isTouchPrimary());
+  }
   // ?quality=low gilt, bis die Einstellungen etwas anderes sagen (Qualität dort wählen oder Spielstand importieren).
   const quality = params.get('quality') === 'low' ? 'low' : initial.data.settings.quality;
 

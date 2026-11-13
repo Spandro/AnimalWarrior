@@ -103,3 +103,13 @@ export const DYING_TILT = 1.35;
 
 /** Unter diesem Lebensanteil pulsiert der rote Bildrand. */
 export const LOW_HEALTH_FRACTION = 0.25;
+
+/**
+ * Kameralage und wie weit die Kamera hochkant zurückrückt.
+ * - `fovDeg`: senkrechter Blickwinkel, `tiltDeg`: Höhenwinkel über dem Boden
+ * - `landscapeDistance`: Abstand zum Zielpunkt im Querformat
+ * - `minHalfWidth`: so viel Welt soll zu beiden Seiten des Helden sichtbar sein (zusammen 9 Einheiten);
+ *   hochkant rückt die Kamera dafür zurück
+ * - `maxDistance`: weiter als das nie, sonst wird der Held zu klein
+ */
+export const CAMERA_FIT = { fovDeg: 45, tiltDeg: 55, landscapeDistance: 15, minHalfWidth: 4.5, maxDistance: 40 };

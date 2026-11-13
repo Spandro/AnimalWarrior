@@ -1,11 +1,10 @@
 import * as THREE from '../../vendor/three.module.min.js';
-import { SHAKE } from '../data/sprites.js';
+import { SHAKE, CAMERA_FIT } from '../data/sprites.js';
+import { cameraDistanceFor } from './cameraFit.js';
 
 /** Kameraneigung über dem Boden (Höhenwinkel) in Grad. */
-const CAMERA_TILT_DEG = 55;
-/** Abstand der Kamera zum Zielpunkt in Weltmetern. */
-const CAMERA_DISTANCE = 15;
-const CAMERA_FOV = 45;
+const CAMERA_TILT_DEG = CAMERA_FIT.tiltDeg;
+const CAMERA_FOV = CAMERA_FIT.fovDeg;
 /** Nebel- und Hintergrundfarbe, abgestimmt auf die mittlere Bodenfarbe. */
 const FOG_COLOR = 0x7b8566;
 const FOG_NEAR = 34;
@@ -49,7 +48,10 @@ export function createRenderer(canvas, { quality = 'high' } = {}) {
 
   const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.5, 150);
   const tilt = THREE.MathUtils.degToRad(CAMERA_TILT_DEG);
-  const cameraOffset = new THREE.Vector3(0, Math.sin(tilt) * CAMERA_DISTANCE, Math.cos(tilt) * CAMERA_DISTANCE);
+  // Abstand zum Zielpunkt; `resize` setzt ihn je nach Seitenverhältnis neu (hochkant weiter weg).
+  const cameraOffset = new THREE.Vector3();
+  const setDistance = (d) => cameraOffset.set(0, Math.sin(tilt) * d, Math.cos(tilt) * d);
+  setDistance(CAMERA_FIT.landscapeDistance);
   const target = new THREE.Vector3();
 
   // Umgebungslicht als Himmel/Boden-Verlauf: kühles Himmelslicht von oben, grünlich-erdiges Streulicht von unten.
@@ -97,6 +99,9 @@ export function createRenderer(canvas, { quality = 'high' } = {}) {
     const h = Math.max(1, canvas.clientHeight || window.innerHeight);
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
+    // Schmales Bild (Handy hochkant): Kamera zurück, damit seitlich genug Welt sichtbar bleibt.
+    setDistance(cameraDistanceFor(camera.aspect, CAMERA_FOV, CAMERA_TILT_DEG));
+    setTarget(target.x, target.z);
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
 

@@ -65,10 +65,12 @@ function textCell(node) {
 
 /**
  * @param {HTMLElement} uiLayer
+ * @param {{ onPause?: () => void }} [options] `onPause` zeigt den Pause-Knopf unten neben den Fähigkeiten;
+ *   er tut dasselbe wie Esc.
  * @returns {{ handle(events: object[], world: import('../core/world.js').World): void,
  *   update(run: import('../modes/survivor.js').Run): void, dispose(): void }}
  */
-export function createHud(uiLayer) {
+export function createHud(uiLayer, { onPause } = {}) {
   const hp = bar('hud-hp', 'Leben');
   const xp = bar('hud-xp', 'Erfahrung');
   const levelNode = el('span', { class: 'hud-level' });
@@ -95,6 +97,14 @@ export function createHud(uiLayer) {
     slots.push({ li, initials, level, id: null, lv: -1 });
   }
 
+  // Pause mit dem Daumen: eigener Knopf unten rechts, weil es am Handy kein Esc gibt.
+  const pauseButton = onPause
+    ? el('button', {
+        class: 'hud-pause', type: 'button', 'data-ui-control': true,
+        'aria-label': 'Pause', title: 'Pause (Esc)', onclick: () => onPause(),
+      }, el('span', { class: 'hud-pause-icon', 'aria-hidden': 'true', text: '❚❚' }))
+    : null;
+
   const root = el('div', { class: 'hud', 'aria-live': 'off' },
     el('div', { class: 'hud-top' },
       el('div', { class: 'hud-vitals' },
@@ -105,7 +115,7 @@ export function createHud(uiLayer) {
         el('span', { class: 'hud-gold', title: 'Gold' }, el('span', { class: 'hud-icon', 'aria-hidden': 'true', text: '●' }), goldNode),
         el('span', { class: 'hud-kills', title: 'Besiegte Gegner' }, el('span', { class: 'hud-icon', 'aria-hidden': 'true', text: '✕' }), killsNode))),
     el('div', { class: 'hud-bosses' }, boss, shadowBox, taunt),
-    abilityRow);
+    el('div', { class: 'hud-bottom' }, abilityRow, pauseButton));
   uiLayer.append(root);
 
   const setLevel = textCell(levelNode);

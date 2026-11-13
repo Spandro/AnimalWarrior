@@ -30,7 +30,7 @@ export function createLevelUpDialog(uiLayer, { onChoose }) {
   const root = el('div', { class: 'overlay levelup', 'data-ui-control': true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'levelup-title', hidden: true },
     el('div', { class: 'levelup-box', tabindex: '-1' },
       title,
-      el('p', { class: 'levelup-hint', text: 'Wähle eine Verbesserung – Klick oder Taste 1–3.' }),
+      el('p', { class: 'levelup-hint', text: 'Wähle eine Verbesserung – tippen, klicken oder Taste 1–3.' }),
       list));
   uiLayer.append(root);
 

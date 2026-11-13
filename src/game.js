@@ -73,7 +73,7 @@ export function startGame({
   const chestView = createChestView(view.scene, world.seed, sprites);
   const heroView = createHeroView(view.scene, animalId, classId, { sprites, camera: view.camera });
   const effects = createEffects(view.scene, uiLayer, { quality, camera: view.camera });
-  const hud = createHud(uiLayer);
+  const hud = createHud(uiLayer, { onPause: () => togglePause() });
   const chestHint = createChestHint(uiLayer);
   const deathOverlay = createDeathOverlay(uiLayer, { canvas });
   /** Weniger Bewegung gewünscht: kein Wackeln, Sterbephase sofort beendet, kürzere Abblende. */
@@ -83,28 +83,34 @@ export function startGame({
   const levelUp = createLevelUpDialog(uiLayer, { onChoose: (i) => chooseCard(run, i) });
   const pauseMenu = createPauseMenu(uiLayer, { onResume: resume, onAbandon: abandon });
 
+  // Fenstergröße oder Drehung geändert: Kamera und Sichtbereich neu setzen. Der Steuerkreis gehört zum
+  // alten Bild und würde den Helden sonst weiterlaufen lassen, also wird er zurückgesetzt.
   function onResize() {
     const { halfW, halfH } = view.resize();
     setView(run, halfW, halfH);
+    pointer.reset();
   }
   window.addEventListener('resize', onResize);
-  onResize();
+  window.addEventListener('orientationchange', onResize);
 
   // ------------------------------------------------ Eingabe, Pause
 
   const keys = createKeyState();
   const detachKeyboard = attachKeyboard(window, keys, {
-    onPause() {
-      if (run.state === 'playing') pause();
-      else if (run.state === 'paused' && !pauseMenu.busy) resume();
-    },
+    onPause: () => togglePause(),
     onCardKey(index) { if (levelUp.open) levelUp.choose(index); },
   });
 
   const pointer = createPointerState();
   const stick = createStick(uiLayer);
   const detachPointer = attachPointer(canvas, pointer, { isBlocked: () => run.state !== 'playing' });
+  onResize();
 
+  /** Esc und der Pause-Knopf in der Anzeige: hält an oder setzt fort. */
+  function togglePause() {
+    if (run.state === 'playing') pause();
+    else if (run.state === 'paused' && !pauseMenu.busy) resume();
+  }
   function pause() {
     keys.clear();
     pointer.reset();
@@ -356,6 +362,7 @@ export function startGame({
       clearTimeout(endTimer);
       for (const type of SKIP_EVENTS) window.removeEventListener(type, onSkipInput, true);
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
       window.removeEventListener('blur', onFocusLost);
       document.removeEventListener('visibilitychange', onVisibility);
       if (debug) window.removeEventListener('keydown', onDebugKey);
@@ -402,7 +409,7 @@ function createPauseMenu(uiLayer, { onResume, onAbandon }) {
   const root = el('div', { class: 'overlay pause', 'data-ui-control': true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'pause-title', hidden: true },
     el('div', { class: 'pause-box' },
       el('h2', { id: 'pause-title', text: 'Pause' }),
-      el('p', { class: 'muted', text: 'Esc oder „Weiter“ setzt fort.' }),
+      el('p', { class: 'muted', text: '„Weiter“ oder Esc setzt fort.' }),
       resumeBtn,
       abandonBtn));
   uiLayer.append(root);
