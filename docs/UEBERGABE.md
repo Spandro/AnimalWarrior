@@ -2,7 +2,7 @@
 
 Diese Datei ist für die nächste Sitzung gedacht, falls die laufende abbricht. Sie wird an jedem Pausenpunkt aktualisiert.
 
-Zuletzt aktualisiert: 2026-11-13, nach dem Bau von Aufgabe 3 von Paket 1 (302 Tests grün laut Bericht).
+Zuletzt aktualisiert: 2026-11-13, Pausenpunkt nach Aufgabe 4 von Paket 1. Nächster Schritt: Aufgabe 5.
 
 ## 1. Was fertig ist
 
@@ -26,14 +26,14 @@ Zuletzt aktualisiert: 2026-11-13, nach dem Bau von Aufgabe 3 von Paket 1 (302 Te
 |---|---|---|
 | 1 | Steuerung mit Finger und Maus (`src/input/pointer.js`, `src/ui/stick.js`) | fertig, geprüft, Commit `90079bd` |
 | 2 | Auto-Zielen für Krieger und Dieb (`aim`-Feld in `src/data/abilities.js`) | fertig, geprüft, Commit `1b478d3` |
-| 3 | Rotes Aufblitzen, Sterbephase (`dying`), Sieg-Moment | gebaut, Commit `d373e8a`, Prüfung steht aus |
-| 4 | Kisten auf der Karte, Pfeil, Erfolg „Schatzsucher" | offen |
+| 3 | Rotes Aufblitzen, Sterbephase (`dying`), Sieg-Moment | fertig, geprüft, Commits `d373e8a` und `ddf560c` |
+| 4 | Kisten auf der Karte, Pfeil, Erfolg „Schatzsucher" (`src/core/chests.js`) | fertig, geprüft, Commit `e678d53` |
 | 5 | Handy-Oberfläche: Anzeige hochkant, Pause-Knopf, Kamera, große Knöpfe | offen |
 | 6 | Gemalte Umgebung (`assets/umgebung/`), gemalte Kisten und Aufsammelbares, Menü-Hintergründe | offen |
 | 7 | Abschlussprüfung, README | offen |
 | danach | Gesamtprüfung über Paket 1, eine Korrekturrunde | offen |
 
-Teststand nach Aufgabe 2: 286 Tests grün (`tests.html`).
+Teststand nach Aufgabe 4: 326 Tests grün (`tests.html`).
 
 ## 2. Was noch fehlt (vom Auftraggeber gewünscht, noch nicht entworfen)
 
@@ -93,9 +93,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/serve.ps1 -Port 8080
 
 ## 7. Fortsetzen von Paket 1
 
-1. `git log --oneline -8` ansehen: Gibt es einen Commit „feat: hit feedback, dying phase and victory moment", ist Aufgabe 3 gebaut; sonst Aufgabe 3 neu beginnen (Auftrag im Plan, Abschnitt „Task 3").
-2. Ist Aufgabe 3 gebaut, aber im Protokoll nicht als „complete" vermerkt, fehlt ihre Prüfung.
-3. Danach Aufgaben 4 bis 7 in Reihenfolge, dann eine Gesamtprüfung ab Commit `1e7ebd1`.
+1. Aufgaben 1 bis 4 sind gebaut und geprüft. Weiter mit Aufgabe 5 (Auftrag im Plan, Abschnitt „Task 5").
+2. Steht im `git log` ein Commit zu einer späteren Aufgabe, der hier nicht als geprüft vermerkt ist, fehlt dessen Prüfung.
+3. Danach Aufgaben 6 und 7, dann eine Gesamtprüfung ab Commit `1e7ebd1`.
 4. Entscheidungen, die im Plan nicht stehen:
    - Kisten werden im Zustand `dying` nicht geöffnet.
    - Passt die Kameraregel für Querformat nicht zur echten Brennweite, bleibt quer der Abstand 15; die Mindestbreite gilt dann nur hochkant.
