@@ -51,9 +51,14 @@ export const SFX = {
     { kind: 'tone', wave: 'sawtooth', freq: [170, 70], dur: 0.2, gain: 0.35 },
     { kind: 'noise', filter: 'lowpass', freq: [1500, 300], dur: 0.15, gain: 0.4 },
   ],
-  death: [
+  // Sterbephase: das lange Absinken beginnt mit dem tödlichen Treffer, `death` (nach der Sterbephase) setzt einen kurzen dumpfen Schlusston.
+  dying: [
     { kind: 'tone', wave: 'sawtooth', freq: [420, 50], dur: 1.3, gain: 0.35, attack: 0.02 },
     { kind: 'tone', wave: 'square', freq: [210, 40], dur: 1.3, gain: 0.15, attack: 0.02 },
+  ],
+  death: [
+    { kind: 'tone', wave: 'sine', freq: [90, 45], dur: 0.5, gain: 0.3, attack: 0.01 },
+    { kind: 'noise', filter: 'lowpass', freq: [300, 80], dur: 0.35, gain: 0.25 },
   ],
   victory: [
     ...arpeggio('triangle', [523, 659, 784, 1047, 784, 1047, 1319], 0.14, 0.4, 0.3),

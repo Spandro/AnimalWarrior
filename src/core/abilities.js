@@ -72,10 +72,11 @@ export function castAbility(world, abilityId, level, aim) {
  * Zählt Abklingzeiten herunter, löst fällige automatische Fähigkeiten aus und bewegt Geschosse, Zonen, Umläufe, Beschwörungen.
  * @param {World} world
  * @param {number} dt
+ * @param {boolean} [fire] false: keine Abklingzeiten, keine neuen Würfe (der Held ist träge), nur Bewegung der vorhandenen Geschosse, Zonen usw.
  */
-export function stepAbilities(world, dt) {
+export function stepAbilities(world, dt, fire = true) {
   const ctx = createContext(world);
-  for (const a of world.hero.abilities) {
+  for (const a of fire ? world.hero.abilities : []) {
     const def = ABILITIES[a.id];
     if (def.trigger !== 'auto') continue;
     if (def.shape === 'orbit') {

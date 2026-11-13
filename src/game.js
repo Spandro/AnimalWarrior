@@ -5,7 +5,10 @@ import { createTerrainView } from './render/terrain.js';
 import { createEnemyView } from './render/enemies.js';
 import { createHeroView } from './render/hero.js';
 import { createEffects } from './render/effects.js';
-import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary, getFacts, abandonRun } from './modes/survivor.js';
+import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary, getFacts, abandonRun, skipDying } from './modes/survivor.js';
+import { DYING } from './data/waves.js';
+import { LOW_HEALTH_FRACTION } from './data/sprites.js';
+import { DEATH_LINES, VICTORY_LINES } from './data/texts.js';
 import { evaluateAchievements, liveStats } from './core/achievements.js';
 import { spawnEnemy, damageEnemy } from './core/world.js';
 import { xpToNext } from './core/progression.js';
@@ -14,6 +17,7 @@ import { createKeyState, attachKeyboard } from './input/keyboard.js';
 import { createPointerState, attachPointer, combineMove } from './input/pointer.js';
 import { createStick } from './ui/stick.js';
 import { createHud } from './ui/hud.js';
+import { deathSequence, createDeathOverlay, DEATH_TIMES } from './ui/deathSequence.js';
 import { createLevelUpDialog } from './ui/levelup.js';
 import { el } from './ui/dom.js';
 import { confirmDialog } from './ui/menus.js';
@@ -22,8 +26,11 @@ const STEP = 1 / 60;
 const MAX_STEPS_PER_FRAME = 5;
 /** Längster Abstand zweier Bilder, der noch nachgeholt wird (s). */
 const MAX_FRAME_DT = 0.25;
-/** So lange läuft das Bild nach Sieg oder Tod weiter, bevor das Ergebnis kommt (reale s). */
-const END_DELAY = 1.6;
+/** Siegesmoment vor dem Ergebnis und ab wann er sich abkürzen lässt (reale s). */
+const VICTORY_MOMENT = 1.5;
+const VICTORY_SKIP_AFTER = 0.5;
+/** So lange schlucken wir Eingaben nach dem Ergebnisbildschirm, damit das Abkürzen nichts darunter auslöst (ms). */
+const INPUT_GUARD_MS = 300;
 const STRESS_ENEMIES = 300;
 const FPS_WINDOW = 5;
 
@@ -64,6 +71,11 @@ export function startGame({
   const heroView = createHeroView(view.scene, animalId, classId, { sprites, camera: view.camera });
   const effects = createEffects(view.scene, uiLayer, { quality, camera: view.camera });
   const hud = createHud(uiLayer);
+  const deathOverlay = createDeathOverlay(uiLayer, { canvas });
+  /** Weniger Bewegung gewünscht: kein Wackeln, Sterbephase sofort beendet, kürzere Abblende. */
+  const reducedMotion = (() => {
+    try { return !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+  })();
   const levelUp = createLevelUpDialog(uiLayer, { onChoose: (i) => chooseCard(run, i) });
   const pauseMenu = createPauseMenu(uiLayer, { onResume: resume, onAbandon: abandon });
 
@@ -158,22 +170,77 @@ export function startGame({
 
   // ------------------------------------------------ Schleife
 
+  /** Echtzeit-Zeitstempel (ms, wie requestAnimationFrame) des Ereignisses `dying` bzw. `victory`; null davor. */
+  let dyingAt = null, victoryAt = null, frameNow = performance.now();
+  let deathLine = '', victoryLine = '', skipAllowed = false;
+  const pickLine = (lines) => lines[Math.floor(Math.random() * lines.length)];
+
   function handleEvents() {
     heroView.handle(run.events, world);
     hud.handle(run.events, world);
     effects.handle(run.events, world);
     sfx?.handle(run.events);
+    let startedDying = false;
+    for (const e of run.events) {
+      if (e.type === 'heroHit') {
+        heroView.flash();
+        if (!reducedMotion) view.shake();
+      } else if (e.type === 'dying') {
+        startedDying = true;
+        dyingAt = frameNow;
+        deathLine = pickLine(DEATH_LINES);
+        keys.clear();
+        pointer.reset();
+      } else if (e.type === 'victory') {
+        victoryAt = frameNow;
+        victoryLine = pickLine(VICTORY_LINES);
+        deathOverlay.showVictory(victoryLine);
+      }
+    }
+    if (startedDying && reducedMotion) { skipDying(run); handleEvents(); }
   }
 
-  let endTimer = 0, ended = false;
-  /** Meldet das Ende einmal, nach `delay` ms. */
+  // ------------------------------------------------ Ende, Abkürzen
+
+  let endTimer = 0, ended = false, presented = false;
+  /** Meldet das Ende einmal, nach `delay` ms; Filter und Deckelement verschwinden vor dem Ergebnisbildschirm. */
   function finish(delay) {
     if (ended) return;
     ended = true;
+    presented = dyingAt !== null || victoryAt !== null;
     keys.clear();
     pointer.reset();
-    endTimer = setTimeout(() => onEnd?.(getSummary(run), { facts: getFacts(run), earlyIds: [...early] }), delay);
+    endTimer = setTimeout(() => {
+      deathOverlay.hide();
+      if (presented) guardInput(INPUT_GUARD_MS);
+      onEnd?.(getSummary(run), { facts: getFacts(run), earlyIds: [...early] });
+    }, delay);
   }
+
+  /** Springt in der Darstellung vor: zum Text, zum Ende bzw. beim Sieg ans Ende des Moments. */
+  function skipPresentation(now) {
+    const times = reducedMotion ? DEATH_TIMES.reduced : DEATH_TIMES.normal;
+    if (run.state === 'dying') {
+      skipDying(run);
+      handleEvents();
+      dyingAt = Math.min(dyingAt, now - times.text * 1000);
+    } else if (run.state === 'lost' && dyingAt !== null) {
+      dyingAt = Math.min(dyingAt, now - times.done * 1000);
+    } else if (run.state === 'won' && victoryAt !== null) {
+      victoryAt = Math.min(victoryAt, now - VICTORY_MOMENT * 1000);
+    }
+  }
+
+  const presenting = () => !ended && ((dyingAt !== null && (run.state === 'dying' || run.state === 'lost')) || (victoryAt !== null && run.state === 'won'));
+  function onSkipInput(e) {
+    if (!presenting()) return;
+    // Ein gehaltenes Laufkommando (Tastenwiederholung) soll nicht gleich abkürzen.
+    if (e.type === 'keydown' && e.repeat) { e.stopImmediatePropagation(); return; }
+    if (skipAllowed && e.type !== 'click') skipPresentation(performance.now());
+    e.stopImmediatePropagation();
+  }
+  const SKIP_EVENTS = ['pointerdown', 'click', 'keydown'];
+  for (const type of SKIP_EVENTS) window.addEventListener(type, onSkipInput, true);
 
   /**
    * Erfolge mitten im Durchgang: einmal je Spielsekunde mit den laufenden Zahlen; neu erfüllte Ids werden sofort
@@ -182,7 +249,7 @@ export function startGame({
   const early = new Set();
   let achievementSecond = -1;
   function checkAchievements() {
-    if (!achievements || ended || run.state === 'won' || run.state === 'lost') return;
+    if (!achievements || ended || run.state === 'won' || run.state === 'lost' || run.state === 'dying') return;
     const second = Math.floor(world.time);
     if (second === achievementSecond) return;
     achievementSecond = second;
@@ -195,10 +262,30 @@ export function startGame({
     }
   }
 
-  let acc = 0, last = NaN, rafId = 0;
+  /** Todes- und Siegesdarstellung eines Bildes aus der verstrichenen Echtzeit; meldet das Ende, wenn sie fertig ist. */
+  function present(now) {
+    if (ended) return;
+    if (dyingAt !== null && (run.state === 'dying' || run.state === 'lost')) {
+      const v = deathSequence((now - dyingAt) / 1000, reducedMotion);
+      skipAllowed = v.canSkip;
+      deathOverlay.apply(v, deathLine);
+      heroView.setDying(v.heroTilt, v.heroOpacity);
+      if (run.state === 'lost' && v.done) finish(0);
+    } else if (victoryAt !== null && run.state === 'won') {
+      const t = (now - victoryAt) / 1000;
+      skipAllowed = t >= VICTORY_SKIP_AFTER;
+      if (t >= VICTORY_MOMENT) finish(0);
+    } else if (run.state === 'lost') {
+      finish(0); // Aufgeben: ohne Darstellung wie bisher sofort
+    }
+  }
+
+  let acc = 0, last = NaN, rafId = 0, lastLow = false;
   function frame(now) {
     rafId = requestAnimationFrame(frame);
-    const dt = Number.isNaN(last) ? 0 : Math.min(MAX_FRAME_DT, (now - last) / 1000);
+    frameNow = now;
+    const realDt = Number.isNaN(last) ? 0 : Math.max(0, (now - last) / 1000);
+    const dt = Math.min(MAX_FRAME_DT, realDt);
     last = now;
 
     let steps = 0;
@@ -212,6 +299,10 @@ export function startGame({
         steps++;
       }
       if (steps === MAX_STEPS_PER_FRAME) acc = Math.min(acc, STEP);
+    } else if (run.state === 'dying') {
+      // Echtzeit ungedeckelt: nach einem verdeckten Tab ist die Sterbephase sofort vorbei; die Welt läuft nur im Zeitlupentempo.
+      stepRun(run, realDt, { moveX: 0, moveZ: 0 });
+      handleEvents();
     }
     // Pause, Kartenwahl und Ende: Welt steht, kein Nachholen danach.
     if (run.state !== 'playing') acc = 0;
@@ -221,7 +312,11 @@ export function startGame({
       if (autopick) chooseCard(run, 0);
       else { keys.clear(); pointer.reset(); levelUp.show(run.cards, world, world.run.level + 1); }
     }
-    if (run.state === 'won' || run.state === 'lost') finish(END_DELAY * 1000);
+    present(now);
+
+    // Wenig Leben: roter Rand pulsiert (nur beim Wechsel schreiben).
+    const low = run.state === 'playing' && world.hero.hp / world.hero.stats.maxHp < LOW_HEALTH_FRACTION;
+    if (low !== lastLow) { lastLow = low; effects.setLowHealth(low); }
 
     const alpha = run.state === 'playing' ? acc / STEP : 1;
     heroView.sync(world, alpha);
@@ -229,7 +324,7 @@ export function startGame({
     view.setTarget(p.x, p.z);
     terrain.update(p.x, p.z);
     enemyView.sync(world, alpha);
-    effects.update(run.state === 'playing' || ended ? dt : 0, p);
+    effects.update(run.state === 'dying' ? dt * DYING.timeScale : run.state === 'levelup' || run.state === 'paused' ? 0 : dt, p);
     hud.update(run);
     stick.update(pointer);
     view.render();
@@ -237,7 +332,7 @@ export function startGame({
   }
   rafId = requestAnimationFrame(frame);
 
-  if (debug) window.__debug = { run, view, enemyView, heroView, effects, terrain, hud, levelUp, pauseMenu, keys, pointer };
+  if (debug) window.__debug = { run, view, enemyView, heroView, effects, terrain, hud, levelUp, pauseMenu, keys, pointer, deathOverlay };
 
   let stopped = false;
   return {
@@ -253,6 +348,7 @@ export function startGame({
       stopped = true;
       cancelAnimationFrame(rafId);
       clearTimeout(endTimer);
+      for (const type of SKIP_EVENTS) window.removeEventListener(type, onSkipInput, true);
       window.removeEventListener('resize', onResize);
       window.removeEventListener('blur', onFocusLost);
       document.removeEventListener('visibilitychange', onVisibility);
@@ -265,6 +361,7 @@ export function startGame({
       heroView.dispose();
       effects.dispose();
       hud.dispose();
+      deathOverlay.dispose();
       levelUp.dispose();
       pauseMenu.dispose();
       fpsNode?.remove();
@@ -308,4 +405,17 @@ function createPauseMenu(uiLayer, { onResume, onAbandon }) {
     get busy() { return busy; },
     dispose() { root.remove(); },
   };
+}
+
+/**
+ * Schluckt Tippen, Klick und Tasten für `ms` Millisekunden (vor allen anderen Zuhörern), damit das Abkürzen der
+ * Todesdarstellung nichts auslöst, was danach unter dem Zeiger auf dem Ergebnisbildschirm liegt. Läuft unabhängig vom
+ * Durchgang weiter, auch wenn der Aufrufer ihn mit `stop()` beendet.
+ * @param {number} ms
+ */
+function guardInput(ms) {
+  const swallow = (e) => e.stopImmediatePropagation();
+  const types = ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'keydown'];
+  for (const type of types) window.addEventListener(type, swallow, true);
+  setTimeout(() => { for (const type of types) window.removeEventListener(type, swallow, true); }, ms);
 }

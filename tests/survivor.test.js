@@ -1,6 +1,6 @@
 import { test, assertEqual, assertClose, assertTrue } from './runner.js';
-import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary, displayTime, abandonRun } from '../src/modes/survivor.js';
-import { spawnRadius, hpMul, BOSS_HP_MUL, MAX_ENEMIES, DEFAULT_VIEW } from '../src/data/waves.js';
+import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary, displayTime, abandonRun, skipDying } from '../src/modes/survivor.js';
+import { spawnRadius, hpMul, BOSS_HP_MUL, MAX_ENEMIES, DEFAULT_VIEW, DYING } from '../src/data/waves.js';
 import { createWorld, stepWorld, spawnEnemy, damageEnemy } from '../src/core/world.js';
 import { obstaclesNear, obstaclesInCell } from '../src/core/terrain.js';
 import { ENEMIES, ELITE, DROPS, BOSS } from '../src/data/enemies.js';
@@ -164,12 +164,128 @@ function lethalContact(run) {
   spawnEnemy(run.world, 'ratte', run.world.hero.x, run.world.hero.z);
 }
 
-test('survivor: Held mit 1 Leben und Ratte in Berührung → lost, Ereignis death', () => {
+test('survivor: Held mit 1 Leben und Ratte in Berührung → dying, Ereignis dying, kein death', () => {
   const run = newRun();
   lethalContact(run);
   stepRun(run, 0.05, NONE);
+  assertEqual(run.state, 'dying');
+  assertEqual(ofType(run.events, 'dying'), [{ type: 'dying' }]);
+  assertEqual(ofType(run.events, 'death'), []);
+  assertEqual(run.dyingLeft, DYING.duration);
+});
+
+/** Tödlicher Treffer, Zustand dying. */
+function dyingRun(opts = {}) {
+  const run = newRun(opts);
+  lethalContact(run);
+  stepRun(run, 0.05, NONE);
+  assertEqual(run.state, 'dying');
+  return run;
+}
+
+test('survivor: nach 1,0 s Echtzeit in dying → lost mit genau einem death; Welt läuft mit 0,25 weiter, Summary zeigt Todeszeit', () => {
+  const run = dyingRun();
+  const w = run.world, died = w.time;
+  assertEqual(run.deathTime, died);
+  const events = [];
+  for (let i = 0; i < 10; i++) { stepRun(run, 0.1, NONE); events.push(...run.events); }
   assertEqual(run.state, 'lost');
-  assertEqual(ofType(run.events, 'death'), [{ type: 'death' }]);
+  assertEqual(ofType(events, 'death').length, 1);
+  assertClose(w.time - died, 0.25, 1e-9);
+  assertEqual(getSummary(run).time, died);
+  assertEqual(displayTime(run), died);
+  assertEqual(run.facts.time, died);
+});
+
+test('survivor: in dying wächst die Gegnerzahl nicht, hp sinkt nicht, Ratte läuft ein Viertel der Strecke', () => {
+  const run = dyingRun();
+  const w = run.world;
+  const hp = w.hero.hp;
+  w.enemies.length = 0;
+  const rat = spawnEnemy(w, 'ratte', 12, 0);
+  const n = w.enemies.length;
+  const x0 = rat.x;
+  stepRun(run, 0.4, NONE); // 0,1 s Weltzeit
+  assertEqual(run.state, 'dying');
+  assertEqual(w.enemies.length, n);
+  assertEqual(w.hero.hp, hp);
+  assertClose(x0 - rat.x, ENEMIES.ratte.speed * 0.1, 1e-6);
+  // auch bei später Spielzeit (Elite, Boss, Schatten wären fällig) erscheint nichts
+  w.time = 899.9;
+  stepRun(run, 0.4, NONE);
+  assertEqual(w.enemies.length, n);
+});
+
+test('survivor: in dying ist der Held träge: keine Bewegung, keine Fähigkeiten, kein Einsammeln, keine Regeneration', () => {
+  const run = dyingRun();
+  const w = run.world;
+  w.hero.abilities = [{ id: 'schwerthieb', level: 1, cooldownLeft: 0 }];
+  w.hero.stats = { ...w.hero.stats, hpRegen: 5 };
+  w.hero.hp = -2;
+  w.enemies.length = 0;
+  spawnEnemy(w, 'ratte', w.hero.x + 3, w.hero.z).speed = 0;
+  w.pickups.push({ kind: 'gold', x: w.hero.x, z: w.hero.z, value: 5 });
+  const [x, z] = [w.hero.x, w.hero.z];
+  const events = [];
+  for (let i = 0; i < 5; i++) { stepRun(run, 0.1, { moveX: 1, moveZ: 0 }); events.push(...run.events); }
+  assertEqual(ofType(events, 'cast'), []);
+  assertEqual([w.hero.x, w.hero.z], [x, z]);
+  assertEqual(w.hero.hp, -2);
+  assertEqual(w.pickups.length, 1);
+  assertEqual(w.run.gold, 0);
+});
+
+test('survivor: Fähigkeiten feuern außerhalb von dying (Gegenprobe)', () => {
+  const run = immortal(newRun());
+  const w = run.world;
+  w.hero.abilities = [{ id: 'schwerthieb', level: 1, cooldownLeft: 0 }];
+  spawnEnemy(w, 'ratte', w.hero.x + 1, w.hero.z).speed = 0;
+  stepRun(run, 0.1, NONE);
+  assertTrue(ofType(run.events, 'cast').length > 0);
+});
+
+test('survivor: skipDying → sofort lost mit einem death; in playing ohne Wirkung', () => {
+  const live = newRun();
+  skipDying(live);
+  assertEqual(live.state, 'playing');
+  assertEqual(live.events, []);
+  const run = dyingRun();
+  skipDying(run);
+  assertEqual(run.state, 'lost');
+  assertEqual(ofType(run.events, 'death').length, 1);
+  skipDying(run);
+  stepRun(run, 1, NONE);
+  assertEqual(run.state, 'lost');
+  assertEqual(run.events, []);
+});
+
+test('survivor: setPaused(true) in dying ändert nichts', () => {
+  const run = dyingRun();
+  setPaused(run, true);
+  assertEqual(run.state, 'dying');
+});
+
+test('survivor: abandonRun in playing → lost ohne dying; in dying → lost mit insgesamt einem death', () => {
+  const a = newRun();
+  abandonRun(a);
+  assertEqual(a.state, 'lost');
+  assertEqual(ofType(a.events, 'dying'), []);
+  const b = dyingRun();
+  const events = [...b.events];
+  abandonRun(b);
+  events.push(...b.events);
+  assertEqual(b.state, 'lost');
+  assertEqual(ofType(events, 'death').length, 1);
+  assertEqual(b.facts.ended, true);
+  assertEqual(b.facts.time, b.deathTime);
+});
+
+test('survivor: run.facts.ended ist in dying false, in lost true', () => {
+  const run = dyingRun();
+  assertEqual(run.facts.ended, false);
+  play(run, 1, 0.1);
+  assertEqual(run.state, 'lost');
+  assertEqual([run.facts.ended, run.facts.won, run.facts.hpFractionAtEnd], [true, false, 0]);
 });
 
 test('survivor: mit revive einmal Wiederbelebung mit halbem Leben, beim zweiten Mal lost', () => {
@@ -189,8 +305,9 @@ test('survivor: mit revive einmal Wiederbelebung mit halbem Leben, beim zweiten 
   w.hero.invulnerableUntil = 0;
   lethalContact(run);
   stepRun(run, 0.05, NONE);
-  assertEqual(run.state, 'lost');
-  assertEqual(ofType(run.events, 'death').length, 1);
+  assertEqual(run.state, 'dying');
+  assertEqual(ofType(run.events, 'dying').length, 1);
+  assertEqual(ofType(run.events, 'revive'), []);
 });
 
 test('survivor: 25 xp → zwei Level-ups nacheinander, danach playing', () => {
@@ -215,14 +332,17 @@ test('survivor: 25 xp → zwei Level-ups nacheinander, danach playing', () => {
   assertEqual(run.cards, null);
 });
 
-test('survivor: Level-up und tödlicher Treffer im selben Schritt → lost, cards null', () => {
+test('survivor: Level-up und tödlicher Treffer im selben Schritt → dying, cards null, auch nach der Phase', () => {
   const run = newRun();
   run.world.run.xp = 25;
   lethalContact(run);
   stepRun(run, 0.05, NONE);
-  assertEqual(run.state, 'lost');
+  assertEqual(run.state, 'dying');
   assertEqual(run.cards, null);
   assertEqual(ofType(run.events, 'levelup'), []);
+  play(run, 1, 0.1);
+  assertEqual(run.state, 'lost');
+  assertEqual(run.cards, null);
 });
 
 test('survivor: stepRun in paused und levelup lässt world.time unverändert', () => {

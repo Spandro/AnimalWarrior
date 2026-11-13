@@ -1,4 +1,5 @@
 import * as THREE from '../../vendor/three.module.min.js';
+import { SHAKE } from '../data/sprites.js';
 
 /** Kameraneigung über dem Boden (Höhenwinkel) in Grad. */
 const CAMERA_TILT_DEG = 55;
@@ -118,8 +119,35 @@ export function createRenderer(canvas, { quality = 'high' } = {}) {
     return { halfW, halfH };
   }
 
+  // Kamerawackeln: abklingender Ausschlag aus Sinusrauschen der Echtzeit, nur für den Zeichenaufruf auf die Kamera
+  // gelegt und danach wieder abgezogen (setTarget setzt die Position ohnehin jedes Bild neu, es sammelt sich nichts an).
+  let shakeAmount = 0, shakeStart = 0, shakeSeconds = 0;
+
+  /**
+   * Lässt das Bild kurz wackeln.
+   * @param {number} [amount] größter Ausschlag in Welteinheiten
+   * @param {number} [seconds] Dauer
+   */
+  function shake(amount = SHAKE.amount, seconds = SHAKE.seconds) {
+    shakeAmount = amount; shakeSeconds = seconds; shakeStart = performance.now();
+  }
+
   function render() {
+    let ox = 0, oy = 0;
+    if (shakeAmount > 0) {
+      const t = (performance.now() - shakeStart) / 1000;
+      if (t >= shakeSeconds) shakeAmount = 0;
+      else {
+        const k = (1 - t / shakeSeconds) ** 2 * shakeAmount;
+        ox = Math.sin(t * 91.7) * Math.cos(t * 53.1) * k;
+        oy = Math.sin(t * 77.3 + 1.3) * Math.cos(t * 41.9) * k;
+        camera.position.x += ox;
+        camera.position.y += oy;
+      }
+    }
     renderer.render(scene, camera);
+    camera.position.x -= ox;
+    camera.position.y -= oy;
   }
 
   function dispose() {
@@ -136,6 +164,7 @@ export function createRenderer(canvas, { quality = 'high' } = {}) {
     scene,
     camera,
     setTarget,
+    shake,
     setQuality,
     get quality() { return currentQuality; },
     resize,

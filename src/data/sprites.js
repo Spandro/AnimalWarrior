@@ -91,3 +91,15 @@ export const MOTION = {
   lope: { freq: 2.4, bob: 0.12, tilt: 0.1, squash: 0.05, tiltRate: 1 },
   lumber: { freq: 1.1, bob: 0.1, tilt: 0.07, squash: 0.03, tiltRate: 1 },
 };
+
+/** Treffer am Helden: Dauer (ms) und Farbfaktor (RGB, multipliziert das Bild) des roten Aufblitzens. */
+export const HERO_FLASH = { ms: 120, color: [1, 0.22, 0.22] };
+
+/** Kamerawackeln bei einem Treffer: Ausschlag in Welteinheiten und Dauer in Sekunden. */
+export const SHAKE = { amount: 0.08, seconds: 0.15 };
+
+/** Sterbender Held: Neigung beim Umfallen (rad, bei Neigung 1). */
+export const DYING_TILT = 1.35;
+
+/** Unter diesem Lebensanteil pulsiert der rote Bildrand. */
+export const LOW_HEALTH_FRACTION = 0.25;

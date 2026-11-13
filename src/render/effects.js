@@ -278,13 +278,18 @@ function createVignette(uiLayer) {
     boxShadow: 'inset 0 0 110px 28px rgba(200, 16, 16, 0.85)',
   });
   uiLayer.appendChild(el);
-  let level = 0;
+  let level = 0, low = false, pulsing = false;
   return {
     hit(strength) { level = Math.max(level, Math.min(1, strength)); },
+    /** Unter wenig Leben pulsiert der Rand (CSS-Klasse); während eines Treffer-Aufblitzens ruht das Pulsieren. */
+    setLow(on) { low = on; },
     update(dt) {
-      if (level <= 0) return;
-      level = Math.max(0, level - dt * VIGNETTE_DECAY);
-      el.style.opacity = level.toFixed(3);
+      if (level > 0) {
+        level = Math.max(0, level - dt * VIGNETTE_DECAY);
+        el.style.opacity = level.toFixed(3);
+      }
+      const want = low && level <= 0;
+      if (want !== pulsing) { pulsing = want; el.classList.toggle('low-health', want); }
     },
     dispose() { el.remove(); },
   };
@@ -583,5 +588,8 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
     scene.remove(root);
   }
 
-  return { handle, update, setQuality, dispose };
+  /** @param {boolean} on wenig Leben: roter Rand pulsiert */
+  function setLowHealth(on) { vignette.setLow(on); }
+
+  return { handle, update, setQuality, setLowHealth, dispose };
 }

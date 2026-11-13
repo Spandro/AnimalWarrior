@@ -580,14 +580,16 @@ function collectPickups(world) {
  * @param {World} world
  * @param {number} dt
  * @param {{ moveX: number, moveZ: number }} input
+ * @param {{ inert?: boolean }} [opts] `inert`: der Held ist träge (Sterbephase) – er bewegt sich nicht, regeneriert nicht,
+ *   löst nichts aus und sammelt nichts ein; Gegner, Geschosse und Zonen laufen weiter.
  */
-export function stepWorld(world, dt, input) {
+export function stepWorld(world, dt, input, { inert = false } = {}) {
   world.events = [];
   world.time += dt;
   const hero = world.hero;
 
   // Held bewegen
-  const len = Math.hypot(input.moveX, input.moveZ);
+  const len = inert ? 0 : Math.hypot(input.moveX, input.moveZ);
   if (len > 0) {
     const dx = input.moveX / len, dz = input.moveZ / len;
     hero.facing = { x: dx, z: dz };
@@ -603,10 +605,10 @@ export function stepWorld(world, dt, input) {
   if (hero.buffs.length !== before) recomputeHeroStats(world);
 
   // Regeneration
-  if (hero.stats.hpRegen > 0) hero.hp = Math.min(hero.stats.maxHp, hero.hp + hero.stats.hpRegen * dt);
+  if (!inert && hero.stats.hpRegen > 0) hero.hp = Math.min(hero.stats.maxHp, hero.hp + hero.stats.hpRegen * dt);
 
   // Fähigkeiten auslösen, Geschosse, Zonen, Umläufe und Beschwörungen bewegen
-  stepAbilities(world, dt);
+  stepAbilities(world, dt, !inert);
 
   // Gegner bewegen
   for (const e of world.enemies) {
@@ -630,5 +632,5 @@ export function stepWorld(world, dt, input) {
     }
   }
 
-  collectPickups(world);
+  if (!inert) collectPickups(world);
 }

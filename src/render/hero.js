@@ -5,7 +5,7 @@ import {
   billboardOrientation, spriteGeometry, spriteWidth, spriteMaterial, shadowMaterial, composeSprite, spriteMotion,
 } from './sprites.js';
 import { CLASSES } from '../data/classes.js';
-import { HERO_SPRITES, BILLBOARD, AIM_TURN_DURATION } from '../data/sprites.js';
+import { HERO_SPRITES, BILLBOARD, AIM_TURN_DURATION, HERO_FLASH, DYING_TILT } from '../data/sprites.js';
 import { ABILITIES } from '../data/abilities.js';
 
 /** Dauer der Hiebanimation in Weltsekunden. */
@@ -16,6 +16,8 @@ const TURN_RATE = 0.3;
 const SPEED_SMOOTHING = 0.35;
 /** Blinkfrequenz während der Unverwundbarkeit nach der Wiederbelebung. */
 const BLINK_HZ = 10;
+/** Deckkraft des Heldenrings. */
+const RING_OPACITY = 0.55;
 /** Farbe der Schattenklone (multipliziert das Bild) und ihre Deckkraft. */
 const CLONE_COLOR = 0x3c3060;
 const CLONE_OPACITY = 0.7;
@@ -40,7 +42,7 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
   // Heller Bodenring unter dem Helden, damit er im Gewühl auffindbar bleibt.
   const ringGeo = new THREE.RingGeometry(0.62, 0.74, 40).rotateX(-Math.PI / 2);
   // Ohne Tiefentest zuletzt gezeichnet: bleibt sichtbar, auch wenn Gegner auf dem Helden stehen.
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0xfff2c8, transparent: true, opacity: 0.55, depthWrite: false, depthTest: false });
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xfff2c8, transparent: true, opacity: RING_OPACITY, depthWrite: false, depthTest: false });
   const ring = new THREE.Mesh(ringGeo, ringMat);
   ring.position.y = 0.03;
   ring.renderOrder = 10;
@@ -53,6 +55,8 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
   /** Blickseite (-1/1) zum Ziel der letzten zielenden Fähigkeit und bis wann sie gilt (nur Darstellung). */
   let aimSide = 0, aimUntil = -Infinity;
   let speed = 0, lastX = NaN, lastZ = NaN, lastT = NaN, lastRenderT = NaN;
+  /** Treffer-Aufblitzen (Echtzeit in ms) und Sterbezustand (Neigung und Deckkraft, 0…1). */
+  let flashUntil = -Infinity, dyingTilt = 0, opacity = 1, dying = false;
 
   /**
    * Startet die Hiebanimation bei jedem Einsatz der Startfähigkeit.
@@ -94,8 +98,10 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
     body.update({
       position, facing: hero.facing, aimSide: t < aimUntil ? aimSide : 0, speed, time: t, frameDt,
       attackT: since >= 0 && since < ATTACK_DURATION ? since / ATTACK_DURATION : undefined,
-      visible: !(world.time < hero.invulnerableUntil && Math.floor(t * BLINK_HZ) % 2),
+      visible: dying || !(world.time < hero.invulnerableUntil && Math.floor(t * BLINK_HZ) % 2),
+      flash: performance.now() < flashUntil, dyingTilt, opacity,
     });
+    ringMat.opacity = RING_OPACITY * opacity;
     ring.position.set(position.x, 0.03, position.z);
     body.updateClones(world.summons, t);
   }
@@ -111,6 +117,14 @@ export function createHeroView(scene, animalId, classId, { sprites, camera } = {
     handle,
     sync,
     dispose,
+    /** Lässt den Helden kurz rot aufblitzen (Treffer). */
+    flash() { flashUntil = performance.now() + HERO_FLASH.ms; },
+    /**
+     * Sterbezustand: `tilt` 0…1 kippt den Helden um, `opacity` 1…0 blendet ihn aus (mit dem Bodenschatten und dem Ring).
+     * @param {number} tilt
+     * @param {number} alpha
+     */
+    setDying(tilt, alpha) { dying = true; dyingTilt = tilt; opacity = alpha; },
     /** Gezeichnete (überblendete) Heldenposition, Ziel der Kamera. */
     get position() { return position; },
   };
@@ -149,6 +163,7 @@ function createSpriteBody(scene, animalId, classId, sprites, camera) {
   /** Blickseite der Klone, beim ersten Erscheinen vom Helden übernommen. */
   const cloneFace = new WeakMap();
   let face = 1;
+  let lookFlash = false, lookOpacity = 1;
 
   const placeBlob = (x, z, scale, lift) => {
     const k = scale * (1 - 0.35 * Math.min(1, lift / 0.4));
@@ -158,11 +173,28 @@ function createSpriteBody(scene, animalId, classId, sprites, camera) {
 
   return {
     /** @param {BodyInput} input */
-    update({ position, facing, aimSide, speed, time, attackT, visible }) {
+    update({ position, facing, aimSide, speed, time, attackT, visible, flash, dyingTilt, opacity }) {
       if (aimSide) face = aimSide;
       else if (facing.x > BILLBOARD.flipHysteresis) face = 1;
       else if (facing.x < -BILLBOARD.flipHysteresis) face = -1;
       const m = spriteMotion(def.motion, { speed, time, attackT });
+      m.tilt += dyingTilt * DYING_TILT;
+      // Nur bei Änderung schreiben: rotes Aufblitzen und Ausblenden betreffen allein diese Tafel (eigenes Material).
+      if (flash !== lookFlash) {
+        lookFlash = flash;
+        if (flash) material.color.setRGB(...HERO_FLASH.color); else material.color.setScalar(BILLBOARD.shade);
+      }
+      if (opacity !== lookOpacity) {
+        const wasSolid = lookOpacity >= 1;
+        lookOpacity = opacity;
+        material.opacity = opacity;
+        blobMat.opacity = BILLBOARD.shadowOpacity * opacity;
+        if (wasSolid !== opacity >= 1) {
+          material.transparent = opacity < 1;
+          material.alphaToCoverage = opacity >= 1;
+          material.needsUpdate = true;
+        }
+      }
       composeSprite(figure.matrix, orient, position.x, 0, position.z, width, height, face, m, def.footOffset);
       figure.matrixWorldNeedsUpdate = true;
       figure.visible = visible;
@@ -212,6 +244,12 @@ function createFigureBody(scene, animalId, classId) {
   const clones = [];
   const cloneYaw = new WeakMap();
   let yaw = 0;
+  // Die Materialien gehören dieser Figur (buildCharacter legt sie je Aufruf neu an); Klone nutzen shadowMat.
+  /** @type {THREE.MeshStandardMaterial[]} */
+  const ownMaterials = [];
+  figure.traverse((o) => { if (o.isMesh && !ownMaterials.includes(o.material)) ownMaterials.push(o.material); });
+  const baseEmissive = new Map(ownMaterials.map((m) => [m, m.emissive.getHex()]));
+  let lookFlash = false, lookOpacity = 1;
 
   function makeClone() {
     const c = buildCharacter(animalId, classId);
@@ -223,12 +261,21 @@ function createFigureBody(scene, animalId, classId) {
 
   return {
     /** @param {BodyInput} input */
-    update({ position, facing, speed, time, frameDt, attackT, visible }) {
+    update({ position, facing, speed, time, frameDt, attackT, visible, flash, dyingTilt, opacity }) {
       const target = Math.atan2(facing.x, facing.z);
       yaw = wrapAngle(yaw + wrapAngle(target - yaw) * Math.min(1, TURN_RATE * frameDt * 60));
       animateCharacter(figure, { speed, time, attackT });
       figure.position.copy(position);
       figure.rotation.y = yaw;
+      figure.rotation.z = dyingTilt * DYING_TILT;
+      if (flash !== lookFlash) {
+        lookFlash = flash;
+        for (const m of ownMaterials) { m.emissive.setHex(flash ? 0xff2020 : baseEmissive.get(m)); }
+      }
+      if (opacity !== lookOpacity) {
+        lookOpacity = opacity;
+        for (const m of ownMaterials) { m.transparent = opacity < 1; m.opacity = opacity; m.needsUpdate = true; }
+      }
       figure.visible = visible;
     },
     updateClones(summons, t) {

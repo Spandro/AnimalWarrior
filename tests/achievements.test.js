@@ -256,10 +256,13 @@ test('facts: Wiederbelebung, Tod mit Lebensanteil 0 und Ende', () => {
   w.hero.hp = 1;
   spawnEnemy(w, 'ratte', w.hero.x, w.hero.z);
   stepRun(run, 0.05, NONE);
+  assertEqual(run.state, 'dying');
+  const died = run.deathTime;
+  stepRun(run, 1, NONE);
   assertEqual(run.state, 'lost');
   const f = run.facts;
   assertEqual([f.ended, f.won, f.hpFractionAtEnd], [true, false, 0]);
-  assertClose(f.time, w.time, 1e-9);
+  assertClose(f.time, died, 1e-9);
 });
 
 test('facts: Sieg setzt won und den Lebensanteil', () => {

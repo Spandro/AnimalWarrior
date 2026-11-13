@@ -34,7 +34,7 @@ test('sfx: shouldPlay spielt unbekannte Typen nie', () => {
 });
 
 test('sfx: Daten haben alle Klänge des Spiels, hit, pickup und heroHit sind gedrosselt', () => {
-  for (const type of ['hit', 'pickup', 'levelup', 'bossSpawn', 'heroHit', 'death', 'victory', 'chest']) {
+  for (const type of ['hit', 'pickup', 'levelup', 'bossSpawn', 'heroHit', 'dying', 'death', 'victory', 'chest']) {
     assertTrue(Array.isArray(SFX[type]) && SFX[type].length > 0, type);
   }
   assertEqual(SFX_LIMITS, { hit: 12, pickup: 15, heroHit: 8 });

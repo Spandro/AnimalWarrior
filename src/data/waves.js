@@ -40,6 +40,9 @@ export const MAX_SUBSTEP = 1 / 30;
 /** Wiederbelebung: Lebensanteil, Unverwundbarkeit (s), Radius und Strecke des Wegstoßens. */
 export const REVIVE = { hpFraction: 0.5, invulnerable: 2, pushRadius: 6, pushDistance: 5 };
 
+/** Sterbephase: Länge in realen Sekunden und Tempo der Welt (Zeitlupe) darin. */
+export const DYING = { duration: 1.0, timeScale: 0.25 };
+
 /** Sichtbereich, bis die Darstellung `setView` aufruft. */
 export const DEFAULT_VIEW = { halfW: 20, halfH: 12 };
 

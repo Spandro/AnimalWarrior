@@ -7,7 +7,7 @@ import { SHADOW, SHADOW_LINES, shadowMaxHp } from '../data/shadow.js';
 import {
   RUN_DURATION, MAX_ENEMIES, unlockMinute, weights, MAX_FORMULA_MINUTE, spawnPerSecond, hpMul, dmgMul,
   ELITE_INTERVAL, BOSS_TIMES, BOSS_HP_MUL, LEASH_DISTANCE, CAP_BACKLOG, SPAWN_REROLLS, MAX_SUBSTEP, REVIVE,
-  DEFAULT_VIEW, spawnRadius,
+  DEFAULT_VIEW, spawnRadius, DYING,
 } from '../data/waves.js';
 
 /**
@@ -16,7 +16,8 @@ import {
  *
  * Ereignisse: Nach jedem `stepRun` stehen in `run.events` alle Ereignisse dieses Aufrufs (aus allen
  * Teilschritten, inklusive der Modus-Ereignisse `levelup`, `bossSpawn`, `revive`, `death`, `victory`, `chest`,
- * `shadowAppear`, `shadowVanish`; `shadowFlee` kommt aus der Welt).
+ * `shadowAppear`, `shadowVanish`, `dying`; `shadowFlee` kommt aus der Welt). `dying` (tödlicher Treffer ohne Wiederbelebung)
+ * eröffnet die Sterbephase; `death` und das Abschließen der Zahlen folgen erst beim Übergang nach `lost`.
  * Verbraucher lesen `run.events`, nicht `world.events` (das enthält nur den letzten Teilschritt).
  *
  * Schatten: `{ type: 'shadowAppear'|'shadowFlee', line, x, z }`, `{ type: 'shadowVanish', line, x, z, rewarded }`
@@ -25,14 +26,16 @@ import {
  * @typedef {import('../core/world.js').World} World
  * @typedef {import('../core/progression.js').Card} Card
  * @typedef {import('../data/animals.js').Modifier} Modifier
- * @typedef {'playing'|'levelup'|'paused'|'won'|'lost'} RunState
+ * @typedef {'playing'|'levelup'|'paused'|'dying'|'won'|'lost'} RunState
  * @typedef {{ acc: number, backlog: number, strongPending: number, nextEliteAt: number, bossIndex: number,
  *   finalBoss: import('../core/world.js').Enemy|null, shadowIndex: number }} SpawnState
  * @typedef {import('../data/achievements.js').RunFacts} RunFacts
  * @typedef {{ world: World, state: RunState, cards: Card[]|null, view: { halfW: number, halfH: number },
- *   timeScale: number, events: object[], spawn: SpawnState, facts: RunFacts, streakFrom: number }} Run
+ *   timeScale: number, events: object[], spawn: SpawnState, facts: RunFacts, streakFrom: number,
+ *   dyingLeft: number, deathTime: number|null }} Run
  *   `facts`: Zahlen für die Erfolge, in `stepRun` aus den Ereignissen jedes Teilschritts fortgeschrieben (nur einfache
  *   Werte, keine Verweise in die Welt); `streakFrom`: Spielzeit der letzten Tötung (oder 0).
+ *   `dyingLeft`: verbleibende reale Sekunden der Sterbephase; `deathTime`: Spielzeit des tödlichen Treffers (null davor).
  */
 
 /**
@@ -49,8 +52,13 @@ export function createSurvivorRun({ seed, animalId, classId, modifiers = [], rev
       ended: false, won: false, time: 0, level: 1, kills: 0, killsByType: {}, dodges: 0, goldEarned: 0, level10At: null,
       shadowsRouted: 0, revived: 0, hpFractionAtEnd: 1, longestNoKillStreak: 0, maxedAbilities: 0, animalId, classId,
     },
-    streakFrom: 0,
+    streakFrom: 0, dyingLeft: 0, deathTime: null,
   };
+}
+
+/** Spielzeit für Zahlen und Anzeige: ab dem tödlichen Treffer der Todeszeitpunkt. */
+function endTime(run) {
+  return run.deathTime ?? run.world.time;
 }
 
 /**
@@ -71,13 +79,14 @@ export function recordFacts(run, events) {
     else if (e.type === 'revive') f.revived++;
   }
   f.kills = world.run.kills;
-  f.time = world.time;
+  const now = endTime(run);
+  f.time = now;
   f.level = world.run.level;
-  if (f.level10At === null && f.level >= 10) f.level10At = world.time;
+  if (f.level10At === null && f.level >= 10) f.level10At = now;
   f.goldEarned = world.run.gold;
   f.maxedAbilities = world.hero.abilities.filter((a) => a.level >= MAX_LEVEL).length;
-  f.longestNoKillStreak = Math.max(f.longestNoKillStreak, world.time - run.streakFrom);
-  if (killed) run.streakFrom = world.time;
+  f.longestNoKillStreak = Math.max(f.longestNoKillStreak, now - run.streakFrom);
+  if (killed) run.streakFrom = now;
 }
 
 /**
@@ -91,18 +100,40 @@ export function getFacts(run) {
 
 /**
  * Simuliert `dt × timeScale` Sekunden in Teilschritten von höchstens MAX_SUBSTEP; nur im Zustand playing.
- * Hält an, sobald ein Teilschritt den Zustand ändert (Level-up, Sieg, Tod).
+ * Hält an, sobald ein Teilschritt den Zustand ändert (Level-up, Sieg, tödlicher Treffer).
+ * In der Sterbephase (`dying`) ist `dt` reale Zeit: sie zählt `dyingLeft` herunter (ohne `timeScale`) und die Welt läuft
+ * mit `DYING.timeScale` weiter, der Held träge; nach `DYING.duration` s wird der Durchgang `lost`.
  * @param {Run} run
  * @param {number} dt
  * @param {{ moveX: number, moveZ: number }} input
  */
 export function stepRun(run, dt, input) {
   run.events = [];
+  if (run.state === 'dying') { stepDying(run, dt); return; }
   let remaining = dt * run.timeScale;
   while (run.state === 'playing' && remaining > 1e-9) {
     const h = Math.min(remaining, MAX_SUBSTEP);
     remaining -= h;
     subStep(run, h, input);
+  }
+}
+
+function stepDying(run, dt) {
+  const real = Math.min(Math.max(dt, 0), run.dyingLeft);
+  run.dyingLeft -= real;
+  let remaining = real * DYING.timeScale;
+  while (remaining > 1e-9) {
+    const h = Math.min(remaining, MAX_SUBSTEP);
+    remaining -= h;
+    stepWorld(run.world, h, { moveX: 0, moveZ: 0 }, { inert: true });
+    recordFacts(run, run.world.events);
+    run.events.push(...run.world.events);
+  }
+  if (run.dyingLeft <= 1e-9) {
+    run.dyingLeft = 0;
+    run.world.events = [];
+    endRun(run, 'lost', 'death');
+    run.events.push(...run.world.events);
   }
 }
 
@@ -251,7 +282,12 @@ function checkOutcome(run) {
       }
       world.events.push({ type: 'revive' });
     } else {
-      endRun(run, 'lost', 'death');
+      run.state = 'dying';
+      run.dyingLeft = DYING.duration;
+      run.deathTime = world.time;
+      run.cards = null;
+      hero.invulnerableUntil = Infinity;
+      world.events.push({ type: 'dying' });
       return;
     }
   }
@@ -297,13 +333,23 @@ export function abandonRun(run) {
   if (run.state === 'won' || run.state === 'lost') return;
   run.state = 'lost';
   run.cards = null;
+  run.dyingLeft = 0;
   run.events = [{ type: 'death' }];
   recordFacts(run, []);
   finishFacts(run);
 }
 
 /**
- * Pausiert nur aus playing und setzt nur aus paused fort; offene Karten bleiben unberührt.
+ * Kürzt die Sterbephase ab: aus `dying` sofort `lost` (Ereignis `death`, Zahlen abgeschlossen). In allen anderen
+ * Zuständen ohne Wirkung. `run.events` enthält danach nur das Ereignis `death`.
+ * @param {Run} run
+ */
+export function skipDying(run) {
+  if (run.state === 'dying') abandonRun(run);
+}
+
+/**
+ * Pausiert nur aus playing (nicht in der Sterbephase) und setzt nur aus paused fort; offene Karten bleiben unberührt.
  * @param {Run} run
  * @param {boolean} paused
  */
@@ -328,7 +374,7 @@ export function setView(run, halfW, halfH) {
  * @returns {number}
  */
 export function displayTime(run) {
-  return Math.min(run.world.time, RUN_DURATION);
+  return Math.min(endTime(run), RUN_DURATION);
 }
 
 /**
@@ -338,7 +384,7 @@ export function displayTime(run) {
 export function getSummary(run) {
   const { world } = run;
   return {
-    won: run.state === 'won', time: world.time, level: world.run.level, kills: world.run.kills,
+    won: run.state === 'won', time: endTime(run), level: world.run.level, kills: world.run.kills,
     gold: world.run.gold, damageByAbility: { ...world.run.damageByAbility },
   };
 }
