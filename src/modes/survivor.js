@@ -1,6 +1,8 @@
 import { createWorld, stepWorld, spawnEnemy, spawnShadow, cappedEnemyCount, knockback } from '../core/world.js';
 import { pendingLevelUps, rollCards, applyCard, openChest } from '../core/progression.js';
 import { obstaclesNear } from '../core/terrain.js';
+import { chestsNear } from '../core/chests.js';
+import { MAP_CHESTS } from '../data/chests.js';
 import { ENEMIES, ELITE } from '../data/enemies.js';
 import { MAX_LEVEL } from '../data/bonuses.js';
 import { SHADOW, SHADOW_LINES, shadowMaxHp } from '../data/shadow.js';
@@ -15,7 +17,7 @@ import {
  * `chooseCard`, `setPaused` und `setView`.
  *
  * Ereignisse: Nach jedem `stepRun` stehen in `run.events` alle Ereignisse dieses Aufrufs (aus allen
- * Teilschritten, inklusive der Modus-Ereignisse `levelup`, `bossSpawn`, `revive`, `death`, `victory`, `chest`,
+ * Teilschritten, inklusive der Modus-Ereignisse `mapChest`, `levelup`, `bossSpawn`, `revive`, `death`, `victory`, `chest`,
  * `shadowAppear`, `shadowVanish`, `dying`; `shadowFlee` kommt aus der Welt). `dying` (tödlicher Treffer ohne Wiederbelebung)
  * eröffnet die Sterbephase; `death` und das Abschließen der Zahlen folgen erst beim Übergang nach `lost`.
  * Verbraucher lesen `run.events`, nicht `world.events` (das enthält nur den letzten Teilschritt).
@@ -50,7 +52,7 @@ export function createSurvivorRun({ seed, animalId, classId, modifiers = [], rev
     spawn: { acc: 0, backlog: 0, strongPending: 0, nextEliteAt: ELITE_INTERVAL, bossIndex: 0, finalBoss: null, shadowIndex: 0 },
     facts: {
       ended: false, won: false, time: 0, level: 1, kills: 0, killsByType: {}, dodges: 0, goldEarned: 0, level10At: null,
-      shadowsRouted: 0, revived: 0, hpFractionAtEnd: 1, longestNoKillStreak: 0, maxedAbilities: 0, animalId, classId,
+      shadowsRouted: 0, revived: 0, hpFractionAtEnd: 1, longestNoKillStreak: 0, maxedAbilities: 0, chestsOpened: 0, animalId, classId,
     },
     streakFrom: 0, dyingLeft: 0, deathTime: null,
   };
@@ -146,6 +148,7 @@ function subStep(run, dt, input) {
   spawnWaves(run, dt);
   leash(run);
   checkOutcome(run);
+  openMapChests(run);
   if (run.state === 'playing' && pendingLevelUps(world) > 0) {
     run.state = 'levelup';
     run.cards = rollCards(world, 3);
@@ -153,6 +156,36 @@ function subStep(run, dt, input) {
   }
   recordFacts(run, world.events);
   run.events.push(...world.events);
+}
+
+/**
+ * Öffnet jede ungeöffnete Karten-Kiste in Reichweite des Helden, nur im Zustand playing: Gold (mal Goldgewinn),
+ * Heilung (gedeckelt) oder bei `upgrade` eine Karte ohne Levelverbrauch (`rollCards(world, 1)`; sind alle
+ * Fähigkeiten und Boni voll, ist es eine Ersatzkarte aus Gold oder Heilung). Je Kiste ein Ereignis
+ * `{ type: 'mapChest', id, x, z, kind, gold, heal, card }` mit dem tatsächlich Gewährten.
+ * Läuft in jedem Teilschritt vor der Prüfung auf Level-ups, die Karte ist dann schon angewendet.
+ * @param {Run} run
+ */
+export function openMapChests(run) {
+  if (run.state !== 'playing') return;
+  const world = run.world, hero = world.hero;
+  for (const chest of chestsNear(world.seed, hero.x, hero.z, MAP_CHESTS.openRadius + MAP_CHESTS.radius)) {
+    if (world.openedChests.has(chest.id)) continue;
+    world.openedChests.add(chest.id);
+    const goldGain = hero.stats.goldGain, hp0 = hero.hp;
+    let gold = chest.gold * goldGain, healFraction = 0, card = null;
+    if (chest.kind === 'heal') healFraction = MAP_CHESTS.table.find((t) => t.kind === 'heal').heal;
+    if (chest.kind === 'upgrade') {
+      card = rollCards(world, 1)[0];
+      applyCard(world, card, false);
+      if (card.kind === 'gold') gold += card.value * goldGain;
+    }
+    world.run.gold += chest.gold * goldGain;
+    if (healFraction > 0) hero.hp = Math.min(hero.stats.maxHp, hero.hp + hero.stats.maxHp * healFraction);
+    const healed = (healFraction > 0 || card?.kind === 'heal') ? hero.hp - hp0 : 0;
+    run.facts.chestsOpened += 1;
+    world.events.push({ type: 'mapChest', id: chest.id, x: chest.x, z: chest.z, kind: chest.kind, gold, heal: healed, card });
+  }
 }
 
 /**

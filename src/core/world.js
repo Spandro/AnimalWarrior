@@ -31,7 +31,8 @@ import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
  *   Gegnergeschoss: trifft nur den Held, wird von Hindernissen aufgehalten. `shadow`: vom Schatten geworfen.
  * @typedef {{ time: number, seed: number, rng: import('./rng.js').Rng, hero: Hero, enemies: Enemy[], projectiles: object[],
  *   enemyProjectiles: EnemyProjectile[], zones: object[], orbitals: object[], summons: object[], pickups: Pickup[],
- *   events: object[], run: Run, nextId: number }} World
+ *   events: object[], run: Run, nextId: number, openedChests: Set<string> }} World
+ *   `openedChests`: Kennungen der schon geöffneten Karten-Kisten (`chestInCell`).
  */
 
 /** Einheitsrichtung und Abstand von a nach b; bei Deckung die Richtung `fallback`. */
@@ -353,6 +354,7 @@ export function createWorld({ seed, animalId, classId, modifiers = [] }) {
     },
     enemies: [], projectiles: [], enemyProjectiles: [], zones: [], orbitals: [], summons: [], pickups: [], events: [],
     run: { level: 1, xp: 0, kills: 0, gold: 0, bonuses: {}, damageByAbility: {}, revivesLeft: 0 },
+    openedChests: new Set(),
   };
 }
 

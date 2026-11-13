@@ -68,6 +68,12 @@ export const SFX = {
     ...arpeggio('sine', [1175, 1568, 2093], 0.07, 0.25, 0.22),
     { kind: 'noise', filter: 'highpass', freq: [6000, 3000], dur: 0.3, gain: 0.12 },
   ],
+  // Kiste auf der Karte geöffnet: knarrender Deckel, dann ein kurzes helles Klimpern.
+  mapChest: [
+    { kind: 'noise', filter: 'bandpass', freq: [500, 1400], dur: 0.12, gain: 0.18 },
+    ...arpeggio('sine', [988, 1319, 1760], 0.06, 0.2, 0.2).map((v) => ({ ...v, delay: v.delay + 0.06 })),
+    { kind: 'noise', filter: 'highpass', freq: [6500, 3500], dur: 0.2, gain: 0.1, delay: 0.1 },
+  ],
   // Dein Schatten: tiefes, schwebendes Rauschen beim Erscheinen, ein abfallendes Wimmern bei der Flucht,
   // ein leises Verwehen beim Auflösen.
   shadowAppear: [

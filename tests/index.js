@@ -17,3 +17,4 @@ import './sfx.test.js';
 import './shadow.test.js';
 import './achievements.test.js';
 import './deathSequence.test.js';
+import './chests.test.js';

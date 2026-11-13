@@ -20,7 +20,7 @@ export function evaluateAchievements(ctx, alreadyUnlocked) {
 /** Leere Zahlen eines Durchgangs: keine Bedingung, die einen Durchgang braucht, ist damit erfüllt. @type {RunFacts} */
 const NO_RUN = Object.freeze({
   ended: false, won: false, time: 0, level: 0, kills: 0, killsByType: Object.freeze({}), dodges: 0, goldEarned: 0,
-  level10At: null, shadowsRouted: 0, revived: 0, hpFractionAtEnd: 1, longestNoKillStreak: 0, maxedAbilities: 0,
+  level10At: null, shadowsRouted: 0, revived: 0, hpFractionAtEnd: 1, longestNoKillStreak: 0, maxedAbilities: 0, chestsOpened: 0,
   animalId: '', classId: '',
 });
 

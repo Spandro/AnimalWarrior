@@ -1,5 +1,6 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { BOSS } from '../data/enemies.js';
+import { describeCard } from '../ui/cardText.js';
 
 /**
  * Kurzlebige Effekte aus den Ereignissen eines Logikschritts: Formen der Fähigkeiten, Funken, Staub,
@@ -215,6 +216,7 @@ const NUMBER_STYLE = {
   crit: { size: 27, color: '#ffd23a' },
   heal: { size: 18, color: '#86e07a' },
   info: { size: 14, color: '#d8d8d8' },
+  loot: { size: 20, color: '#ffd23a' },
 };
 
 function createNumbers(uiLayer, size) {
@@ -509,6 +511,16 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
   }
 
   /** Dunkler Rauch mit violetten Funken, wo der Schatten erscheint oder sich auflöst. */
+  /** Inhalt einer geöffneten Karten-Kiste: Funken und aufsteigender Text über der Kiste. */
+  function mapChest(e, w) {
+    burst(glow, 24, e.x, 0.7, e.z, { speed: 3, up: 3.5, life: 0.7, size: 0.08, color: 0xffd040, gravity: 6 });
+    const gold = Math.round(e.gold);
+    let y = 1.5;
+    if (e.card && e.card.kind !== 'gold' && e.card.kind !== 'heal') { numbers.show(describeCard(e.card, w).title, e.x, y, e.z, 'loot'); y += 0.6; }
+    if (e.heal > 0) { numbers.show('Heilung', e.x, y, e.z, 'heal'); y += 0.6; }
+    if (gold > 0) numbers.show(`+${gold} Gold`, e.x, y, e.z, 'loot');
+  }
+
   function shadowSmoke(e, strength = 1) {
     burst(dust, Math.round(16 * strength), e.x, 0.5, e.z, {
       speed: 2.6, up: 1.6, life: 0.8, size: 0.2, endSize: 0.42, color: 0x3a2a52, gravity: -0.6, drag: 2.5, spread: 0.6,
@@ -537,6 +549,7 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
         case 'bossTelegraph': bossTelegraph(e); break;
         case 'levelup': levelup(hero); break;
         case 'revive': revive(hero); break;
+        case 'mapChest': mapChest(e, w); break;
         case 'shadowAppear': case 'shadowVanish': shadowSmoke(e); break;
         case 'shadowFlee': shadowSmoke(e, 0.5); break;
         case 'heroHit':

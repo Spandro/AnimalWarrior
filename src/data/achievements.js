@@ -10,7 +10,7 @@ import { ANIMALS } from './animals.js';
  * zuerst erreicht wurde (null davor).
  * @typedef {{ ended: boolean, won: boolean, time: number, level: number, kills: number, killsByType: Record<string, number>,
  *   dodges: number, goldEarned: number, level10At: number | null, shadowsRouted: number, revived: number,
- *   hpFractionAtEnd: number, longestNoKillStreak: number, maxedAbilities: number, animalId: string, classId: string }} RunFacts
+ *   hpFractionAtEnd: number, longestNoKillStreak: number, maxedAbilities: number, chestsOpened: number, animalId: string, classId: string }} RunFacts
  *
  * Eingabe jeder Bedingung. `stats` enthält die Zahlen des laufenden Durchgangs schon (mitten im Durchgang nur
  * Tötungen und Schatten), `save.gold` ebenso das verdiente Gold.
@@ -110,5 +110,9 @@ export const ACHIEVEMENTS = [
   {
     id: 'fruehes-ende', title: 'Frühes Ende', condition: 'Stirb in den ersten 30 Sekunden',
     line: 'Das ging schnell. Rekordverdächtig schnell.', gold: 25, check: (c) => c.run.ended && !c.run.won && c.run.time < 30,
+  },
+  {
+    id: 'schatzsucher', title: 'Schatzsucher', condition: 'Öffne in einem Durchgang 10 Kisten',
+    line: 'Fremde Kisten öffnen: hier ausnahmsweise erlaubt.', gold: 50, check: (c) => c.run.chestsOpened >= 10,
   },
 ];

@@ -12,7 +12,7 @@ import { SFX } from '../src/data/sfx.js';
 
 const facts = (o = {}) => ({
   ended: false, won: false, time: 0, level: 1, kills: 0, killsByType: {}, dodges: 0, goldEarned: 0, level10At: null,
-  shadowsRouted: 0, revived: 0, hpFractionAtEnd: 1, longestNoKillStreak: 0, maxedAbilities: 0,
+  shadowsRouted: 0, revived: 0, hpFractionAtEnd: 1, longestNoKillStreak: 0, maxedAbilities: 0, chestsOpened: 0,
   animalId: 'hase', classId: 'krieger', ...o,
 });
 const stats = (o = {}) => ({ kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, ...o });
@@ -21,8 +21,8 @@ const byId = (id) => ACHIEVEMENTS.find((a) => a.id === id);
 
 // ------------------------------------------------------------------ Daten
 
-test('achievements: 22 eindeutige Ids mit Titel, Bedingung, Spruch und positivem Gold', () => {
-  assertEqual(ACHIEVEMENTS.length, 22);
+test('achievements: 23 eindeutige Ids mit Titel, Bedingung, Spruch und positivem Gold', () => {
+  assertEqual(ACHIEVEMENTS.length, 23);
   assertEqual(new Set(ACHIEVEMENTS.map((a) => a.id)).size, ACHIEVEMENTS.length);
   for (const a of ACHIEVEMENTS) {
     for (const key of ['id', 'title', 'condition', 'line']) assertTrue(typeof a[key] === 'string' && a[key].trim() !== '', `${a.id}.${key}`);
@@ -69,6 +69,7 @@ const CASES = [
   ['massenabfertigung', { run: { kills: 999 } }, { run: { kills: 1000 } }],
   ['stammgast', { stats: { runs: 24 } }, { stats: { runs: 25 } }],
   ['fruehes-ende', { run: { ended: true, won: false, time: 30 } }, { run: { ended: true, won: false, time: 29.9 } }],
+  ['schatzsucher', { run: { chestsOpened: 9 } }, { run: { chestsOpened: 10 } }],
 ];
 
 test('achievements: die Tabelle deckt jede Erfolgs-Id genau einmal ab', () => {
@@ -363,4 +364,21 @@ test('achievements: unlockStored hört nach höchstens drei Runden auf', () => {
   const s = saveWith({ gold: 0, stats: stats({ runs: 1 }) });
   const ids = unlockStored(s, 1, 1);
   assertEqual(ids, ['erste-schritte']);
+});
+
+test('achievements: Schatzsucher steht am Ende der Liste, Texte wie vorgegeben', () => {
+  const a = ACHIEVEMENTS[ACHIEVEMENTS.length - 1];
+  assertEqual([a.id, a.title, a.condition, a.line, a.gold],
+    ['schatzsucher', 'Schatzsucher', 'Öffne in einem Durchgang 10 Kisten', 'Fremde Kisten öffnen: hier ausnahmsweise erlaubt.', 50]);
+});
+
+test('achievements: ältere Spielstände ohne Schatzsucher bleiben gültig, mit ihm auch, unbekannte Ids nicht', () => {
+  const old = { ...defaultSave(), achievements: Object.fromEntries(ACHIEVEMENTS.slice(0, -1).map((a) => [a.id, 1])) };
+  assertTrue(validate(old).ok);
+  assertTrue(validate({ ...old, achievements: { ...old.achievements, schatzsucher: 5 } }).ok);
+  assertEqual(validate({ ...old, achievements: { ...old.achievements, schatzsucherX: 5 } }).ok, false);
+});
+
+test('achievements: evaluateStored löst Schatzsucher nie ohne Durchgang aus', () => {
+  assertTrue(!evaluateStored(defaultSave()).includes('schatzsucher'));
 });

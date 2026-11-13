@@ -570,3 +570,12 @@ body[data-screen="game"] .toasts { top: auto; bottom: 64px; }
   .fx-vignette.low-health { animation: none; opacity: 0.4; }
   .death-text { animation: none; }
 }
+
+/* Pfeil zur nächsten Kiste am Bildrand: Dreieck, das nach rechts zeigt und über die Drehung ausgerichtet wird. */
+.chest-hint {
+  position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none;
+  border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-left: 22px solid #ffd040;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.85)); opacity: 0.92;
+}
+.chest-hint[hidden] { display: none; }
+#ui > .chest-hint { pointer-events: none; }

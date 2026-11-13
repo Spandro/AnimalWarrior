@@ -4,6 +4,7 @@ import { createRenderer } from './render/renderer.js';
 import { createTerrainView } from './render/terrain.js';
 import { createEnemyView } from './render/enemies.js';
 import { createHeroView } from './render/hero.js';
+import { createChestView } from './render/chests.js';
 import { createEffects } from './render/effects.js';
 import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary, getFacts, abandonRun, skipDying } from './modes/survivor.js';
 import { DYING } from './data/waves.js';
@@ -17,6 +18,7 @@ import { createKeyState, attachKeyboard } from './input/keyboard.js';
 import { createPointerState, attachPointer, combineMove } from './input/pointer.js';
 import { createStick } from './ui/stick.js';
 import { createHud } from './ui/hud.js';
+import { createChestHint } from './ui/chestHint.js';
 import { deathSequence, createDeathOverlay, DEATH_TIMES } from './ui/deathSequence.js';
 import { createLevelUpDialog } from './ui/levelup.js';
 import { el } from './ui/dom.js';
@@ -68,9 +70,11 @@ export function startGame({
   const world = run.world;
   const terrain = createTerrainView(view.scene, world.seed);
   const enemyView = createEnemyView(view.scene, { sprites, camera: view.camera });
+  const chestView = createChestView(view.scene, world.seed, sprites);
   const heroView = createHeroView(view.scene, animalId, classId, { sprites, camera: view.camera });
   const effects = createEffects(view.scene, uiLayer, { quality, camera: view.camera });
   const hud = createHud(uiLayer);
+  const chestHint = createChestHint(uiLayer);
   const deathOverlay = createDeathOverlay(uiLayer, { canvas });
   /** Weniger Bewegung gewünscht: kein Wackeln, Sterbephase sofort beendet, kürzere Abblende. */
   const reducedMotion = (() => {
@@ -324,15 +328,17 @@ export function startGame({
     view.setTarget(p.x, p.z);
     terrain.update(p.x, p.z);
     enemyView.sync(world, alpha);
+    chestView.sync(world);
     effects.update(run.state === 'dying' ? dt * DYING.timeScale : run.state === 'levelup' || run.state === 'paused' ? 0 : dt, p);
     hud.update(run);
+    chestHint.update(world, { halfW: run.view.halfW, halfH: run.view.halfH, width: uiLayer.clientWidth, height: uiLayer.clientHeight }, run.state);
     stick.update(pointer);
     view.render();
     if (stress) measureFps(now);
   }
   rafId = requestAnimationFrame(frame);
 
-  if (debug) window.__debug = { run, view, enemyView, heroView, effects, terrain, hud, levelUp, pauseMenu, keys, pointer, deathOverlay };
+  if (debug) window.__debug = { run, view, enemyView, chestView, chestHint, heroView, effects, terrain, hud, levelUp, pauseMenu, keys, pointer, deathOverlay };
 
   let stopped = false;
   return {
@@ -358,9 +364,11 @@ export function startGame({
       stick.dispose();
       terrain.dispose();
       enemyView.dispose();
+      chestView.dispose();
       heroView.dispose();
       effects.dispose();
       hud.dispose();
+      chestHint.dispose();
       deathOverlay.dispose();
       levelUp.dispose();
       pauseMenu.dispose();
