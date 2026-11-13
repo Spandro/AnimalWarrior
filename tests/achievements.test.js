@@ -15,14 +15,14 @@ const facts = (o = {}) => ({
   shadowsRouted: 0, revived: 0, hpFractionAtEnd: 1, longestNoKillStreak: 0, maxedAbilities: 0, chestsOpened: 0,
   animalId: 'hase', classId: 'krieger', ...o,
 });
-const stats = (o = {}) => ({ kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, ...o });
+const stats = (o = {}) => ({ kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0, ...o });
 const ctx = ({ run, stats: s, save } = {}) => ({ run: facts(run), stats: stats(s), save: { ...defaultSave(), ...save } });
 const byId = (id) => ACHIEVEMENTS.find((a) => a.id === id);
 
 // ------------------------------------------------------------------ Daten
 
-test('achievements: 23 eindeutige Ids mit Titel, Bedingung, Spruch und positivem Gold', () => {
-  assertEqual(ACHIEVEMENTS.length, 23);
+test('achievements: 27 eindeutige Ids mit Titel, Bedingung, Spruch und positivem Gold', () => {
+  assertEqual(ACHIEVEMENTS.length, 27);
   assertEqual(new Set(ACHIEVEMENTS.map((a) => a.id)).size, ACHIEVEMENTS.length);
   for (const a of ACHIEVEMENTS) {
     for (const key of ['id', 'title', 'condition', 'line']) assertTrue(typeof a[key] === 'string' && a[key].trim() !== '', `${a.id}.${key}`);
@@ -70,6 +70,13 @@ const CASES = [
   ['stammgast', { stats: { runs: 24 } }, { stats: { runs: 25 } }],
   ['fruehes-ende', { run: { ended: true, won: false, time: 30 } }, { run: { ended: true, won: false, time: 29.9 } }],
   ['schatzsucher', { run: { chestsOpened: 9 } }, { run: { chestsOpened: 10 } }],
+  ['tavern-stammgast', { stats: { tavernRounds: 49 } }, { stats: { tavernRounds: 50 } }],
+  ['riecher', { stats: { hiLoBestStreak: 4 } }, { stats: { hiLoBestStreak: 5 } }],
+  ['sammelwut', { save: { inventory: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'] } },
+    { save: { inventory: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'] } }],
+  ['hochstapler',
+    { run: { ended: true, won: true, animalId: 'hase' } },
+    { run: { ended: true, won: true, animalId: 'giraffe' } }],
 ];
 
 test('achievements: die Tabelle deckt jede Erfolgs-Id genau einmal ab', () => {
@@ -83,6 +90,31 @@ for (const [id, no, yes] of CASES) {
     assertEqual(a.check(ctx(yes)), true, 'erfüllt');
   });
 }
+
+test('achievements: Taverne-Erfolge mit Texten und Gold wie in der Spec', () => {
+  const rows = [
+    ['tavern-stammgast', 'Dein Krug hat schon deinen Namen.', 25],
+    ['riecher', 'Kasimir prüft jetzt seine Ärmel.', 50],
+    ['sammelwut', 'Der Dachboden ist voll. Die Truhe noch nicht.', 50],
+    ['hochstapler', 'Zusammen sind sie größer als jeder Bär.', 100],
+  ];
+  for (const [id, line, gold] of rows) assertEqual([byId(id).line, byId(id).gold], [line, gold], id);
+  assertEqual(byId('hochstapler').title, 'Hochstapler');
+  assertEqual(byId('riecher').title, 'Riecher');
+  assertEqual(byId('sammelwut').title, 'Sammelwut');
+});
+
+test('achievements: Hochstapler braucht einen beendeten Sieg mit dem Duo', () => {
+  const h = byId('hochstapler');
+  assertEqual(h.check(ctx({ run: { ended: false, won: true, animalId: 'giraffe' } })), false);
+  assertEqual(h.check(ctx({ run: { ended: true, won: false, animalId: 'giraffe' } })), false);
+});
+
+test('achievements: Zoo-Direktor prüft fest Hase, Ente und Waschbär, auch wenn die Giraffe fehlt', () => {
+  const z = byId('zoo-direktor');
+  assertEqual(z.check(ctx({ stats: { winsByAnimal: { hase: 1, ente: 1, waschbaer: 1 } } })), true);
+  assertEqual(z.check(ctx({ stats: { winsByAnimal: { hase: 1, ente: 1, giraffe: 4 } } })), false);
+});
 
 test('achievements: Randfälle der Bedingungen', () => {
   // Level 10 nie erreicht (null) zählt nicht, auch nicht bei früher Zeit.
@@ -133,7 +165,7 @@ test('achievements: applyRunToStats addiert Tötungen je Art, Durchgänge, Siege
     ended: true, won: true, animalId: 'ente', killsByType: { ratte: 3, wolf: 2 }, shadowsRouted: 2,
   }));
   assertTrue(out === st, 'mutiert und gibt dasselbe Objekt zurück');
-  assertEqual(st, { kills: { ratte: 8, wolf: 2 }, runs: 3, wins: 2, winsByAnimal: { hase: 1, ente: 1 }, shadowsRouted: 3 });
+  assertEqual(st, { kills: { ratte: 8, wolf: 2 }, runs: 3, wins: 2, winsByAnimal: { hase: 1, ente: 1 }, shadowsRouted: 3, tavernRounds: 0, hiLoBestStreak: 0 });
   applyRunToStats(st, facts({ ended: true, won: false, animalId: 'hase', killsByType: { baer: 1 } }));
   assertEqual([st.runs, st.wins, st.winsByAnimal, st.kills.baer], [4, 2, { hase: 1, ente: 1 }, 1]);
 });
@@ -366,14 +398,14 @@ test('achievements: unlockStored hört nach höchstens drei Runden auf', () => {
   assertEqual(ids, ['erste-schritte']);
 });
 
-test('achievements: Schatzsucher steht am Ende der Liste, Texte wie vorgegeben', () => {
-  const a = ACHIEVEMENTS[ACHIEVEMENTS.length - 1];
+test('achievements: Schatzsucher steht hinter den Durchgangs-Erfolgen, Texte wie vorgegeben', () => {
+  const a = ACHIEVEMENTS.find((x) => x.id === 'schatzsucher');
   assertEqual([a.id, a.title, a.condition, a.line, a.gold],
     ['schatzsucher', 'Schatzsucher', 'Öffne in einem Durchgang 10 Kisten', 'Fremde Kisten öffnen: hier ausnahmsweise erlaubt.', 50]);
 });
 
 test('achievements: ältere Spielstände ohne Schatzsucher bleiben gültig, mit ihm auch, unbekannte Ids nicht', () => {
-  const old = { ...defaultSave(), achievements: Object.fromEntries(ACHIEVEMENTS.slice(0, -1).map((a) => [a.id, 1])) };
+  const old = { ...defaultSave(), achievements: Object.fromEntries(ACHIEVEMENTS.filter((a) => a.id !== 'schatzsucher').map((a) => [a.id, 1])) };
   assertTrue(validate(old).ok);
   assertTrue(validate({ ...old, achievements: { ...old.achievements, schatzsucher: 5 } }).ok);
   assertEqual(validate({ ...old, achievements: { ...old.achievements, schatzsucherX: 5 } }).ok, false);

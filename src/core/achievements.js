@@ -26,7 +26,7 @@ const NO_RUN = Object.freeze({
 
 /**
  * Erfolge, die schon aus dem gespeicherten Stand (Zähler und Gold) folgen, ohne Durchgang; noch nicht freigeschaltete Ids.
- * @param {{ gold: number, achievements: Record<string, number>, stats: LifetimeStats }} save
+ * @param {{ gold: number, inventory: string[], achievements: Record<string, number>, stats: LifetimeStats }} save
  * @returns {string[]}
  */
 export function evaluateStored(save) {
@@ -35,7 +35,7 @@ export function evaluateStored(save) {
 
 /**
  * Schaltet gespeicherte Erfolge in Runden frei (Gold aus einer Runde kann die nächste auslösen, z. B. Sparschwein).
- * @param {{ gold: number, achievements: Record<string, number>, stats: LifetimeStats }} save wird verändert
+ * @param {{ gold: number, inventory: string[], achievements: Record<string, number>, stats: LifetimeStats }} save wird verändert
  * @param {number} nowMs
  * @param {number} [maxRounds]
  * @returns {string[]} alle freigeschalteten Ids in Reihenfolge der Runden

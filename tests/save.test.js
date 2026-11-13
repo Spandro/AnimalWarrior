@@ -209,7 +209,7 @@ test('save: validate prüft Stufen, Einstellungen und Namen', () => {
 test('save: migrate lässt die aktuelle Version unverändert und wirft sonst', () => {
   const s = defaultSave();
   assertEqual(migrate(s), s);
-  assertEqual(SAVE_VERSION, 2);
+  assertEqual(SAVE_VERSION, 3);
   assertThrows(() => migrate({ version: 99 }));
   assertThrows(() => migrate({ version: 0 }));
   assertThrows(() => migrate(null));
@@ -223,14 +223,15 @@ const v1Save = () => ({
   heroes: [v1Hero(1, 'hase', 5, 1), v1Hero(2, 'ente', 7, 2)],
 });
 
-test('save: migrate hebt Version 1 auf 2 mit leeren Erfolgen und Zählern aus den Helden', () => {
+test('save: migrate hebt Version 1 auf 3 mit leeren Erfolgen und Zählern aus den Helden', () => {
   const old = v1Save();
   const copy = JSON.parse(JSON.stringify(old));
   const s = migrate(old);
   assertEqual(old, copy, 'Eingabe bleibt unverändert');
-  assertEqual(s.version, 2);
+  assertEqual(s.version, 3);
   assertEqual(s.achievements, {});
-  assertEqual(s.stats, { kills: {}, runs: 12, wins: 3, winsByAnimal: { hase: 1, ente: 2 }, shadowsRouted: 0 });
+  assertEqual(s.stats, { kills: {}, runs: 12, wins: 3, winsByAnimal: { hase: 1, ente: 2 }, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0 });
+  assertEqual([s.inventory, s.seenItems, s.unlocks], [[], [], []]);
   assertEqual(s.gold, 340);
   assertEqual(s.heroes, old.heroes);
   assertEqual(s.metaUpgrades, { leben: 2 });
@@ -254,20 +255,20 @@ test('save: migrate leitet Siege je Tier aus den Helden ab, nur positive Zahlen 
 
 test('save: migrate einer Version 1 ohne Helden ergibt Nullzähler', () => {
   const s = migrate({ version: 1, gold: 0, metaUpgrades: {}, settings: { volume: 70, quality: 'high' }, heroes: [] });
-  assertEqual(s.stats, { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0 });
+  assertEqual(s.stats, { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0 });
   assertTrue(validate(s).ok);
 });
 
-test('save: Spielstand der Version 1 im Speicher wird beim Laden migriert und dann als Version 2 gespeichert', () => {
+test('save: Spielstand der Version 1 im Speicher wird beim Laden migriert und dann als Version 3 gespeichert', () => {
   const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify(v1Save()) });
   const store = createStore(storage);
   const r = store.load();
   assertEqual(r.status, 'ok');
-  assertEqual(r.data.version, 2);
+  assertEqual(r.data.version, 3);
   assertEqual(r.data.heroes.length, 2);
   assertEqual(r.data.gold, 340);
   store.update((s) => { s.gold += 1; });
-  assertEqual(JSON.parse(storage.getItem(STORAGE_KEY)).version, 2);
+  assertEqual(JSON.parse(storage.getItem(STORAGE_KEY)).version, 3);
   assertEqual(JSON.parse(storage.getItem(STORAGE_KEY)).gold, 341);
 });
 
@@ -275,17 +276,17 @@ test('save: importJson nimmt den Export einer älteren Version 1 an und migriert
   const store = createStore(memoryStorage());
   const r = store.importJson(JSON.stringify(v1Save(), null, 2));
   assertTrue(r.ok, r.error);
-  assertEqual(r.data.version, 2);
+  assertEqual(r.data.version, 3);
   assertEqual(store.load().data.stats.runs, 12);
   assertEqual(store.load().data.heroes.length, 2);
 });
 
-test('save: Version 2 mit Erfolgen und Statistik übersteht Speichern, Export und Import', () => {
+test('save: Version 3 mit Erfolgen und Statistik übersteht Speichern, Export und Import', () => {
   const store = createStore(memoryStorage());
   store.update((s) => {
     s.gold = 80;
     s.achievements = { 'erste-schritte': 1700000000000, pazifist: 1700000005000 };
-    s.stats = { kills: { ratte: 12, baer: 1 }, runs: 3, wins: 1, winsByAnimal: { hase: 1 }, shadowsRouted: 2 };
+    s.stats = { kills: { ratte: 12, baer: 1 }, runs: 3, wins: 1, winsByAnimal: { hase: 1 }, shadowsRouted: 2, tavernRounds: 4, hiLoBestStreak: 2 };
   });
   const loaded = store.load();
   assertEqual(loaded.status, 'ok');
@@ -295,11 +296,12 @@ test('save: Version 2 mit Erfolgen und Statistik übersteht Speichern, Export un
   assertEqual(other.load().data, loaded.data);
 });
 
-test('save: defaultSave enthält Erfolge und Nullstatistik', () => {
+test('save: defaultSave enthält Erfolge, Nullstatistik und leere Taverne-Felder', () => {
   const s = defaultSave();
-  assertEqual(s.version, 2);
+  assertEqual(s.version, 3);
   assertEqual(s.achievements, {});
-  assertEqual(s.stats, { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0 });
+  assertEqual(s.stats, { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0 });
+  assertEqual([s.inventory, s.seenItems, s.unlocks], [[], [], []]);
 });
 
 test('save: validate lehnt unbekannte Erfolge, negative oder gebrochene Zähler und falsche Formen ab', () => {
@@ -379,7 +381,7 @@ test('save: exportText enthält den Spielstand im Speicher und lässt sich wiede
   addHero(save, spec, ctx(1));
   addHero(save, { name: 'Quak', animal: 'ente', class: 'magier' }, ctx(2));
   save.achievements['erste-schritte'] = 5;
-  save.stats = { kills: { ratte: 12 }, runs: 3, wins: 1, winsByAnimal: { hase: 1 }, shadowsRouted: 2 };
+  save.stats = { kills: { ratte: 12 }, runs: 3, wins: 1, winsByAnimal: { hase: 1 }, shadowsRouted: 2, tavernRounds: 0, hiLoBestStreak: 0 };
   const text = exportText(save);
   assertEqual(JSON.parse(text), save);
   const back = createStore(memoryStorage()).importJson(text);
@@ -400,4 +402,69 @@ test('save: settleRun verbucht den Durchgang beim Helden, ohne Held bleibt nur d
   assertEqual([s.gold, s.heroes[0].survivor], [12, { bestTime: 100, wins: 1, runs: 1 }]);
   settleRun(s, 'weg', { won: true, time: 100, gold: 8.5 });
   assertEqual([s.gold, s.heroes[0].survivor], [20, { bestTime: 100, wins: 1, runs: 1 }]);
+});
+
+// ------------------------------------------------------------------ Version 3 (Taverne)
+
+const v2Save = () => ({
+  version: 2, gold: 340, metaUpgrades: { leben: 2 }, settings: { volume: 40, quality: 'low' },
+  heroes: [v1Hero(1, 'hase', 5, 1), v1Hero(2, 'ente', 7, 2)],
+  achievements: { pazifist: 1700000000000 },
+  stats: { kills: { ratte: 9 }, runs: 12, wins: 3, winsByAnimal: { hase: 1, ente: 2 }, shadowsRouted: 1 },
+});
+
+test('save: migrate hebt Version 2 auf 3, ergänzt leere Listen und Zähler und lässt alles andere unverändert', () => {
+  const old = v2Save();
+  const copy = JSON.parse(JSON.stringify(old));
+  const s = migrate(old);
+  assertEqual(old, copy, 'Eingabe bleibt unverändert');
+  assertEqual(s.version, 3);
+  assertEqual([s.inventory, s.seenItems, s.unlocks], [[], [], []]);
+  assertEqual(s.stats, { ...old.stats, tavernRounds: 0, hiLoBestStreak: 0 });
+  assertEqual([s.gold, s.metaUpgrades, s.settings, s.heroes, s.achievements],
+    [340, { leben: 2 }, { volume: 40, quality: 'low' }, old.heroes, old.achievements]);
+  assertTrue(validate(s).ok);
+});
+
+test('save: importJson nimmt den Export einer Version 2 an und migriert ihn', () => {
+  const store = createStore(memoryStorage());
+  const r = store.importJson(JSON.stringify(v2Save(), null, 2));
+  assertTrue(r.ok, r.error);
+  assertEqual(r.data.version, 3);
+  assertEqual(store.load().data.heroes.length, 2);
+  assertEqual(store.load().data.stats.runs, 12);
+});
+
+test('save: validate lehnt unbekannte und doppelte Gegenstände, fremde seenItems und unbekannte Freischaltungen ab', () => {
+  const s = defaultSave();
+  const withLists = (o) => ({ ...s, ...o });
+  assertTrue(validate(withLists({ inventory: ['helm_zuversicht'], seenItems: ['helm_zuversicht'], unlocks: ['duo'] })).ok);
+  assertEqual(validate(withLists({ inventory: ['gibtEsNicht'] })).ok, false);
+  assertEqual(validate(withLists({ inventory: ['helm_zuversicht', 'helm_zuversicht'] })).ok, false);
+  assertEqual(validate(withLists({ inventory: ['helm_zuversicht'], seenItems: ['denkerkappe'] })).ok, false);
+  assertEqual(validate(withLists({ inventory: ['helm_zuversicht'], seenItems: ['helm_zuversicht', 'helm_zuversicht'] })).ok, false);
+  assertEqual(validate(withLists({ unlocks: ['gibtEsNicht'] })).ok, false);
+  assertEqual(validate(withLists({ unlocks: ['duo', 'duo'] })).ok, false);
+  assertEqual(validate(withLists({ inventory: undefined })).ok, false);
+  assertEqual(validate(withLists({ seenItems: 'x' })).ok, false);
+  assertEqual(validate(withLists({ unlocks: {} })).ok, false);
+});
+
+test('save: validate lehnt ungültige Taverne-Zähler ab', () => {
+  const s = defaultSave();
+  const withStats = (o) => ({ ...s, stats: { ...s.stats, ...o } });
+  assertEqual(validate(withStats({ tavernRounds: -1 })).ok, false);
+  assertEqual(validate(withStats({ tavernRounds: 1.5 })).ok, false);
+  assertEqual(validate(withStats({ hiLoBestStreak: -1 })).ok, false);
+  assertEqual(validate(withStats({ hiLoBestStreak: 'x' })).ok, false);
+  assertEqual(validate(withStats({ tavernRounds: undefined })).ok, false);
+  assertTrue(validate(withStats({ tavernRounds: 50, hiLoBestStreak: 5 })).ok);
+});
+
+test('save: validate lehnt Helden mit unbekanntem Tier oder unbekannter Klasse ab', () => {
+  const s = defaultSave();
+  const hero = (extra) => ({ id: 'a', name: 'x', animal: 'hase', class: 'krieger', createdAt: 1, survivor: { bestTime: 0, wins: 0, runs: 0 }, ...extra });
+  assertTrue(validate({ ...s, heroes: [hero({})] }).ok);
+  assertEqual(validate({ ...s, heroes: [hero({ animal: 'drache' })] }).ok, false);
+  assertEqual(validate({ ...s, heroes: [hero({ class: 'barde' })] }).ok, false);
 });

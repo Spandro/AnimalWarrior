@@ -1,8 +1,10 @@
 import { ANIMALS } from '../data/animals.js';
-import { CLASSES } from '../data/classes.js';
 import { META } from '../data/meta.js';
 import { ENEMIES } from '../data/enemies.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
+import { ITEMS } from '../data/items.js';
+import { UNLOCKS } from '../data/tavern.js';
+import { isValidPair, animalUnlocked } from '../core/roster.js';
 
 /**
  * @typedef {{ bestTime: number, wins: number, runs: number }} SurvivorRecord
@@ -10,11 +12,13 @@ import { ACHIEVEMENTS } from '../data/achievements.js';
  * @typedef {{ volume: number, quality: 'high' | 'low' }} Settings
  * @typedef {import('../data/achievements.js').LifetimeStats} LifetimeStats
  * @typedef {{ version: number, heroes: Hero[], gold: number, metaUpgrades: Record<string, number>, settings: Settings,
- *   achievements: Record<string, number>, stats: LifetimeStats }} Save
- *   `achievements`: Erfolgs-Id → Zeitpunkt der Freischaltung (ms); `stats`: lebenslange Zähler für alle Helden.
+ *   achievements: Record<string, number>, stats: LifetimeStats, inventory: string[], seenItems: string[], unlocks: string[] }} Save
+ *   `achievements`: Erfolgs-Id → Zeitpunkt der Freischaltung (ms); `stats`: lebenslange Zähler für alle Helden;
+ *   `inventory`: Kennungen der gefundenen Gegenstände (jede höchstens einmal); `seenItems`: davon in der Truhe schon
+ *   angesehene; `unlocks`: Freischaltungen des Spielstands (z. B. 'duo').
  */
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 export const STORAGE_KEY = 'animalwarrior.save';
 export const BACKUP_KEY = 'animalwarrior.save.corrupt';
 export const MAX_HEROES = 6;
@@ -29,7 +33,10 @@ export function defaultSave() {
     metaUpgrades: {},
     settings: { volume: 70, quality: 'high' },
     achievements: {},
-    stats: { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0 },
+    stats: { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0 },
+    inventory: [],
+    seenItems: [],
+    unlocks: [],
   };
 }
 
@@ -38,6 +45,7 @@ const countOf = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? 
 /**
  * Migrationsschritte: Version n → n + 1; sie ändern ihre Eingabe nicht.
  * 1 → 2: Erfolge und lebenslange Zähler; Durchgänge, Siege und Siege je Tier stammen aus den Helden, der Rest beginnt bei null.
+ * 2 → 3: Taverne – leere Truhe und Freischaltungen, Zähler für Runden und Trefferserie bei null; alles andere bleibt.
  */
 const MIGRATIONS = {
   1: (data) => {
@@ -57,6 +65,14 @@ const MIGRATIONS = {
       stats: { kills: {}, runs: total('runs'), wins: total('wins'), winsByAnimal, shadowsRouted: 0 },
     };
   },
+  2: (data) => ({
+    ...data,
+    version: 3,
+    stats: { ...data.stats, tavernRounds: 0, hiLoBestStreak: 0 },
+    inventory: [],
+    seenItems: [],
+    unlocks: [],
+  }),
 };
 
 /**
@@ -81,6 +97,10 @@ export function migrate(data) {
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const isNonNegNumber = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
 
+/** Liste bekannter, nicht doppelter Kennungen. */
+const isIdList = (list, known) =>
+  Array.isArray(list) && new Set(list).size === list.length && list.every((id) => typeof id === 'string' && known(id));
+
 /**
  * @param {any} data
  * @returns {{ ok: boolean, error?: string }}
@@ -91,14 +111,17 @@ export function validate(data) {
   if (data.version !== SAVE_VERSION) return fail('Falsche Version');
   if (!Array.isArray(data.heroes)) return fail('Helden fehlen');
   if (data.heroes.length > MAX_HEROES) return fail('Zu viele Helden');
+  if (!isIdList(data.inventory, (id) => Object.hasOwn(ITEMS, id))) return fail('Ungültige Truhe');
+  if (!isIdList(data.seenItems, (id) => data.inventory.includes(id))) return fail('Ungültige angesehene Gegenstände');
+  if (!isIdList(data.unlocks, (id) => UNLOCKS.includes(id))) return fail('Ungültige Freischaltungen');
   const ids = new Set();
   for (const h of data.heroes) {
     if (!isObject(h)) return fail('Ungültiger Held');
     if (typeof h.id !== 'string' || h.id === '' || ids.has(h.id)) return fail('Ungültige Helden-Id');
     ids.add(h.id);
     if (typeof h.name !== 'string' || h.name.length < 1 || h.name.length > MAX_NAME_LENGTH) return fail('Ungültiger Heldenname');
-    if (!Object.hasOwn(ANIMALS, h.animal)) return fail('Unbekanntes Tier');
-    if (!Object.hasOwn(CLASSES, h.class)) return fail('Unbekannte Klasse');
+    if (!isValidPair(h.animal, h.class)) return fail('Ungültige Kombination aus Tier und Klasse');
+    if (!animalUnlocked(data, h.animal)) return fail('Tier nicht freigeschaltet');
     if (typeof h.createdAt !== 'number' || !Number.isFinite(h.createdAt)) return fail('Ungültiges Erstellungsdatum');
     const s = h.survivor;
     if (!isObject(s) || !isNonNegNumber(s.bestTime) || !isNonNegNumber(s.wins) || !isNonNegNumber(s.runs)) {
@@ -123,7 +146,7 @@ export function validate(data) {
   }
   const stats = data.stats;
   if (!isObject(stats)) return fail('Statistik fehlt');
-  for (const key of ['runs', 'wins', 'shadowsRouted']) {
+  for (const key of ['runs', 'wins', 'shadowsRouted', 'tavernRounds', 'hiLoBestStreak']) {
     if (!Number.isInteger(stats[key]) || stats[key] < 0) return fail('Ungültiger Zähler');
   }
   for (const [field, known] of [['kills', ENEMIES], ['winsByAnimal', ANIMALS]]) {

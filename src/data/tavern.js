@@ -6,6 +6,9 @@
 /** Einsätze, Beute-Schwelle und Preis des Duos. */
 export const TAVERN = { stakes: [10, 50, 100, 500], lootMinStake: 100, duoPrice: 20000 };
 
+/** Bekannte Freischaltungen des Spielstands (`save.unlocks`). Tiere nennen sie im Feld `unlock`. */
+export const UNLOCKS = ['duo'];
+
 /** Würfelbecher: Gewinn zahlt `winMul` × Einsatz, Gleichstand `tieMul` × Einsatz (abgerundet). */
 export const DICE = { winMul: 2, tieMul: 0.5 };
 

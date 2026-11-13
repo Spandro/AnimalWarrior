@@ -1,9 +1,7 @@
-import { ANIMALS } from './animals.js';
-
 /**
  * Lebenslange Zähler im Spielstand (gemeinsam für alle Helden).
  * @typedef {{ kills: Record<string, number>, runs: number, wins: number, winsByAnimal: Record<string, number>,
- *   shadowsRouted: number }} LifetimeStats
+ *   shadowsRouted: number, tavernRounds: number, hiLoBestStreak: number }} LifetimeStats
  *
  * Zahlen eines Durchgangs (`run.facts` aus modes/survivor.js), nur einfache Werte.
  * `ended`/`won`/`hpFractionAtEnd` gelten erst, wenn der Durchgang vorbei ist; `level10At`: Spielzeit, zu der Level 10
@@ -13,8 +11,8 @@ import { ANIMALS } from './animals.js';
  *   hpFractionAtEnd: number, longestNoKillStreak: number, maxedAbilities: number, chestsOpened: number, animalId: string, classId: string }} RunFacts
  *
  * Eingabe jeder Bedingung. `stats` enthält die Zahlen des laufenden Durchgangs schon (mitten im Durchgang nur
- * Tötungen und Schatten), `save.gold` ebenso das verdiente Gold.
- * @typedef {{ run: RunFacts, stats: LifetimeStats, save: { gold: number } }} AchievementContext
+ * Tötungen und Schatten), `save.gold` ebenso das verdiente Gold; `save.inventory`: Kennungen der Truhe.
+ * @typedef {{ run: RunFacts, stats: LifetimeStats, save: { gold: number, inventory: string[] } }} AchievementContext
  * @typedef {{ id: string, title: string, condition: string, line: string, gold: number, check: (ctx: AchievementContext) => boolean }} Achievement
  */
 
@@ -85,7 +83,8 @@ export const ACHIEVEMENTS = [
   {
     id: 'zoo-direktor', title: 'Zoo-Direktor', condition: 'Gewinne mit jedem Tier einen Durchgang',
     line: 'Hase, Ente, Waschbär. Fehlt nur noch der Streichelzoo.', gold: 200,
-    check: (c) => Object.keys(ANIMALS).every((id) => (c.stats.winsByAnimal[id] || 0) >= 1),
+    // Fest die drei Ursprungstiere: das Duo darf den Erfolg nicht nachträglich schwerer machen (es hat "Hochstapler").
+    check: (c) => ['hase', 'ente', 'waschbaer'].every((id) => (c.stats.winsByAnimal[id] || 0) >= 1),
   },
   {
     id: 'knapp-daneben', title: 'Knapp daneben', condition: 'Gewinne mit weniger als 5 % Leben',
@@ -114,5 +113,23 @@ export const ACHIEVEMENTS = [
   {
     id: 'schatzsucher', title: 'Schatzsucher', condition: 'Öffne in einem Durchgang 10 Kisten',
     line: 'Fremde Kisten öffnen: hier ausnahmsweise erlaubt.', gold: 50, check: (c) => c.run.chestsOpened >= 10,
+  },
+  {
+    // Die Kennung `stammgast` gehört schon dem Erfolg für 25 Durchgänge und bleibt dort (gespeicherte Stände).
+    id: 'tavern-stammgast', title: 'Taverne-Stammgast', condition: 'Spiele 50 Runden in der Taverne',
+    line: 'Dein Krug hat schon deinen Namen.', gold: 25, check: (c) => c.stats.tavernRounds >= 50,
+  },
+  {
+    id: 'riecher', title: 'Riecher', condition: 'Erziele bei Höher oder tiefer fünf Treffer in einer Runde',
+    line: 'Kasimir prüft jetzt seine Ärmel.', gold: 50, check: (c) => c.stats.hiLoBestStreak >= 5,
+  },
+  {
+    id: 'sammelwut', title: 'Sammelwut', condition: 'Finde 12 verschiedene Gegenstände für deine Truhe',
+    line: 'Der Dachboden ist voll. Die Truhe noch nicht.', gold: 50, check: (c) => c.save.inventory.length >= 12,
+  },
+  {
+    id: 'hochstapler', title: 'Hochstapler', condition: 'Gewinne einen Durchgang mit dem Duo',
+    line: 'Zusammen sind sie größer als jeder Bär.', gold: 100,
+    check: (c) => c.run.ended && c.run.won && c.run.animalId === 'giraffe',
   },
 ];
