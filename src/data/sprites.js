@@ -1,7 +1,7 @@
 // Gemalte Figuren: wo sie in den Bildbögen liegen, wie groß sie in der Welt sind und wie sie sich bewegen.
 
 /**
- * @typedef {'hop'|'waddle'|'scurry'|'trot'|'fly'|'hopSlow'|'lope'|'lumber'} MotionId
+ * @typedef {'hop'|'waddle'|'scurry'|'trot'|'fly'|'hopSlow'|'lope'|'lumber'|'slither'} MotionId
  * @typedef {{ sheet: 'helden'|'gegner'|'gegner2'|'bosse', x: number, y: number, w: number, h: number, heightM: number, motion: MotionId,
  *   footOffset: number }} SpriteDef
  *   Pixelrechteck der Figur im Bogen (x, y von links oben; enge Umrandung plus 6 px Rand), Höhe in Weltmetern,
@@ -77,6 +77,12 @@ export const ENEMY_SPRITES = {
   giftkroete: { sheet: 'gegner', x: 16, y: 863, w: 397, h: 278, heightM: 0.8, motion: 'hopSlow', footOffset: 0.06 },
   wolf: { sheet: 'gegner', x: 408, y: 774, w: 438, h: 380, heightM: 1.3, motion: 'lope', footOffset: 0.07 },
   baer: { sheet: 'gegner', x: 869, y: 620, w: 376, h: 554, heightM: 3.2, motion: 'lumber', footOffset: 0.12 },
+  fuchs: { sheet: 'gegner2', x: 9, y: 330, w: 425, h: 224, heightM: 0.75, motion: 'lope', footOffset: 0.04 },
+  dachs: { sheet: 'gegner2', x: 458, y: 304, w: 359, h: 269, heightM: 0.7, motion: 'trot', footOffset: 0.04 },
+  uhu: { sheet: 'gegner2', x: 831, y: 174, w: 413, h: 413, heightM: 0.9, motion: 'fly', footOffset: 0 },
+  kreuzotter: { sheet: 'gegner2', x: 54, y: 707, w: 319, h: 266, heightM: 0.45, motion: 'slither', footOffset: 0.03 },
+  igel: { sheet: 'gegner2', x: 441, y: 714, w: 317, h: 269, heightM: 0.5, motion: 'scurry', footOffset: 0.03 },
+  luchs: { sheet: 'gegner2', x: 791, y: 683, w: 428, h: 326, heightM: 1.1, motion: 'lope', footOffset: 0.05 },
 };
 
 /** Flughöhe der Krähe über dem Boden (m, Unterkante des Bildes). */
@@ -107,6 +113,7 @@ export const MOTION = {
   hopSlow: { freq: 0.9, bob: 0.3, tilt: 0.2, squash: 0.12 },
   lope: { freq: 2.4, bob: 0.12, tilt: 0.1, squash: 0.05, tiltRate: 1 },
   lumber: { freq: 1.1, bob: 0.1, tilt: 0.07, squash: 0.03, tiltRate: 1 },
+  slither: { freq: 1.6, bob: 0, tilt: 0.08, squash: 0.06 },
 };
 
 /** Treffer am Helden: Dauer (ms) und Farbfaktor (RGB, multipliziert das Bild) des roten Aufblitzens. */

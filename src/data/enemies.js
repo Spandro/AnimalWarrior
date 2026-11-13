@@ -1,15 +1,23 @@
 /**
- * @typedef {{ id: string, hp: number, speed: number, damage: number, radius: number, xp: number, behavior: string, flying?: boolean }} EnemyDef
+ * @typedef {{ id: string, name: string, hp: number, speed: number, damage: number, radius: number, xp: number, behavior: string,
+ *   flying?: boolean, venom?: boolean }} EnemyDef
+ *   name: Anzeigename (Bossanzeige); venom: Berührungstreffer vergiftet (siehe VENOM).
  */
 
 /** @type {Record<string, EnemyDef>} */
 export const ENEMIES = {
-  ratte: { id: 'ratte', hp: 6, speed: 4.2, damage: 4, radius: 0.35, xp: 1, behavior: 'chase' },
-  wildschwein: { id: 'wildschwein', hp: 40, speed: 2.4, damage: 10, radius: 0.7, xp: 4, behavior: 'charge' },
-  kraehe: { id: 'kraehe', hp: 14, speed: 4.8, damage: 6, radius: 0.4, xp: 3, behavior: 'strafe', flying: true },
-  giftkroete: { id: 'giftkroete', hp: 25, speed: 2.6, damage: 8, radius: 0.5, xp: 5, behavior: 'ranged' },
-  wolf: { id: 'wolf', hp: 45, speed: 5.4, damage: 12, radius: 0.5, xp: 6, behavior: 'circle' },
-  baer: { id: 'baer', hp: 1500, speed: 3.2, damage: 25, radius: 1.4, xp: 100, behavior: 'boss' },
+  ratte: { id: 'ratte', name: 'Ratte', hp: 6, speed: 4.2, damage: 4, radius: 0.35, xp: 1, behavior: 'chase' },
+  wildschwein: { id: 'wildschwein', name: 'Wildschwein', hp: 40, speed: 2.4, damage: 10, radius: 0.7, xp: 4, behavior: 'charge' },
+  kraehe: { id: 'kraehe', name: 'Krähe', hp: 14, speed: 4.8, damage: 6, radius: 0.4, xp: 3, behavior: 'strafe', flying: true },
+  giftkroete: { id: 'giftkroete', name: 'Giftkröte', hp: 25, speed: 2.6, damage: 8, radius: 0.5, xp: 5, behavior: 'ranged' },
+  wolf: { id: 'wolf', name: 'Wolf', hp: 45, speed: 5.4, damage: 12, radius: 0.5, xp: 6, behavior: 'circle' },
+  fuchs: { id: 'fuchs', name: 'Fuchs', hp: 10, speed: 5.6, damage: 5, radius: 0.4, xp: 2, behavior: 'strafe' },
+  igel: { id: 'igel', name: 'Igel', hp: 20, speed: 2.0, damage: 7, radius: 0.4, xp: 3, behavior: 'curl' },
+  dachs: { id: 'dachs', name: 'Dachs', hp: 70, speed: 2.2, damage: 10, radius: 0.55, xp: 5, behavior: 'chase' },
+  kreuzotter: { id: 'kreuzotter', name: 'Kreuzotter', hp: 18, speed: 3.4, damage: 6, radius: 0.4, xp: 4, behavior: 'slither', venom: true },
+  uhu: { id: 'uhu', name: 'Uhu', hp: 35, speed: 4.0, damage: 10, radius: 0.5, xp: 6, behavior: 'charge', flying: true },
+  luchs: { id: 'luchs', name: 'Luchs', hp: 40, speed: 4.4, damage: 14, radius: 0.5, xp: 7, behavior: 'pounce' },
+  baer: { id: 'baer', name: 'Bär', hp: 1500, speed: 3.2, damage: 25, radius: 1.4, xp: 100, behavior: 'boss' },
 };
 
 export const ELITE = { hpMul: 8, scale: 1.6, xpMul: 10 };
@@ -42,6 +50,28 @@ export const CHARGE = { interval: 4, windup: 0.6, duration: 1, speedMul: 3 };
 
 /** Krähe: nähert sich mit seitlichem Versatz (Anteil `lateral` je Vorwärtseinheit), Seitenwechsel alle `switchInterval` s. */
 export const STRAFE = { lateral: 0.6, switchInterval: 1.5 };
+
+/** Kreuzotter: wie STRAFE, aber enger gewunden. */
+export const SLITHER = { lateral: 0.8, switchInterval: 0.6 };
+
+/**
+ * Gift der Kreuzotter: ein durchgekommener Biss vergiftet `duration` s; alle `tick` s verliert der Held
+ * `dpsMul` × Schaden der Otter × `tick` Leben. Ein neuer Biss frischt die Dauer auf, stapelt aber nicht.
+ */
+export const VENOM = { duration: 4, tick: 0.5, dpsMul: 0.5 };
+
+/**
+ * Igel: nimmt er Schaden, rollt er sich `duration` s ein, nimmt dann nur `damageTaken` des Schadens und rollt mit
+ * `speedMul`-fachem Tempo; danach `cooldown` s, in denen er sich nicht erneut einrollt.
+ */
+export const CURL = { duration: 2.5, damageTaken: 0.2, speedMul: 3, cooldown: 1.5 };
+
+/**
+ * Luchs: verfolgt, bis der Held höchstens `engageRange` entfernt ist; duckt sich dann `crouch` s (Bodenkreis mit
+ * `radius` an der Heldenposition) und springt in `leapTime` s dorthin. Trifft bei der Landung mit `damageMul`,
+ * wenn der Held im Kreis steht; danach `cooldown` s normales Verfolgen.
+ */
+export const POUNCE = { engageRange: 8, crouch: 0.8, leapTime: 0.5, radius: 1.2, cooldown: 3, damageMul: 1 };
 
 /**
  * Giftkröte: hält `minRange`–`maxRange` Abstand und schießt alle `fireInterval` s, wenn der Held

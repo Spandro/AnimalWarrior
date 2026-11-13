@@ -1,6 +1,6 @@
 import { test, assertEqual, assertClose, assertTrue } from './runner.js';
 import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary, displayTime, abandonRun, skipDying } from '../src/modes/survivor.js';
-import { spawnRadius, hpMul, BOSS_HP_MUL, MAX_ENEMIES, DEFAULT_VIEW, DYING } from '../src/data/waves.js';
+import { spawnRadius, hpMul, BOSS_HP_MUL, MAX_ENEMIES, DEFAULT_VIEW, DYING, unlockMinute, weights } from '../src/data/waves.js';
 import { createWorld, stepWorld, spawnEnemy, damageEnemy } from '../src/core/world.js';
 import { obstaclesNear, obstaclesInCell } from '../src/core/terrain.js';
 import { ENEMIES, ELITE, DROPS, BOSS } from '../src/data/enemies.js';
@@ -57,6 +57,22 @@ test('survivor: nach setView(30, 6) erscheint kein Gegner näher als 33', () => 
 test('survivor: Standardsicht ist 20 × 12', () => {
   assertEqual(newRun().view, DEFAULT_VIEW);
   assertEqual(DEFAULT_VIEW, { halfW: 20, halfH: 12 });
+});
+
+test('survivor: Freischaltminuten und Gewichte der Gegner, jeder Gegner hat einen Namen', () => {
+  assertEqual(unlockMinute, {
+    ratte: 0, fuchs: 1, wildschwein: 2, igel: 3, kraehe: 4, dachs: 5, giftkroete: 6, kreuzotter: 7, uhu: 8, wolf: 9, luchs: 10,
+  });
+  assertEqual(weights, {
+    ratte: 10, fuchs: 6, wildschwein: 3, igel: 3, kraehe: 4, dachs: 2, giftkroete: 2, kreuzotter: 3, uhu: 2, wolf: 3, luchs: 2,
+  });
+  for (const [type, def] of Object.entries(ENEMIES)) {
+    assertTrue(typeof def.name === 'string' && def.name.length > 0, `${type}: Name`);
+    if (def.behavior !== 'boss') assertTrue(type in unlockMinute && type in weights, `${type}: Welle`);
+  }
+  assertEqual(['fuchs', 'igel', 'dachs', 'kreuzotter', 'uhu', 'luchs'].map((t) => ENEMIES[t].name),
+    ['Fuchs', 'Igel', 'Dachs', 'Kreuzotter', 'Uhu', 'Luchs']);
+  assertTrue(ENEMIES.uhu.flying && ENEMIES.kreuzotter.venom);
 });
 
 test('survivor: in Minute 0 erscheinen nur Ratten', () => {

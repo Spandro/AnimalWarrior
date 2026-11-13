@@ -6,10 +6,14 @@ export { MAX_ENEMIES };
 export const RUN_DURATION = 900;
 
 /** Minute, ab der ein Gegnertyp erscheint. */
-export const unlockMinute = { ratte: 0, wildschwein: 2, kraehe: 4, giftkroete: 6, wolf: 9 };
+export const unlockMinute = {
+  ratte: 0, fuchs: 1, wildschwein: 2, igel: 3, kraehe: 4, dachs: 5, giftkroete: 6, kreuzotter: 7, uhu: 8, wolf: 9, luchs: 10,
+};
 
 /** Relative Häufigkeit der freigeschalteten Gegnertypen. */
-export const weights = { ratte: 10, wildschwein: 3, kraehe: 4, giftkroete: 2, wolf: 3 };
+export const weights = {
+  ratte: 10, fuchs: 6, wildschwein: 3, igel: 3, kraehe: 4, dachs: 2, giftkroete: 2, kreuzotter: 3, uhu: 2, wolf: 3, luchs: 2,
+};
 
 /** Minute, ab der die Formeln nicht mehr steigen. */
 export const MAX_FORMULA_MINUTE = 14;

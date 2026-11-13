@@ -204,6 +204,12 @@ const wingParts = (s) => [
 ];
 
 /** Fassungsvermögen je Gegnertyp: 300 reguläre insgesamt plus ausgenommene Elite; Bären sind Bosse. */
+/** 3D-Ersatz für Tiere ohne eigene Form: Kennung → Form aus ENEMY_PARTS. */
+const FALLBACK_SHAPE = {
+  fuchs: 'wolf', luchs: 'wolf', dachs: 'wildschwein', keiler: 'wildschwein', igel: 'ratte', kreuzotter: 'ratte',
+  uhu: 'kraehe', hirsch: 'baer', wisent: 'baer',
+};
+
 const ENEMY_CAPACITY = 320;
 const BOSS_CAPACITY = 4;
 const CROW_HEIGHT = 1.3;
@@ -318,9 +324,11 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
   let orient = null;
   if (painted) {
     orient = billboardOrientation(camera);
-    const spriteMat = mat(spriteMaterial(sprites.textures.gegner));
+    /** @type {Record<string, THREE.Material>} je Bildbogen ein Material */
+    const sheetMats = {};
+    const sheetMat = (sheet) => (sheetMats[sheet] ??= mat(spriteMaterial(sprites.textures[sheet])));
     for (const [type, def] of Object.entries(ENEMY_SPRITES)) {
-      enemyPools[type] = createPool(root, geo(spriteGeometry(def, sprites.sizes[def.sheet])), spriteMat, capacity(type), { grow: false });
+      enemyPools[type] = createPool(root, geo(spriteGeometry(def, sprites.sizes[def.sheet])), sheetMat(def.sheet), capacity(type), { grow: false });
       spriteSize[type] = { width: spriteWidth(def), height: def.heightM };
     }
     blobs = createPool(root, discGeo, mat(shadowMaterial()), ENEMY_CAPACITY, { grow: false });
@@ -328,6 +336,13 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
     const furMat = mat(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88 }));
     for (const type of Object.keys(ENEMY_PARTS)) {
       enemyPools[type] = createPool(root, geo(mergeParts(ENEMY_PARTS[type])), furMat, capacity(type), { grow: false, castShadow: true });
+    }
+    // Neue Tiere ohne eigene Form: Form eines ähnlichen Tiers, nach Körperradius skaliert.
+    for (const [type, form] of Object.entries(FALLBACK_SHAPE)) {
+      if (!ENEMIES[type]) continue;
+      const g = mergeParts(ENEMY_PARTS[form]);
+      g.scale(...Array(3).fill(ENEMIES[type].radius / ENEMIES[form].radius));
+      enemyPools[type] = createPool(root, geo(g), furMat, capacity(type), { grow: false, castShadow: true });
     }
     wingL = createPool(root, geo(mergeParts(wingParts(1))), furMat, ENEMY_CAPACITY, { grow: false, castShadow: true });
     wingR = createPool(root, geo(mergeParts(wingParts(-1))), furMat, ENEMY_CAPACITY, { grow: false, castShadow: true });

@@ -159,6 +159,20 @@ test('sprites: jede Heldenkombination und jeder Gegnertyp hat ein Bild', () => {
   for (const type of Object.keys(ENEMIES)) check(type, ENEMY_SPRITES[type]);
 });
 
+test('sprites: alle Gegnerausschnitte liegen im Bogen; die neuen wie ausgemessen', () => {
+  for (const [type, s] of Object.entries(ENEMY_SPRITES)) {
+    assertTrue(s.x >= 0 && s.y >= 0 && s.x + s.w <= 1254 && s.y + s.h <= 1254, `${type} ragt aus dem Bogen`);
+    assertTrue(Object.hasOwn(SHEETS, s.sheet), `${type}: Bogen ${s.sheet}`);
+  }
+  const cut = (t) => { const s = ENEMY_SPRITES[t]; return [s.sheet, s.x, s.y, s.w, s.h]; };
+  assertEqual(cut('fuchs'), ['gegner2', 9, 330, 425, 224]);
+  assertEqual(cut('dachs'), ['gegner2', 458, 304, 359, 269]);
+  assertEqual(cut('uhu'), ['gegner2', 831, 174, 413, 413]);
+  assertEqual(cut('kreuzotter'), ['gegner2', 54, 707, 319, 266]);
+  assertEqual(cut('igel'), ['gegner2', 441, 714, 317, 269]);
+  assertEqual(cut('luchs'), ['gegner2', 791, 683, 428, 326]);
+});
+
 test('hero: die Figur dreht sich beim Zielen in die Zielrichtung, sonst in die Laufrichtung', () => {
   const lauf = { x: 1, z: 0 };
   // Ohne Zielrichtung zählt die Laufrichtung.
