@@ -130,17 +130,23 @@ Ein Kartenstapel mit 2 bis 10, Bube, Dame, König und Ass (13 Werte). Die Farben
   - Eine Wahl ohne Gewinnchance (Höher bei Ass) ist gesperrt.
   - Grund: Mit festem Verdoppeln könnte man bei einer 2 fast sicher „Höher“ tippen und Gold vermehren. Gold würde wertlos.
 - Nach jedem Treffer: **„Auszahlen“** oder **weiterspielen**. Höchstens **fünf Treffer** pro Runde. Nach dem fünften wird automatisch ausgezahlt, ebenso, sobald der Topf das **50-Fache des Einsatzes** erreicht.
-- **Joker:** Jede aufgedeckte Karte ist mit 2 % Chance ein Joker. Dann wird der bisherige Topf sofort ausgezahlt, ohne Verlust. Ab Einsatz 100 gibt es dazu einen Gegenstand. Die Runde endet.
+- **Joker:** Jede Karte, die nach einem Tipp aufgedeckt wird, ist mit 2 % Chance ein Joker. Dann wird der bisherige Topf sofort ausgezahlt, ohne Verlust. Ab Einsatz 100 gibt es dazu einen Gegenstand. Die Runde endet.
+  - Die offene Startkarte ist nie ein Joker.
+  - Der Joker wird vor dem Kartenwert ausgewürfelt. Er nimmt also Gewinn und Verlust anteilig je 2 % weg.
+  - Er zählt nicht als Treffer, weder für die fünf Treffer noch für die Trefferserie.
+- **Karten** werden unabhängig gezogen: jeder der 13 Werte mit gleicher Chance, wie mit Zurücklegen. Die Faktoren rechnen ohne Joker.
+- **Topf:** Nach jedem Treffer wird der Topf auf ganzes Gold abgerundet. Die Obergrenze des 50-fachen Einsatzes prüft den abgerundeten Wert.
 - Auszahlung je Schritt im Schnitt etwa **93 %**. Wer früh auszahlt, verliert am wenigsten.
 - **Speichern je Schritt:**
-  - Beim Start wird der Einsatz abgebucht und gespeichert. Der Topf lebt nur im Speicher der Seite.
+  - Beim Start wird der Einsatz abgebucht und gespeichert. Die Runde zählt dabei schon für `tavernRounds`. Der Topf lebt nur im Speicher der Seite.
   - Jeder Schritt wird sofort ausgewertet. Erst „Auszahlen“, das automatische Auszahlen oder der Joker schreibt den Topf gut.
+  - Endet eine Runde mit einem Fehltipp, wird ebenfalls gespeichert, damit die Trefferserie (`hiLoBestStreak`) erhalten bleibt.
   - Wer mitten in einer Runde die Seite schließt oder „Zurück“ tippt, verliert den Topf. „Zurück“ fragt deshalb nach, solange ein Topf da ist.
 - Die bisher längste Trefferserie wird für einen Erfolg gezählt.
 
 ### 5.5 Erfolge der Taverne
 
-Drei neue Erfolge im Ton der vorhandenen. Die Belohnung ist bewusst klein:
+Vier neue Erfolge im Ton der vorhandenen. Die Belohnung ist bewusst klein:
 
 | Erfolg | Bedingung | Spruch | Gold |
 |---|---|---|---|
@@ -149,7 +155,7 @@ Drei neue Erfolge im Ton der vorhandenen. Die Belohnung ist bewusst klein:
 | Sammelwut | 12 verschiedene Gegenstände in der Truhe | „Der Dachboden ist voll. Die Truhe noch nicht.“ | 50 |
 | Hochstapler | Einen Durchgang mit dem Duo gewinnen | „Zusammen sind sie größer als jeder Bär.“ | 100 |
 
-Taverne-Erfolge werden nach jeder Runde geprüft und wie bisher eingeblendet. „Hochstapler“ wird wie die anderen Durchgangserfolge geprüft.
+Nach jeder Runde und nach der Freischaltung werden **alle** gespeicherten Erfolge neu geprüft, wie es die vorhandene Prüfung außerhalb eines Durchgangs schon tut. Dazu zählt auch „Sparschwein“ (1.000 Gold besitzen). Neue Erfolge werden wie bisher eingeblendet. „Hochstapler“ wird wie die anderen Durchgangserfolge geprüft.
 
 ## 6. Beute und Truhe
 
@@ -255,14 +261,18 @@ Fünf Fähigkeiten, alle mit vorhandenen Wirkungsformen, Stufen nach demselben M
 | **Nüsse von oben** | Geschoss auf den nächsten Gegner | Erdmännchen | Wirft Nüsse vom Giraffenkopf | Schaden 5, Abklingzeit 0,9 s, 2 Nüsse, Reichweite 12; Stufe 3: +1 Nuss; Stufe 5: durchschlagen 2 Gegner |
 | **Stampede für Arme** | Ring um den Helden | Giraffe | Stampft, Schaden rundum und Verlangsamung | Schaden 11, Abklingzeit 3,5 s, Radius 3,2, Verlangsamung 30 % für 1,5 s; Stufe 3: Radius ×1,25; Stufe 5: Abklingzeit ×0,75 |
 | **Hier wurde gebuddelt** | Zielfläche in der dichtesten Gruppe | Erdmännchen | Ein Loch tut sich auf, Gegner stolpern und sind kurz verwirrt | Schaden 20, Abklingzeit 6 s, Radius 2,5, Verzögerung 0,6 s, Verwirrung 1,5 s; Stufe 3: Radius +1; Stufe 5: Verwirrung +1,5 s |
-| **Großfamilie** | Beschwörung | Erdmännchen | Die Verwandtschaft taucht auf und lenkt Gegner ab | Abklingzeit 12 s, Dauer 5 s, Lockradius 8; Stufe 3: Dauer +2 s; Stufe 5: zum Ende eine Staubexplosion mit 25 Schaden |
+| **Großfamilie** | Beschwörung | Erdmännchen | Die Verwandtschaft taucht auf und lenkt Gegner ab | Abklingzeit 12 s, Dauer 5 s, Lockradius 8, Explosionsradius 3; Stufe 3: Dauer +2 s; Stufe 5: zum Ende eine Staubexplosion mit 25 Schaden |
 
 Die Zahlen sind Startwerte fürs Balancing, wie bei den anderen Klassen.
+
+- Die Spalte „Wer“ wirkt nur in der Darstellung: Nüsse starten auf Kopfhöhe der Giraffe, die Buddelstelle zeigt einen Erdhaufen.
+- Die Großfamilie erscheint als kleine Gruppe von drei Erdmännchen aus Grundformen. Ein eigenes Bild ist nicht nötig. Die Spiellogik behandelt sie wie den vorhandenen Klon.
 
 ### 7.5 Aussehen
 
 - Eine Figur: Die Giraffe trägt das Erdmännchen auf dem Kopf. Das Bild kommt vom Auftraggeber (Abschnitt 9).
 - Größe in der Welt: etwa 2,6 m. Die Figur ist deutlich größer als die anderen Helden (1,6 m), aber kleiner als der Bär (3,2 m).
+- Die Größe wirkt **nur im Bild**. Körperradius, Trefferfläche, Kamera und Hindernisse bleiben wie bei allen Helden, damit das Duo nicht schwerer zu spielen ist.
 - Neue Gangart „schreiten“: langsamer, gemächlicher Passgang mit leichtem Wiegen des Halses (eine Neigung, kein Hüpfen).
 - Fehlt das Bild, gibt es eine einfache Ersatzfigur aus Grundformen (langer Hals, kleines Erdmännchen obendrauf), wie bei den anderen Helden. Gleiches gilt für die drehende Vorschau bei der Heldenerstellung.
 - Bisherige Regeln gelten weiter: Die Figur schaut nach rechts, wird nach links gespiegelt, hat einen Bodenschatten und blitzt bei Treffern rot.
@@ -340,6 +350,13 @@ Es gelten die Regeln aus Abschnitt 4 der Übergabe, besonders:
 - Vier Taverne-Erfolge mit kleinen Belohnungen; „Zoo-Direktor“ bleibt bei drei Tieren
 - Die Truhe zeigt nicht gefundene Gegenstände als Umrisse („X von 24 gefunden“)
 - Taverne nur über die Modusauswahl erreichbar (nicht zusätzlich im Hauptmenü)
+- Nach dem Gegenlesen festgelegt:
+  - Joker nie auf der Startkarte und nicht als Treffer gezählt
+  - Karten unabhängig gezogen; Topf je Schritt auf ganzes Gold abgerundet
+  - Rundenzähler beim Start, Serie auch nach einem Fehltipp gespeichert
+  - nach jeder Runde alle gespeicherten Erfolge prüfen
+  - die Größe des Duos wirkt nur im Bild
+  - die Großfamilie besteht aus drei Erdmännchen aus Grundformen
 
 ## 13. Was dem Bau überlassen bleibt
 
