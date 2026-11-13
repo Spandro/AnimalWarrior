@@ -54,9 +54,9 @@ Heldenauswahl → Modusauswahl → **Taverne** → Spieltisch, Truhe oder Stall.
 
 - **Modusauswahl:** drei Karten: Wellen-Modus, Taverne, Abenteuer-Modus (weiter gesperrt). Hochkant untereinander.
 - **Taverne (Übersicht):** Hintergrund ist die gemalte Gaststube (abgedunkelt und weichgezeichnet wie die anderen Menüs). Oben steht das Gold, darunter „<Heldenname> sitzt am Tresen“. Darunter fünf Karten:
-  1. Würfelbecher (Wirt: Dachs)
-  2. Glücksrad (Wirtin: Elster)
-  3. Höher oder tiefer (Wirt: Fuchs)
+  1. Würfelbecher (Wirt: Kasimir, ein Affe)
+  2. Glücksrad (Wirtin: Madame Funkel, eine Elster)
+  3. Höher oder tiefer (Wirt: wieder Kasimir)
   4. Truhe („7 von 24 gefunden“)
   5. Stall: das Duo, bis zur Freischaltung geschwärzt mit Preis
 - **Spieltisch:** Wirtstier mit Namen und einem wechselnden Spruch, das Spiel in der Mitte, unten Einsatzwahl und Spielknopf, oben das aktuelle Gold. „Zurück“ führt zur Übersicht.
@@ -67,7 +67,7 @@ Skizze hochkant (Spieltisch):
 ```text
 ┌─────────────────────┐
 │ ← Zurück   Gold 1.240│
-│  [Dachs]  Grummel:   │
+│  [Affe]  Kasimir:    │
 │  „Würfel lügen nie.  │
 │   Ich manchmal.“     │
 │                      │
@@ -87,7 +87,7 @@ Man betritt die Taverne immer mit einem gewählten Helden. Der Held spielt aber 
 ### 5.1 Gemeinsame Regeln
 
 - **Einsätze:** 10, 50, 100 oder 500 Gold. Ein Einsatz ist nur wählbar, wenn man so viel Gold hat. Mit weniger als 10 Gold sagt der Wirt freundlich, man solle erst einmal Gold verdienen.
-- **Beute** ist nur bei einem Einsatz ab 100 Gold möglich. Der Bildschirm sagt das mit einem Satz („Ab 100 Gold Einsatz spielt Grummel auch um Beute.“).
+- **Beute** ist nur bei einem Einsatz ab 100 Gold möglich. Der Bildschirm sagt das mit einem Satz („Ab 100 Gold Einsatz spielt Kasimir auch um Beute.“).
 - **Auszahlung:** Jedes Spiel zahlt im Schnitt **90 bis 95 %** des Einsatzes in Gold zurück (genaue Werte unten). Beute kommt obendrauf. Ihr Gegenwert (Verkauf von Doppelten, Abschnitt 6.3) bleibt so klein, dass die Taverne insgesamt unter 97 % bleibt.
 - **Verrechnung genau einmal:** Wird eine Runde gestartet, wird ihr Ausgang sofort ausgewürfelt, mit Einsatz, Gewinn und Beute in den Spielstand geschrieben und gespeichert. Erst danach läuft die Animation. Schließt man den Tab während der Animation, gilt das Ergebnis trotzdem.
 - Bei Höher oder tiefer gilt das für jeden einzelnen Schritt (Abschnitt 5.4).
@@ -96,7 +96,7 @@ Man betritt die Taverne immer mit einem gewählten Helden. Der Held spielt aber 
 - Würfel, Rad und Karten werden im Code gezeichnet. Dafür braucht es keine Bilder.
 - **Ton:** kurze neue Effekte für Würfeln, Radklackern, Kartenaufdecken, Münzen und Beute. Sie entstehen per Web Audio wie die übrigen.
 
-### 5.2 Würfelbecher (Wirt Grummel, ein Dachs)
+### 5.2 Würfelbecher (Wirt Kasimir, ein Affe)
 
 - Spieler und Wirt würfeln je zwei Würfel. Die höhere Summe gewinnt.
 - **Gewinn:** doppelter Einsatz zurück. **Gleichstand:** halber Einsatz zurück. **Verloren:** nichts.
@@ -119,7 +119,7 @@ Man betritt die Taverne immer mit einem gewählten Helden. Der Held spielt aber 
 - **Beutefeld:** ab Einsatz 100 ein Gegenstand, kein Gold. Darunter gibt es den Einsatz zurück.
 - Auszahlung im Schnitt: ab 100 Einsatz 18/20 = **90 %** plus Beute, darunter 19/20 = **95 %**.
 
-### 5.4 Höher oder tiefer (Wirt Fiete, ein Fuchs)
+### 5.4 Höher oder tiefer (Wirt Kasimir, derselbe Affe)
 
 Ein Kartenstapel mit 2 bis 10, Bube, Dame, König und Ass (13 Werte). Die Farben spielen keine Rolle.
 
@@ -151,7 +151,7 @@ Vier neue Erfolge im Ton der vorhandenen. Die Belohnung ist bewusst klein:
 | Erfolg | Bedingung | Spruch | Gold |
 |---|---|---|---|
 | Stammgast | 50 Runden in der Taverne gespielt | „Dein Krug hat schon deinen Namen.“ | 25 |
-| Riecher | Bei Höher oder tiefer fünf Treffer in einer Runde | „Fiete prüft jetzt seine Ärmel.“ | 50 |
+| Riecher | Bei Höher oder tiefer fünf Treffer in einer Runde | „Kasimir prüft jetzt seine Ärmel.“ | 50 |
 | Sammelwut | 12 verschiedene Gegenstände in der Truhe | „Der Dachboden ist voll. Die Truhe noch nicht.“ | 50 |
 | Hochstapler | Einen Durchgang mit dem Duo gewinnen | „Zusammen sind sie größer als jeder Bär.“ | 100 |
 
@@ -199,7 +199,7 @@ Nach jeder Runde und nach der Freischaltung werden **alle** gespeicherten Erfolg
 | Waffe (Nahkampf) | Opas Schwert „Erbstück“ | legendär | Schaden +12 %, kritische Chance +5 Prozentpunkte | Opa hat damit Brot geschnitten. |
 | Schmuck | Glückspfennig mit Loch | gewöhnlich | Gold +5 % | Das Loch bringt das Glück. |
 | Schmuck | Kette aus Kronkorken | gewöhnlich | Sammelradius +10 % | Gesammelt in der Taverne. Jeder einzelne. |
-| Schmuck | Ring der unverschämten Glückssträhne | legendär | kritische Chance +10 Prozentpunkte, Gold +10 % | Fiete will ihn zurück. |
+| Schmuck | Ring der unverschämten Glückssträhne | legendär | kritische Chance +10 Prozentpunkte, Gold +10 % | Kasimir will ihn zurück. |
 
 ### 6.2 Truhe
 
@@ -215,7 +215,7 @@ Nach jeder Runde und nach der Freischaltung werden **alle** gespeicherten Erfolg
 
 ### 6.3 Doppelte
 
-Gewinnt man einen Gegenstand, den man schon besitzt, verkauft der Wirt ihn sofort. Der Spieler sieht „Schon vorhanden – Grummel kauft ihn dir für 30 Gold ab.“
+Gewinnt man einen Gegenstand, den man schon besitzt, verkauft der Wirt ihn sofort. Der Spieler sieht „Schon vorhanden – Kasimir kauft ihn dir für 30 Gold ab.“ (bzw. Madame Funkel am Glücksrad)
 
 - Verkaufswert: gewöhnlich 10, selten 30, legendär 100 Gold.
 - Der Verkaufswert zählt nicht zum Goldgewinn-Wert des Helden.
@@ -307,7 +307,7 @@ stats.hiLoBestStreak: number längste Trefferserie bei Höher oder tiefer
 Vier Bilder. Bis sie da sind, gibt es überall Ersatz:
 
 - **Gaststube:** dunkler Holzton als Verlauf
-- **Wirte:** ein Kreis mit dem Anfangsbuchstaben
+- **Wirte (Affe und Elster):** ein Kreis mit dem Anfangsbuchstaben
 - **Beute:** ein Symbol der Art (Helm, Hemd, Stiefel, Schwert, Ring) im Seltenheitsrahmen
 - **Duo:** die 3D-Ersatzfigur
 
@@ -316,7 +316,7 @@ Ausschnitte werden nach Lieferung ausgemessen und in die Daten eingetragen, wie 
 | Datei | Inhalt |
 |---|---|
 | `assets/taverne/gaststube.webp` | Gemütliche Gaststube von innen, als Hintergrund |
-| `assets/taverne/wirte.webp` | Dachs, Elster und Fuchs nebeneinander auf weißem Grund |
+| `assets/taverne/wirte.webp` | Affe und Elster nebeneinander auf weißem Grund |
 | `assets/taverne/beute.webp` | Die 24 Gegenstände in einem Raster 6 × 4 auf weißem Grund |
 | `assets/figuren/duo.webp` | Giraffe mit Erdmännchen auf dem Kopf, auf weißem Grund |
 
@@ -345,7 +345,7 @@ Es gelten die Regeln aus Abschnitt 4 der Übergabe, besonders:
 - **Höher oder tiefer zahlt nach Risiko statt immer doppelt** (Abschnitt 5.4). Bei der Auswahl stand „jeder Treffer verdoppelt“. Das ließe sich aber mit sicheren Tipps ausnutzen.
 - Einsätze 10/50/100/500, Beute erst ab Einsatz 100, alle Auszahlungsquoten, Radfelder, Joker, Obergrenzen (5 Treffer, 50-facher Einsatz)
 - Seltenheiten und ihre Chancen, Verkaufswerte für Doppelte, der Startkatalog mit Namen, Werten und Sprüchen
-- Wirtstiere und ihre Namen: Grummel (Dachs), Madame Funkel (Elster), Fiete (Fuchs)
+- Namen der Wirte: Kasimir (Affe) und Madame Funkel (Elster). Dass ein Affe beide Tische betreut, hat der Auftraggeber am 2026-11-13 entschieden. So gibt es keine Verwechslung mit Fuchs und Dachs, die das Paket „Neue Gegner“ als Gegner plant.
 - Werte, Klasse „Hochstapler“, Fähigkeiten, Größe und Gangart des Duos
 - Vier Taverne-Erfolge mit kleinen Belohnungen; „Zoo-Direktor“ bleibt bei drei Tieren
 - Die Truhe zeigt nicht gefundene Gegenstände als Umrisse („X von 24 gefunden“)
@@ -399,13 +399,11 @@ Stilblock (wie vereinbart, an jede Beschreibung anhängen): *zarte Aquarellmaler
 
 **1. Gaststube** (`gaststube.webp`, Querformat, etwa 1600 × 1000, *hier ausnahmsweise mit gemaltem Hintergrund statt weiß*): Gemütliche Waldtaverne von innen, aus Holz und Stein, warmes Licht von einem Kamin und Kerzen. Ein langer Holztresen mit Fässern und Krügen, einige runde Tische mit Hockern, an der Wand ein großes hölzernes Glücksrad, auf einem Tisch ein Würfelbecher und Spielkarten. Keine Figuren. Die Mitte des Bildes ruhig halten, weil dort Text liegt.
 
-**2. Wirte** (`wirte.webp`, drei Figuren nebeneinander mit Abstand, je ganz zu sehen, weißer Hintergrund):
+**2. Wirte** (`wirte.webp`, zwei Figuren nebeneinander mit Abstand, je ganz zu sehen, weißer Hintergrund):
 
-- **Dachs** mit Schürze und hochgekrempelten Ärmeln, mürrisch-gemütlich, hält einen Würfelbecher.
+- **Affe** (ein Kapuzineräffchen) in einer gestreiften Weste mit hochgekrempelten Ärmeln, verschmitzt grinsend. In einer Hand hält er einen Würfelbecher, mit der anderen fächert er Spielkarten auf. Aus dem Ärmel lugt eine Karte.
 - **Elster** mit glitzerndem Halstuch und Schmuck, eitel und vergnügt, eine Flügelspitze auf einem kleinen Glücksrad.
-- **Fuchs** in einer Weste mit Taschenuhr, verschmitzt lächelnd, fächert Spielkarten in der Pfote.
-
-Alle drei schauen nach rechts.
+Beide schauen nach rechts.
 
 **3. Beute** (`beute.webp`, 24 Gegenstände in einem Raster aus 6 Spalten und 4 Reihen, gleich große Felder, jeder Gegenstand mittig und mit Abstand, weißer Hintergrund), Reihe für Reihe von links nach rechts:
 
