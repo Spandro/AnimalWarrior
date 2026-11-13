@@ -2,7 +2,7 @@
 
 Diese Datei ist für die nächste Sitzung gedacht, falls die laufende abbricht. Sie wird an jedem Pausenpunkt aktualisiert.
 
-Zuletzt aktualisiert: 2026-11-13, Pausenpunkt nach Abschluss von Paket 1 samt Gesamtprüfung und Korrekturrunde. Nächster Schritt: Paket 2 entwerfen (am besten in einer frischen Sitzung mit Verweis auf diese Datei).
+Zuletzt aktualisiert: 2026-11-13, während der Klärung von Paket 3 (Taverne), das vor Paket 2 entworfen wird. Klärungsstand steht in Abschnitt 2 unter Paket 3. Nächster Schritt: offene Vorschläge bestätigen lassen, Ansätze vorlegen, Spec schreiben.
 
 ## 1. Was fertig ist
 
@@ -68,6 +68,16 @@ Reihenfolge wie vereinbart; jedes Paket bekommt eigenen Entwurf, Spec und Plan.
 
 **Paket 3 – Taverne:** Eigener Punkt in der Modusauswahl. Minispiele und Glücksspiel, bei denen man mit dem gesammelten Gold um Beute spielt – auch Ausrüstung und Waffen für den Abenteuer-Modus. Dort ist außerdem ein weiterer Held für viel Gold freischaltbar, vorerst geschwärzt dargestellt: ein Kombo-Team aus Giraffe und Erdmännchen. Nur Spielgold, kein echtes Geld.
 
+*Klärung läuft (2026-11-13, wird vor Paket 2 gemacht).* Vom Auftraggeber entschieden:
+
+- Gewinne sind vor allem Gold; Ausrüstung und Waffen selten, aber lustig. Später kommt evtl. noch mehr, was man mit Gold kaufen kann.
+- Drei Spiele, alle glücksbasiert: Würfelbecher, Glücksrad, Höher oder tiefer.
+- Duo Giraffe + Erdmännchen wird in diesem Paket **freischaltbar und spielbar** (Wellen-Modus): eigene Sonderklasse mit eigenen Fähigkeiten; das Erdmännchen reitet auf der Giraffe (eine Figur, ein Bild). Preis **20.000 Gold**.
+- Beute kommt in eine **gemeinsame Truhe** für alle Helden (wie das Gold); gespeichert werden nur Kennungen, Werte stehen in den Daten.
+- Beute bekommt **gemalte Symbole** je Gegenstand (Bogen mit etwa 24 Stück; Beschreibungen für den Bildgenerator liefern).
+
+Als Vorschlag vorgelegt, Antwort steht aus: Auszahlung im Schnitt 90–95 % des Einsatzes; Einsätze 10/50/100/500; „Höher oder tiefer“ höchstens fünfmal verdoppeln; Wirtstiere an den Tischen; Beute zeigt Seltenheit und Werte („wirkt im Abenteuer-Modus“), Doppelte werden für Gold verkauft; fünf Duo-Fähigkeiten legt der Entwurf fest; zwei bis drei Taverne-Erfolge. Danach: Ansätze vorlegen (Menü-Taverne mit Spielbildschirmen vs. begehbare 3D-Taverne vs. gemaltes Wimmelbild mit Tippflächen; Empfehlung Menü-Taverne), dann Spec.
+
 **Paket 4 – Abenteuer-Modus mit Story:** Der zweite Modus (in Richtung Action-Rollenspiel: Level durchlaufen, Erfahrung, Ausrüstung mit Werten). Neuer Wunsch: ein Held für alle Modi. Das widerspricht der früheren Wahl „getrennter Fortschritt je Modus" und muss beim Entwurf neu geklärt werden. Namen für Ausrüstung sollen lustig sein („Helm der mäßigen Zuversicht", „Stiefel des übereilten Rückzugs").
 
 **Weitere offene Wünsche und Ideen**
@@ -112,7 +122,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/serve.ps1 -Port 8080
 
 - Sprache: Deutsch, allgemein verständlich; er ist kein Programmierer im Projekt und beurteilt nach Spielen und Ansehen
 - Ablauf je Paket: Wünsche klären → Entwurf (Spec) → Freigabe → Plan → Freigabe → Bau mit Subagenten (je Aufgabe ein Bauer und ein Prüfer) → Gesamtprüfung
-- **Limit:** bei 75 % des 5-Stunden-Fensters abbrechen und berichten (vor jedem Subagenten den Stand prüfen); ebenso bei etwa 10 % restlichem Kontext
+- **Limit (Regel vom 2026-11-13):** vor größeren Schritten (und vor jedem Subagenten) den Verbrauch mit dem Usage-Tool prüfen. Ab etwa 85–90 % eines Fensters (5 Stunden oder Woche): den laufenden kleinen Schritt abschließen, alles committen, nach `origin/main` pushen und den Stand hier festhalten. Sobald das Limit wieder frei ist, ohne neue Rückfrage weitermachen. Wortlaut des Auftraggebers: „wenn du kurz davor bist ans limit zu kommen committe und pushe alles und sobald es wieder geht darfst du direkt weiter machen“. Bei etwa 10 % restlichem Kontext ebenso sichern
 - **Git:** nach jedem Arbeitsschritt lokal committen; **pushen ist an Pausenpunkten erlaubt** (Freigabe vom 2026-11-13), sonst nicht ungefragt; Autor im Repo ist `Spandro` mit GitHub-noreply-Adresse; Remote `origin` = `https://github.com/Spandro/AnimalWarrior.git`, Branch `main`; gearbeitet wird direkt auf `main`
 - Bilder liefert der Auftraggeber über einen Bildgenerator; er bekommt dafür fertige Beschreibungen (Stilblock: zarte Aquarellmalerei mit feinen Buntstift- und Tuschestrichen, Kinderbuch-Illustration nach der Natur, gedeckte Farben, weißer oder transparenter Hintergrund, Figur schaut nach rechts, keine Schlagschatten, kein Text)
 - Lange Sitzungen sind teuer: Nach einer Pause verbraucht schon eine kurze Antwort viel vom Limit. Für neue Pakete lieber eine frische Sitzung starten und auf diese Datei verweisen
