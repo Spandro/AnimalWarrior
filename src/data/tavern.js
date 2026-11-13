@@ -96,5 +96,12 @@ export const TAVERN_IMAGES = {
   duo: 'assets/figuren/duo.webp',
 };
 
+/**
+ * Bewegung an den Spieltischen (ms). Keine Animation dauert länger als etwa 1,5 s. `wheelTurns`: volle Umdrehungen
+ * vor dem Halt. `tickGapMs`: Mindestabstand zweier Radklacker. `cooldownMs`: so lange nimmt der Spielknopf nach einer
+ * Runde nichts an, damit ein Doppeltippen nur eine Runde spielt (auch ohne Animation).
+ */
+export const TABLE_MOTION = { diceMs: 1100, wheelMs: 1500, wheelTurns: 3, cardMs: 450, tickGapMs: 40, cooldownMs: 400 };
+
 /** Welcher Wirt welchen Tisch betreut. */
 export const TABLE_HOST = { dice: 'affe', wheel: 'elster', hilo: 'affe' };

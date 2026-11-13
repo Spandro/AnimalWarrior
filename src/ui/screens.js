@@ -7,6 +7,7 @@ import { renderCreateAnimal, renderCreateClass, renderCreateName } from './heroC
 import { renderResult } from './result.js';
 import { renderAchievements } from './achievements.js';
 import { renderTavern, renderChest, probeImage } from './tavern.js';
+import { renderDice, renderWheel, renderHiLo } from './tavernGames.js';
 import { TAVERN_IMAGES } from '../data/tavern.js';
 import { MENU_SCENES, SCENE_CELLS } from '../data/environment.js';
 
@@ -32,7 +33,9 @@ const BUILDERS = {
   achievements: renderAchievements,
   tavern: renderTavern,
   tavernChest: renderChest,
-  // tavernDice, tavernWheel und tavernHiLo trägt Aufgabe 7 ein.
+  tavernDice: renderDice,
+  tavernWheel: renderWheel,
+  tavernHiLo: renderHiLo,
 };
 
 /**

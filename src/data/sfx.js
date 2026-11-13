@@ -97,4 +97,25 @@ export const SFX = {
   click: [
     { kind: 'tone', wave: 'triangle', freq: [660, 440], dur: 0.05, gain: 0.18 },
   ],
+  // Taverne: Würfel klappern im Becher (drei kurze Holzklacker), das Rad klackert je Feld, eine Karte wird
+  // aufgedeckt, Münzen klimpern bei Gewinn, Beute bekommt eine kleine glitzernde Tonfolge.
+  dice: [0, 0.07, 0.15, 0.26].map((delay, i) => ({
+    kind: 'noise', filter: 'bandpass', freq: [2200 - i * 250, 900], dur: 0.05, gain: 0.32, delay,
+  })),
+  wheelTick: [
+    { kind: 'noise', filter: 'highpass', freq: [4200, 2600], dur: 0.025, gain: 0.22 },
+    { kind: 'tone', wave: 'square', freq: [1400, 900], dur: 0.02, gain: 0.05 },
+  ],
+  card: [
+    { kind: 'noise', filter: 'bandpass', freq: [3000, 1200], dur: 0.12, gain: 0.25 },
+    { kind: 'tone', wave: 'triangle', freq: [520, 620], dur: 0.06, gain: 0.08, delay: 0.06 },
+  ],
+  coins: [
+    ...arpeggio('sine', [1568, 1976, 1760, 2349], 0.055, 0.14, 0.16),
+    { kind: 'noise', filter: 'highpass', freq: [7500, 5000], dur: 0.25, gain: 0.08 },
+  ],
+  loot: [
+    ...arpeggio('triangle', [659, 880, 1109, 1319, 1760], 0.07, 0.3, 0.22),
+    { kind: 'noise', filter: 'highpass', freq: [8000, 4500], dur: 0.45, gain: 0.1, delay: 0.15 },
+  ],
 };

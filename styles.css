@@ -775,3 +775,162 @@ button.chest-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rg
   .stable-buy { justify-content: center; }
   .table-card { padding: 12px 14px; }
 }
+
+/* ---------------------------------------------------------------- Spieltische */
+
+/* Hochkant liegen Einsatz und Spielknopf unten in Daumenreichweite: der untere Block klebt am Rand der Menüebene. */
+.table-screen { gap: 12px; max-width: 640px; padding-bottom: calc(12px + var(--safe-bottom)); }
+.table-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.table-top .gold-line { font-size: 1.05rem; }
+.table-header h1 { font-size: clamp(1.4rem, 5vw, 2rem); }
+.host-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.host-speech {
+  position: relative; flex: 1; min-width: 0; padding: 8px 12px; border-radius: 12px;
+  background: rgba(244, 236, 216, 0.08); border: 1px solid var(--line-soft); overflow-wrap: anywhere;
+}
+.host-name { display: block; font-size: 0.85rem; color: var(--muted); }
+.host-line { font-family: var(--serif); font-style: italic; }
+.host-line.host-broke { color: var(--accent-hi); font-style: normal; }
+
+.table-stage {
+  display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap;
+  padding: 14px 10px; border-radius: 16px; min-height: 150px;
+  background: radial-gradient(ellipse at 50% 40%, #2f5a35, #1c3a22 70%);
+  border: 3px solid #5a3a1c; box-shadow: inset 0 0 26px rgba(0, 0, 0, 0.55), 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+.table-result { display: flex; flex-direction: column; gap: 10px; min-height: 1.5em; }
+.table-result-text { font-weight: 600; text-align: center; overflow-wrap: anywhere; }
+.table-result-text[data-tone="win"] { color: var(--accent-hi); }
+.table-result-text[data-tone="lose"] { color: #e0a08a; }
+.loot-slot:empty { display: none; }
+
+.table-controls {
+  position: sticky; bottom: 0; z-index: 2; margin: auto -16px 0; padding: 10px 16px calc(6px + var(--safe-bottom));
+  display: flex; flex-direction: column; gap: 10px;
+  background: linear-gradient(180deg, rgba(22, 13, 7, 0), #160d07 12px);
+}
+.loot-note { font-size: 0.9rem; text-align: center; }
+.stakes-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.stakes-label { flex: none; color: var(--muted); }
+.stakes { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; min-width: 0; }
+.btn.stake { padding: 8px 4px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.btn.stake[aria-pressed="true"] { border-color: var(--accent-hi); background: rgba(236, 192, 97, 0.22); box-shadow: inset 0 0 0 1px var(--accent-hi); }
+.table-actions { display: flex; flex-direction: column; gap: 8px; }
+.table-play { width: 100%; }
+.hilo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hilo-guess { min-height: 54px; font-size: 1.05rem; padding: 8px 6px; }
+.hilo-cash { width: 100%; }
+
+/* Beute-Moment */
+.loot-moment {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 14px; min-width: 0;
+  border: 3px solid var(--rarity); background: linear-gradient(180deg, #3a2a18, #251a0e);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rarity) 25%, transparent), 0 6px 18px rgba(0, 0, 0, 0.45);
+  animation: loot-pop 0.35s ease-out;
+}
+.loot-moment .loot-small { border-radius: 10px; background-color: #251a0e; }
+.loot-moment .loot-small.loot-image { background-color: #f4ecd8; }
+.loot-moment-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.loot-kicker { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-hi); }
+.loot-name { font-family: var(--serif); font-size: 1.1rem; }
+.loot-rarity { color: var(--rarity); font-weight: 700; font-size: 0.9rem; }
+.loot-dup { font-size: 0.9rem; }
+@keyframes loot-pop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: none; } }
+
+/* Würfel aus CSS: 3 × 3-Raster mit Augen */
+.dice-side { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.dice-pair { display: flex; gap: 8px; }
+.die {
+  box-sizing: border-box; width: 52px; height: 52px; padding: 7px; border-radius: 11px;
+  display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); place-items: center;
+  background: linear-gradient(145deg, #fffaf0, #e6dcc6); box-shadow: inset -3px -3px 6px rgba(0, 0, 0, 0.18), 0 3px 6px rgba(0, 0, 0, 0.45);
+}
+.die-pip { width: 9px; height: 9px; border-radius: 50%; }
+.die-pip.on { background: #2a1c0a; }
+.dice-pair.rolling .die { animation: die-shake 0.16s linear infinite; }
+.dice-pair.rolling .die:nth-child(2) { animation-direction: reverse; }
+@keyframes die-shake {
+  0% { transform: rotate(-10deg) translateY(-2px); }
+  50% { transform: rotate(9deg) translateY(2px); }
+  100% { transform: rotate(-10deg) translateY(-2px); }
+}
+.dice-sum { font-weight: 700; font-variant-numeric: tabular-nums; }
+.dice-vs { font-family: var(--serif); font-style: italic; color: var(--muted); }
+
+/* Glücksrad aus SVG */
+.stage-wheel { flex-direction: column; gap: 8px; }
+.wheel { width: min(230px, 62vw, 30vh); min-width: 170px; height: auto; display: block; }
+.wheel-rim { fill: #5a3a1c; stroke: var(--accent); stroke-width: 3; }
+.wheel-field path { stroke: #2a1c0a; stroke-width: 0.8; }
+.wheel-label { font: 700 11px var(--sans); fill: #fff6df; pointer-events: none; }
+.f-niete path { fill: #3b2b1d; }
+.f-niete .wheel-label { font-size: 8.5px; fill: #b9a888; font-weight: 600; }
+.f-x1 path { fill: #5f7a45; }
+.f-x2 path { fill: #3f78b8; }
+.f-x3 path { fill: #8a52b8; }
+.f-x5 path { fill: #d9a441; }
+.f-x5 .wheel-label { fill: #2a1c0a; }
+.f-loot path { fill: #b4553c; }
+.f-loot .wheel-label { font-size: 15px; fill: #ffe9a0; }
+.wheel-field.win path { stroke: #fff1c8; stroke-width: 3; }
+.wheel-hub { fill: #2a1c0a; stroke: var(--accent); stroke-width: 3; }
+.wheel-pointer { fill: var(--accent-hi); stroke: #2a1c0a; stroke-width: 1.5; }
+.wheel-legend { font-size: 0.85rem; text-align: center; max-width: 34ch; }
+
+/* Höher oder tiefer: Karten aus CSS */
+.stage-hilo { flex-direction: column; gap: 10px; }
+.hilo-cards { display: flex; gap: 22px; justify-content: center; }
+.card-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.card-cap { font-size: 0.85rem; }
+.card-slot { perspective: 600px; }
+.play-card {
+  position: relative; box-sizing: border-box; width: 84px; height: 118px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(160deg, #fffaf0, #eadfc8); color: #1f1a14; border: 2px solid #c9b993;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+}
+.play-card.card-red { color: #a8322a; }
+.card-rank { font-family: var(--serif); font-size: 2.6rem; font-weight: 700; }
+.card-corner { position: absolute; font-weight: 800; font-size: 0.95rem; line-height: 1; }
+.card-tl { top: 7px; left: 8px; }
+.card-br { bottom: 7px; right: 8px; transform: rotate(180deg); }
+.card-joker { background: linear-gradient(160deg, #fff1c8, #ecc061); color: #6a2f8a; border-color: var(--accent); }
+.card-joker .card-rank { font-size: 1.5rem; }
+.card-back {
+  background: repeating-linear-gradient(45deg, #7a2e22 0 6px, #5e2219 6px 12px);
+  border: 3px solid #f0e4c6;
+}
+.card-reveal { animation: card-flip var(--card-ms, 450ms) ease-out; }
+@keyframes card-flip {
+  from { transform: rotateY(90deg) translateY(-6px); }
+  to { transform: none; }
+}
+.hilo-pot { text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+@media (max-width: 380px) {
+  .die { width: 44px; height: 44px; padding: 6px; }
+  .die-pip { width: 8px; height: 8px; }
+  .table-stage { gap: 10px; padding: 10px 6px; min-height: 130px; }
+  .stakes { gap: 6px; }
+}
+/* Niedrige Anzeige (z. B. 360 × 640): alles etwas kleiner, damit der klebende untere Block wenig verdeckt. */
+@media (max-height: 700px) {
+  .table-screen { gap: 8px; padding-top: calc(16px + var(--safe-top)); }
+  .table-header h1 { font-size: 1.35rem; }
+  .host-speech { padding: 6px 10px; font-size: 0.92rem; }
+  .table-stage { min-height: 0; padding: 10px 6px; }
+  .wheel { width: min(200px, 60vw, 30vh); min-width: 150px; }
+  .wheel-legend { font-size: 0.8rem; }
+  .play-card { width: 72px; height: 100px; }
+  .card-rank { font-size: 2.2rem; }
+  .table-controls { gap: 6px; padding-top: 8px; }
+  .loot-note { font-size: 0.8rem; }
+  .table-play, .hilo-guess { min-height: 48px; }
+}
+
+/* „Bewegung reduzieren“: keine Animationen und Übergänge in der Taverne; das Ergebnis erscheint sofort. */
+@media (prefers-reduced-motion: reduce) {
+  .chest-tile, .table-card { transition: none; }
+  button.chest-tile:hover, .table-card:hover:not(:disabled) { transform: none; }
+  .dice-pair.rolling .die, .card-reveal, .loot-moment { animation: none; }
+}

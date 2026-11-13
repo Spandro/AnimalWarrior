@@ -125,6 +125,33 @@ test('sfx: 50 pickup-Ereignisse in einem Aufruf starten höchstens eine Stimmeng
   assertEqual(log.oscillators - before, SFX.pickup.filter((v) => v.kind === 'tone').length);
 });
 
+/** Formprüfung einer Stimme wie in data/sfx.js beschrieben. Gibt den ersten Fehler zurück oder null. */
+function voiceProblem(v) {
+  if (!v || typeof v !== 'object') return 'keine Stimme';
+  if (v.kind === 'tone') {
+    if (!['sine', 'square', 'triangle', 'sawtooth'].includes(v.wave)) return `wave ${v.wave}`;
+  } else if (v.kind === 'noise') {
+    if (!['lowpass', 'highpass', 'bandpass'].includes(v.filter)) return `filter ${v.filter}`;
+  } else return `kind ${v.kind}`;
+  if (!Array.isArray(v.freq) || v.freq.length !== 2 || !v.freq.every((f) => Number.isFinite(f) && f > 0)) return 'freq';
+  if (!(Number.isFinite(v.dur) && v.dur > 0 && v.dur <= 2)) return 'dur';
+  if (!(Number.isFinite(v.gain) && v.gain > 0 && v.gain <= 1)) return 'gain';
+  for (const key of ['delay', 'attack']) {
+    if (v[key] !== undefined && !(Number.isFinite(v[key]) && v[key] >= 0)) return key;
+  }
+  return null;
+}
+
+test('sfx: Taverne-Töne vorhanden und wohlgeformt', () => {
+  for (const type of ['dice', 'wheelTick', 'card', 'coins', 'loot']) {
+    assertTrue(Object.hasOwn(SFX, type) && Array.isArray(SFX[type]) && SFX[type].length > 0, type);
+  }
+  // Dieselbe Formprüfung für alle Klänge, die neuen wie die vorhandenen.
+  for (const [type, voices] of Object.entries(SFX)) {
+    for (const v of voices) assertEqual(voiceProblem(v), null, type);
+  }
+});
+
 test('sfx: Gifttreffer spielt keinen Ton, normaler Treffer schon', () => {
   assertEqual(eventSound({ type: 'heroHit', amount: 1.5, poison: true }), null);
   assertEqual(eventSound({ type: 'heroHit', amount: 6 }), 'heroHit');

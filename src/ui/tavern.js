@@ -90,7 +90,7 @@ function chestSvg() {
  * @param {import('../data/items.js').ItemDef | null} def
  * @param {string} [sizeClass]
  */
-function lootIcon(def, sizeClass = '') {
+export function lootIcon(def, sizeClass = '') {
   const box = el('span', { class: `loot-icon ${sizeClass}`.trim(), 'aria-hidden': 'true' });
   if (!def) {
     box.classList.add('loot-unknown');
@@ -118,7 +118,7 @@ function lootIcon(def, sizeClass = '') {
  * mit dem Anfangsbuchstaben.
  * @param {string} hostId
  */
-function hostPortrait(hostId) {
+export function hostPortrait(hostId) {
   const host = HOSTS[hostId];
   const size = 64;
   const box = el('span', { class: 'host-portrait', 'aria-hidden': 'true' }, el('span', { class: 'host-initial', text: host.name.charAt(0) }));
@@ -195,7 +195,7 @@ const UNLOCK_REASON = {
 };
 
 /** Esc führt zurück, solange kein Dialog darüber liegt (Dialoge fangen Esc selbst ab). Gibt die Aufräumfunktion zurück. */
-function backOnEscape(onBack) {
+export function backOnEscape(onBack) {
   const onKey = (e) => {
     if (e.key === 'Escape' && !document.querySelector('.dialog-backdrop')) { e.preventDefault(); onBack(); }
   };
@@ -300,9 +300,12 @@ export function renderTavern(c, props, app) {
     if (scroller) scroller.scrollTop = top;
   }
 
+  // Reihenfolge wie im Entwurf: oben das Gold, darunter „<Held> sitzt am Tresen“.
   c.append(
-    screenHeader('Taverne', `${hero.name} sitzt am Tresen`),
-    el('p', { class: 'gold-line' }, 'Gold: ', goldValue),
+    el('header', { class: 'screen-header' },
+      el('h1', { text: 'Taverne' }),
+      el('p', { class: 'gold-line' }, 'Gold: ', goldValue),
+      el('p', { class: 'subtitle', text: `${hero.name} sitzt am Tresen` })),
     body,
     screenFooter(goBack),
   );
