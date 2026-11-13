@@ -56,7 +56,7 @@ export const HOSTS = {
         'Höher oder tiefer. Mehr Auswahl hat das Leben selten.',
         'Ich mische nicht. Ich ziehe einfach nach Gefühl.',
         'Gleicher Wert verliert. Das steht klein irgendwo.',
-        'Der Joker ist mein Lieblingsgast. Er zahlt nie.',
+        'Der Joker beendet die Runde. Dein Topf bleibt dein.',
         'Eine Karte noch? Mutig. Oder müde.',
         'Wer früh auszahlt, schläft ruhig.',
         'Ass hoch? Du bist optimistisch, nicht klug.',

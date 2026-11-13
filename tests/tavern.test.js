@@ -189,6 +189,7 @@ test('tavern: hiLoGuess – Treffer rundet ab, fünf Treffer, Deckelung, Fehler'
   assertEqual(miss.drawn, 7);
   assertEqual(miss.state.done, true);
   assertEqual(miss.state.result, 'miss');
+  assertEqual(miss.state.pot, 0);
   assertEqual(miss.state.hits, 1);
   const lower = hiLoGuess(s7, 'up', scripted([0.5, 0.0])); // Karte 2
   assertEqual(lower.state.result, 'miss');
