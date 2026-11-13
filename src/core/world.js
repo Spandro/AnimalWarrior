@@ -7,7 +7,7 @@ import { stepAbilities } from './abilities.js';
 import { CLASSES } from '../data/classes.js';
 import { bonusModifiers } from '../data/bonuses.js';
 import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, CONTACT_TOLERANCE, HERO_RADIUS, SEPARATION_CELL, MAX_ENEMIES,
-  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS, CURL, SLITHER, VENOM } from '../data/enemies.js';
+  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS, CURL, SLITHER, VENOM, POUNCE } from '../data/enemies.js';
 import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
 
 /**
@@ -84,6 +84,40 @@ const BEHAVIORS = {
     const to = towards(enemy, enemyTarget(world, enemy));
     if (to.d === 0) return;
     moveDir(enemy, to.x, to.z, Math.min(to.d, enemySpeed(world, enemy) * CURL.speedMul * dt));
+  },
+
+  /**
+   * Luchs: verfolgt; in `POUNCE.engageRange` duckt er sich mit Ankündigung (Kreis am Ziel) und springt dann
+   * sichtbar dorthin. Eine Betäubung während des Duckens bricht den Sprung ab.
+   */
+  pounce(world, enemy, dt) {
+    const ai = enemy.ai, t = world.time;
+    if (ai.phase === 'crouch') {
+      if (enemy.stunnedUntil > ai.crouchStart) { ai.phase = 'chase'; ai.readyAt = t + POUNCE.cooldown; return; }
+      if (t < ai.until) return;
+      ai.phase = 'leap'; ai.leapStart = ai.until; ai.fromX = enemy.x; ai.fromZ = enemy.z;
+    }
+    if (ai.phase === 'leap') {
+      const k = Math.min(1, (t - ai.leapStart) / POUNCE.leapTime);
+      enemy.x = ai.fromX + (ai.tx - ai.fromX) * k;
+      enemy.z = ai.fromZ + (ai.tz - ai.fromZ) * k;
+      if (k < 1) return;
+      const hero = world.hero;
+      if (Math.hypot(hero.x - ai.tx, hero.z - ai.tz) <= POUNCE.radius) damageHero(world, enemy.damage * POUNCE.damageMul);
+      ai.phase = 'chase'; ai.readyAt = t + POUNCE.cooldown;
+      return;
+    }
+    const target = enemyTarget(world, enemy);
+    const to = towards(enemy, target);
+    if (t >= (ai.readyAt ?? 0) && to.d <= POUNCE.engageRange) {
+      ai.phase = 'crouch'; ai.crouchStart = t; ai.until = t + POUNCE.crouch; ai.tx = target.x; ai.tz = target.z;
+      world.events.push({
+        type: 'bossTelegraph', kind: 'leap', x: target.x, z: target.z, radius: POUNCE.radius,
+        delay: POUNCE.crouch + POUNCE.leapTime, dirX: to.x, dirZ: to.z, damageMul: POUNCE.damageMul,
+      });
+      return;
+    }
+    BEHAVIORS.chase(world, enemy, dt);
   },
 
   /** Nähert sich mit seitlichem Versatz, der regelmäßig die Seite wechselt. */

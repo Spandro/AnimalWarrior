@@ -3,7 +3,7 @@ import { createSurvivorRun, stepRun, chooseCard, setPaused, setView, getSummary,
 import { spawnRadius, hpMul, BOSS_HP_MUL, MAX_ENEMIES, DEFAULT_VIEW, DYING, unlockMinute, weights } from '../src/data/waves.js';
 import { createWorld, stepWorld, spawnEnemy, damageEnemy } from '../src/core/world.js';
 import { obstaclesNear, obstaclesInCell } from '../src/core/terrain.js';
-import { ENEMIES, ELITE, DROPS, BOSS, VENOM } from '../src/data/enemies.js';
+import { ENEMIES, ELITE, DROPS, BOSS, VENOM, POUNCE } from '../src/data/enemies.js';
 
 const NONE = { moveX: 0, moveZ: 0 };
 function clearSeed() {
@@ -688,4 +688,62 @@ test('survivor: Kreuzotter windet sich und wechselt die Seite alle 0,6 s', () =>
     px = otter.x; pz = otter.z;
   });
   assertTrue(switches >= 4 && switches <= 6, `${switches} Seitenwechsel`);
+});
+
+// --- Luchs (Anspringen) ---
+
+/** Luchs bei (12, 0) ohne Berührungsschaden; läuft, bis er den Sprung ankündigt. */
+function lynxUntilTelegraph(w) {
+  const lynx = spawnEnemy(w, 'luchs', w.hero.x + 12, w.hero.z);
+  lynx.contactReadyAt = Infinity;
+  let tele = null;
+  for (let i = 0; i < 100 && !tele; i++) { stepWorld(w, 0.05, NONE); tele = ofType(w.events, 'bossTelegraph')[0] || null; }
+  return { lynx, tele };
+}
+
+test('survivor: Luchs duckt sich in 8 Abstand und kündigt den Sprung an der Heldenposition an', () => {
+  const w = behaviorWorld();
+  const { lynx, tele } = lynxUntilTelegraph(w);
+  assertTrue(!!tele, 'keine Ankündigung');
+  assertEqual([tele.kind, tele.radius], ['leap', POUNCE.radius]);
+  assertClose(tele.delay, POUNCE.crouch + POUNCE.leapTime, 1e-9);
+  assertClose(dist(tele, w.hero), 0, 1e-9);
+  assertTrue(dist(lynx, w.hero) <= POUNCE.engageRange + 0.01);
+  const x = lynx.x;
+  simulate(w, POUNCE.crouch - 0.1, 0.05);
+  assertClose(lynx.x, x, 1e-9);
+});
+
+test('survivor: Luchs trifft bei der Landung im Kreis, sonst nicht', () => {
+  for (const stay of [true, false]) {
+    const w = behaviorWorld();
+    const { lynx, tele } = lynxUntilTelegraph(w);
+    if (!stay) w.hero.x = -20;
+    const hits = [];
+    simulate(w, POUNCE.crouch + POUNCE.leapTime + 0.05, 0.05, () => hits.push(...ofType(w.events, 'heroHit')));
+    assertEqual(hits.map((h) => h.amount), stay ? [ENEMIES.luchs.damage * POUNCE.damageMul] : []);
+    if (!stay) assertTrue(dist(lynx, tele) < 0.3, `Luchs landete ${dist(lynx, tele)} vom Ziel`);
+  }
+});
+
+test('survivor: nach dem Sprung 3 s kein neuer Sprung', () => {
+  const w = behaviorWorld();
+  const { lynx } = lynxUntilTelegraph(w);
+  const times = [w.time];
+  simulate(w, 10, 0.05, () => { if (ofType(w.events, 'bossTelegraph').length) times.push(w.time); });
+  assertTrue(times.length >= 2, 'kein zweiter Sprung');
+  for (let i = 1; i < times.length; i++) {
+    assertTrue(times[i] - times[i - 1] >= POUNCE.crouch + POUNCE.leapTime + POUNCE.cooldown - 0.06, `zu früh: ${times[i] - times[i - 1]}`);
+  }
+  assertTrue(lynx.hp > 0);
+});
+
+test('survivor: Betäubung beim Ducken bricht den Sprung ab', () => {
+  const w = behaviorWorld();
+  const { lynx } = lynxUntilTelegraph(w);
+  lynx.stunnedUntil = w.time + 0.3;
+  let leapt = false, hits = 0;
+  simulate(w, 2, 0.05, () => { if (lynx.ai.phase === 'leap') leapt = true; hits += ofType(w.events, 'heroHit').length; });
+  assertTrue(!leapt, 'sprang trotz Betäubung');
+  assertEqual(hits, 0);
 });
