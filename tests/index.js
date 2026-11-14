@@ -27,6 +27,7 @@ import './loot.test.js';
 import './quests.test.js';
 import './adventureSave.test.js';
 import './adventureHero.test.js';
+import './adventure.test.js';
 import './tavern.test.js';
 import './roster.test.js';
 import './tavernSave.test.js';

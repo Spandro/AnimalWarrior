@@ -121,7 +121,7 @@ test('world: tödlicher Treffer zählt kills, legt xp ab und meldet kill', () =>
   assertEqual(w.run.damageByAbility, { schwerthieb: 10 });
   assertEqual(w.events, [
     { type: 'hit', x: 7, z: 8, amount: 10, crit: false },
-    { type: 'kill', enemyType: 'ratte', x: 7, z: 8 },
+    { type: 'kill', enemyType: 'ratte', x: 7, z: 8, id: rat.id, elite: false, boss: false, packId: null },
   ]);
 });
 

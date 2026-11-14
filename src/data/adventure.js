@@ -80,3 +80,22 @@ export const ADVENTURE_BALANCE = { heroHpMul: 2, enemyDamageMul: 0.28, contactIn
 
 /** Gebietsstufe (Spec §8.2): Zuwachs je Stufe über 1 für Leben, Schaden und Erfahrung der Gegner. */
 export const AREA_SCALE = { hp: 0.18, damage: 0.12, xp: 0.15 };
+
+/**
+ * Gegnergruppen (Spec §8.1): Aufmerksamkeit (m), Leine (m vom Ort der Gruppe), ab welcher Nähe eine Gruppe in der
+ * Welt steht (m; darüber wird sie nicht berechnet, mit `despawnPad` Spielraum), Umherlaufen um den Ort (m),
+ * Abstand der Gegner beim Erscheinen (m).
+ */
+export const PACK = { aggro: 10, leash: 25, active: 40, despawnPad: 6, wanderRadius: 4, spread: 2.5 };
+
+/** Tod (Spec §8.5): Goldverlust (Anteil, Deckel) und Dauer der Sterbephase (s). */
+export const DEATH = { goldPct: 0.05, goldMax: 200, seconds: 1.2 };
+
+/** Reichweite für Sprechen, Rasten, Untersuchen, Öffnen (m). */
+export const INTERACT_RANGE = 2.2;
+
+/** Bis zu dieser Entfernung gilt die Umgebung auf der Minikarte als gesehen (m). */
+export const EXPLORE_RADIUS = 20;
+
+/** Abstand vom Lagerfeuer, an dem der Held nach Rasten, Reisen oder Aufwachen steht (m). */
+export const CAMPFIRE_OFFSET = 1.6;

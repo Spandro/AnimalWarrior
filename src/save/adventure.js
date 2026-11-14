@@ -14,8 +14,9 @@ import { MATERIALS, POTION, CLASS_WEAPON, SMITH, SHOP, MAX_ADVENTURE_LEVEL } fro
  *   campfires: string[], quests: QuestLog, trackedQuest: string|null, bosses: string[], chests: string[], found: string[],
  *   questItems: Record<string, number>, explored: Record<string, string>, introSeen: boolean, chapterDone: number[],
  *   unlocked: ('merchant'|'smith')[] }} AdventureRecord
- * @typedef {{ gold: number, items: string[], materials: Record<string, number> }} Ledger
- *   Was ein laufendes Abenteuer seit dem letzten Speichern gemeinsam für alle Helden verdient hat.
+ * @typedef {{ gold: number, items: string[], materials: Record<string, number>, rests?: number }} Ledger
+ *   Was ein laufendes Abenteuer seit dem letzten Speichern gemeinsam für alle Helden verdient hat (`rests`: Rasten
+ *   für den Zähler `stats.campfireRests`).
  */
 
 const HOME = { mapId: 'dorf', campfireId: 'dorf_platz' };
@@ -179,6 +180,7 @@ export function commitAdventure(save, heroId, { record, ledger }) {
   for (const [id, n] of Object.entries(ledger.materials)) {
     if (Object.hasOwn(MATERIALS, id)) save.materials[id] = (save.materials[id] ?? 0) + n;
   }
+  if (ledger.rests) save.stats.campfireRests += ledger.rests;
   return { sold };
 }
 

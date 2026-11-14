@@ -35,6 +35,10 @@ import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
  *   enemyProjectiles: EnemyProjectile[], zones: object[], orbitals: object[], summons: object[], pickups: Pickup[],
  *   events: object[], run: Run, nextId: number, openedChests: Set<string>, terrain: import('./terrain.js').Terrain }} World
  *   `openedChests`: Kennungen der schon geöffneten Karten-Kisten (`chestInCell`); `terrain`: Geländequelle.
+ *   Nur im Abenteuer gesetzt (src/modes/adventure.js): `drops: 'none'` (Besiegte lassen nichts fallen, der Modus
+ *   verteilt Beute selbst), `abilityMods` (Faktoren für Fähigkeiten von Hand), `contactInterval` (statt
+ *   CONTACT_INTERVAL); an Gegnern `passive` mit `home` (ruht an seinem Ort, keine Berührungstreffer), `packId`, `bossId`;
+ *   an Aufsammelbarem `locked` (bleibt liegen) und `ref` (Kennung, kommt im Ereignis `pickup` mit).
  */
 
 /** Einheitsrichtung und Abstand von a nach b; bei Deckung die Richtung `fallback`. */
@@ -471,6 +475,18 @@ export function pushHero(world, dirX, dirZ, distance) {
 }
 
 /** Verwirrter Gegner: läuft in eine zufällige Richtung, die etwa einmal pro Sekunde neu gewürfelt wird. */
+/**
+ * Ruhender Gegner (Abenteuer, `passive`): läuft gemächlich um seinen Ort `home` (Kreis mit `home.r`), kehrt dorthin
+ * zurück, wenn er weiter weg ist.
+ */
+function stepPassive(world, enemy, dt) {
+  const h = enemy.home;
+  if (!h) return;
+  const to = towards(enemy, h);
+  if (to.d > h.r) moveDir(enemy, to.x, to.z, Math.min(to.d, enemy.speed * dt));
+  else wander(world, enemy, dt * 0.4);
+}
+
 function wander(world, enemy, dt) {
   if (!enemy.wander || world.time >= enemy.wander.rerollAt) {
     const a = world.rng.range(0, Math.PI * 2);
@@ -614,7 +630,8 @@ export function damageEnemy(world, enemy, hit, abilityId) {
 
   world.enemies.splice(index, 1);
   world.run.kills++;
-  world.events.push({ type: 'kill', enemyType: enemy.type, x: enemy.x, z: enemy.z });
+  world.events.push({ type: 'kill', enemyType: enemy.type, x: enemy.x, z: enemy.z, id: enemy.id, elite: enemy.elite, boss: enemy.boss, packId: enemy.packId ?? null });
+  if (world.drops === 'none') return;
   const def = ENEMIES[enemy.type];
   const drop = (kind, value) => world.pickups.push({ kind, x: enemy.x, z: enemy.z, value });
   drop('xp', def.xp * (enemy.elite ? ELITE.xpMul : 1));
@@ -758,6 +775,7 @@ function collectPickups(world) {
   const hero = world.hero;
   const r = hero.stats.pickupRadius;
   world.pickups = world.pickups.filter((p) => {
+    if (p.locked) return true;
     const dx = p.x - hero.x, dz = p.z - hero.z;
     if (dx * dx + dz * dz > r * r) return true;
     if (p.kind === 'xp') world.run.xp += p.value * hero.stats.xpGain;
@@ -767,7 +785,7 @@ function collectPickups(world) {
       hero.hp += amount;
       world.events.push({ type: 'heal', amount });
     }
-    world.events.push({ type: 'pickup', kind: p.kind, value: p.value });
+    world.events.push(p.ref === undefined ? { type: 'pickup', kind: p.kind, value: p.value } : { type: 'pickup', kind: p.kind, value: p.value, ref: p.ref });
     return false;
   });
 }
@@ -810,6 +828,7 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
 
   // Gegner bewegen
   for (const e of world.enemies) {
+    if (e.passive) { stepPassive(world, e, dt); continue; }
     if (world.time < e.stunnedUntil) continue;
     if (world.time < e.confusedUntil) wander(world, e, dt);
     else (BEHAVIORS[e.behavior] || BEHAVIORS.chase)(world, e, dt);
@@ -821,7 +840,7 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
 
   // Berührungsschaden
   for (const e of world.enemies) {
-    if (world.time < e.stunnedUntil || !isTargetable(e)) continue;
+    if (world.time < e.stunnedUntil || !isTargetable(e) || e.passive) continue;
     const dx = e.x - hero.x, dz = e.z - hero.z;
     const min = e.radius + hero.radius + CONTACT_TOLERANCE;
     if (dx * dx + dz * dz <= min * min && world.time >= e.contactReadyAt) {
