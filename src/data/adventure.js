@@ -122,3 +122,6 @@ export const MAP_LOOK = {
     panzerla: 0x6f8a4a, kruemel: 0xd29a5a, grabowski: 0x4a4048, nussa: 0xc0622e, pieps: 0x9a7a5a, amsel: 0x2a2a2a,
   },
 };
+
+/** Minikarte: Kantenlänge in Pixeln, gezeigter Umkreis in Metern, Größe der Nebelblöcke (wie die Erkundung). */
+export const MINIMAP = { size: 112, radius: 45, block: EXPLORE_BLOCK };

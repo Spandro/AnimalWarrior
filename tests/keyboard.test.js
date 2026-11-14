@@ -54,3 +54,18 @@ test('keyboard: andere Tasten bewegen nicht', () => {
   k.down('Space'); k.down('Digit1');
   assertEqual(k.readMoveVector(), { moveX: 0, moveZ: 0 });
 });
+
+test('keyboard: onKey bekommt 1–4, E, M und J, Bewegungstasten nicht; true verhindert die Voreinstellung', async () => {
+  const { attachKeyboard } = await import('../src/input/keyboard.js');
+  const handlers = {};
+  const target = { addEventListener: (t, f) => { handlers[t] = f; }, removeEventListener: () => {} };
+  const seen = [];
+  attachKeyboard(target, createKeyState(), { onKey: (code) => { seen.push(code); return code !== 'KeyJ'; } });
+  const press = (code) => {
+    let prevented = false;
+    handlers.keydown({ code, repeat: false, ctrlKey: false, altKey: false, metaKey: false, preventDefault: () => { prevented = true; } });
+    return prevented;
+  };
+  assertEqual([press('Digit4'), press('KeyE'), press('Digit1'), press('KeyJ'), press('KeyW')], [true, true, true, false, true]);
+  assertEqual(seen, ['Digit4', 'KeyE', 'Digit1', 'KeyJ']);
+});

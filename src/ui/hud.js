@@ -36,7 +36,7 @@ export function abilityColor(id) {
  * @param {string} className
  * @param {string} label zugänglicher Name
  */
-function bar(className, label) {
+export function bar(className, label) {
   const fill = el('span', { class: 'hud-bar-fill' });
   const text = el('span', { class: 'hud-bar-text' });
   const root = el('div', { class: `hud-bar ${className}`, role: 'meter', 'aria-label': label, 'aria-valuemin': '0' }, fill, text);

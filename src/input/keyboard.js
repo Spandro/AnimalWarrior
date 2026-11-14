@@ -44,10 +44,11 @@ export function createKeyState() {
  * Tasten mit Strg/Alt/Meta bleiben dem Browser.
  * @param {Window|HTMLElement} target
  * @param {KeyState} keyState
- * @param {{ onPause?: () => void, onCardKey?: (index: number) => void }} [handlers]
+ * @param {{ onPause?: () => void, onCardKey?: (index: number) => void, onKey?: (code: string) => boolean }} [handlers]
+ *   `onKey` (Abenteuer) bekommt alle übrigen Tasten vor der Kartenwahl; liefert es true, ist die Taste verbraucht.
  * @returns {() => void} löst die Ereignisse wieder
  */
-export function attachKeyboard(target, keyState, { onPause, onCardKey } = {}) {
+export function attachKeyboard(target, keyState, { onPause, onCardKey, onKey } = {}) {
   /** @param {KeyboardEvent} e */
   const onKeyDown = (e) => {
     if (e.ctrlKey || e.altKey || e.metaKey) return;
@@ -58,6 +59,9 @@ export function attachKeyboard(target, keyState, { onPause, onCardKey } = {}) {
       if (e.repeat) return;
       e.preventDefault();
       onPause?.();
+    } else if (onKey) {
+      if (e.repeat) return;
+      if (onKey(e.code)) e.preventDefault();
     } else if (Object.hasOwn(CARD_KEYS, e.code)) {
       if (e.repeat) return;
       e.preventDefault();
