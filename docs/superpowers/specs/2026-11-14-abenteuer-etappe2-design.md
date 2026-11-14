@@ -145,7 +145,7 @@ je Held adventure:
   abilities                          enthält auch Astfähigkeiten (nur mit passender Unterklasse)
 ```
 
-- **Umwandlung 4 → 5:** `subclass: null`, `passives: {}`, `freeRespecUsed`-artige Markierung ist nicht nötig, weil die Rückgabe mit der Wahl passiert. Alles andere bleibt. Stammstufen aus Etappe 1 bleiben erhalten. Eine Rückerstattung ist nicht nötig, weil der Stamm gleich funktioniert. *(Entscheidung des Entwurfs; Etappe 1 hatte „Punkte zurück“ vorgesehen, das ist hier überflüssig.)*
+- **Umwandlung 4 → 5:** `subclass: null`, `passives: {}`. Eine eigene Markierung für die kostenlose Rückgabe ist nicht nötig: Sie passiert genau bei der Wahl, und gewählt wird nur, solange `subclass` leer ist. Alles andere bleibt. Stammstufen aus Etappe 1 bleiben erhalten. Eine Rückerstattung ist nicht nötig, weil der Stamm gleich funktioniert. *(Entscheidung des Entwurfs; Etappe 1 hatte „Punkte zurück“ vorgesehen, das ist hier überflüssig.)*
 - **Ausbessern** (wie Etappe 1): Eine Unterklasse, die nicht zur Klasse passt, wird gelöscht. Astfähigkeiten und Dauer-Boni ohne passende Unterklasse fallen weg, ihre Punkte kommen zurück. Stufen werden in ihren Bereich gerückt. Eine Wahl unter Level 10 wird gelöscht.
 - **Sicherungskopie** vor der Umwandlung wie in Etappe 1.
 - Spielversion **0.6.0**.
