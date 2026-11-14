@@ -199,6 +199,8 @@ Aus dem Bau der Taverne (bewusst zurückgestellt, für die Gesamtprüfung):
 - Aussehen der Duo-Figur: einige Zahlen stehen im Darstellungscode statt in den Daten; der Titel des gesperrten Duos hat wenig Kontrast; die Großfamilie ignoriert das Ausblenden beim Tod (Beschreibung bei `createHeroView` und der Test für den Teilausfall beim Laden sind seit der Gesamtprüfung erledigt)
 - Zwischen den ausgeschnittenen Phasen des Duos ist kein Abstand; die Zuordnung der Figurenstücke ist bei einem neuen Bild fragil (Stall, `frameCanvas` und der Ausfall aller Bögen bei einem kaputten Duo-Bild sind seit der Gesamtprüfung behoben)
 - Tests fehlen für die Wahl der Duo-Phase und für „Bewegung reduzieren“; ein Test trägt einen veralteten Titel („stride“)
+- Höher oder tiefer: Drückt man innerhalb von 0,4 s nach dem Aufdecken „Zurück“, kann der Tastatur-Fokus hinter den Dialog „Runde aufgeben?“ springen (nur Tastatur, Esc wirkt weiter; Abhilfe: `keepFocus` überspringen, solange ein Dialog offen ist)
+- Bei einer offenen Taverne in einem zweiten Tab zeigen die Tavernen-Bildschirme das Gold erst nach der nächsten Aktion neu an (kein Gold in Gefahr, jede Buchung prüft den Speicher neu)
 - Auf dem Entwicklungsrechner meldete der Testserver beim Neuladen einmal `ERR_CONNECTION_RESET`; ein zweites Laden ging sofort (Server, nicht Spiel)
 
 Aus der Gesamtprüfung von „Neue Gegner und wechselnde Bosse“ (bewusst zurückgestellt):
