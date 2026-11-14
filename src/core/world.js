@@ -37,7 +37,7 @@ import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
  *   `openedChests`: Kennungen der schon geöffneten Karten-Kisten (`chestInCell`); `terrain`: Geländequelle.
  *   Nur im Abenteuer gesetzt (src/modes/adventure.js): `drops: 'none'` (Besiegte lassen nichts fallen, der Modus
  *   verteilt Beute selbst), `abilityMods` (Faktoren für Fähigkeiten von Hand), `contactInterval` (statt
- *   CONTACT_INTERVAL); an Gegnern `passive` mit `home` (ruht an seinem Ort, keine Berührungstreffer), `packId`, `bossId`;
+ *   CONTACT_INTERVAL), `lifesteal` (Anteil jedes Treffers des Helden, der ihn heilt); am Helden `shield`; an Gegnern `passive` mit `home` (ruht an seinem Ort, keine Berührungstreffer), `packId`, `bossId`;
  *   an Aufsammelbarem `locked` (bleibt liegen) und `ref` (Kennung, kommt im Ereignis `pickup` mit).
  */
 
@@ -523,7 +523,7 @@ export function createWorld({ seed, animalId, classId, modifiers = [], terrain }
       x: 0, z: 0, facing: { x: 1, z: 0 },
       hp: stats.maxHp, stats, modifiers: [...modifiers],
       abilities: [{ id: CLASSES[classId].startAbility, level: 1, cooldownLeft: 0 }],
-      buffs: [], radius: HERO_RADIUS, invulnerableUntil: 0, poison: null, animalId, classId,
+      buffs: [], radius: HERO_RADIUS, invulnerableUntil: 0, poison: null, animalId, classId, shield: null,
     },
     enemies: [], projectiles: [], enemyProjectiles: [], zones: [], orbitals: [], summons: [], pickups: [], events: [],
     run: { level: 1, xp: 0, kills: 0, gold: 0, bonuses: {}, damageByAbility: {}, revivesLeft: 0 },
@@ -636,6 +636,10 @@ export function damageEnemy(world, enemy, hit, abilityId) {
   }
   enemy.hp -= amount;
   dbA[abilityId] = (dbA[abilityId] || 0) + amount;
+  if (world.lifesteal > 0) {
+    const hero = world.hero;
+    hero.hp = Math.min(hero.stats.maxHp, hero.hp + amount * world.lifesteal);
+  }
   if (enemy.hp > 0) return;
 
   world.enemies.splice(index, 1);
@@ -676,7 +680,7 @@ function startShadowFlee(world, enemy) {
 }
 
 /**
- * Schaden am Helden über Ausweichen und Rüstung.
+ * Schaden am Helden über Ausweichen und Rüstung; ein Schild (`hero.shield`, Abenteuer) fängt danach zuerst ab.
  * Gifttreffer (`poison`) tragen im Ereignis `heroHit` das Feld `poison: true`.
  * @param {World} world
  * @param {number} rawAmount
@@ -690,9 +694,28 @@ export function damageHero(world, rawAmount, { poison = false } = {}) {
     { baseDamage: rawAmount, damage: 1, critChance: 0, critDamage: 1 },
     { armor: hero.stats.armor, dodge: hero.stats.dodge });
   if (res.dodged) { world.events.push({ type: 'dodge' }); return false; }
-  hero.hp -= res.amount;
-  world.events.push(poison ? { type: 'heroHit', amount: res.amount, poison: true } : { type: 'heroHit', amount: res.amount });
+  let amount = res.amount;
+  if (hero.shield) {
+    const absorbed = Math.min(hero.shield.hp, amount);
+    hero.shield.hp -= absorbed;
+    amount -= absorbed;
+    world.events.push({ type: 'shieldHit', amount: absorbed });
+    if (hero.shield.hp <= 0) hero.shield = null;
+    if (amount <= 0) return true;
+  }
+  hero.hp -= amount;
+  world.events.push(poison ? { type: 'heroHit', amount, poison: true } : { type: 'heroHit', amount });
   return true;
+}
+
+/**
+ * Gibt dem Helden einen Schild (Abenteuer, Besonderheit „Breites Kreuz“). Ein neuer ersetzt den alten, er stapelt nie.
+ * @param {World} world
+ * @param {number} hp
+ * @param {number} duration
+ */
+export function giveShield(world, hp, duration) {
+  world.hero.shield = { hp, until: world.time + duration };
 }
 
 /** Ein durchgekommener Otterbiss vergiftet (oder frischt das Gift auf); der Tick-Takt eines laufenden Gifts bleibt. */
@@ -829,6 +852,8 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
   for (const b of hero.buffs) b.timeLeft -= dt;
   hero.buffs = hero.buffs.filter((b) => b.timeLeft > 0);
   if (hero.buffs.length !== before) recomputeHeroStats(world);
+
+  if (hero.shield && world.time >= hero.shield.until) hero.shield = null;
 
   // Regeneration
   if (!inert && hero.stats.hpRegen > 0) hero.hp = Math.min(hero.stats.maxHp, hero.hp + hero.stats.hpRegen * dt);

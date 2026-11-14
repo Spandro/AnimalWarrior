@@ -1,5 +1,5 @@
 import { test, assertEqual, assertClose, assertTrue } from './runner.js';
-import { createWorld, stepWorld, spawnEnemy, damageEnemy, damageHero, recomputeHeroStats, isCurled } from '../src/core/world.js';
+import { createWorld, stepWorld, spawnEnemy, damageEnemy, damageHero, recomputeHeroStats, isCurled, giveShield } from '../src/core/world.js';
 import { obstaclesInCell, obstaclesNear } from '../src/core/terrain.js';
 import { DROPS, ELITE, ENEMIES, CURL } from '../src/data/enemies.js';
 
@@ -376,4 +376,41 @@ test('world: Zwickzwack ruft alle 25 s drei Krebse herbei (Ereignis bossSummon)'
   }
   assertEqual(summons, 1);
   assertEqual(world.enemies.filter((e) => e.type === 'krebs').length, 3);
+});
+
+// ---------------------------------------------------------------- Etappe 2: Schild und Lebensraub
+
+test('world: Schild schluckt Schaden bis 0, Rest trifft das Leben, Ereignis shieldHit', () => {
+  const w = createWorld({ seed: 1, animalId: 'ente', classId: 'krieger' });
+  w.hero.stats.armor = 0; w.hero.stats.dodge = 0;
+  const hp = w.hero.hp;
+  giveShield(w, 10, 8);
+  damageHero(w, 6);
+  assertEqual([w.hero.hp, w.hero.shield.hp], [hp, 4]);
+  assertTrue(w.events.some((e) => e.type === 'shieldHit' && e.amount === 6));
+  damageHero(w, 7);
+  assertEqual([w.hero.hp, w.hero.shield], [hp - 3, null]);
+});
+
+test('world: Schild läuft ab, neues Auslösen ersetzt statt zu stapeln', () => {
+  const w = createWorld({ seed: 1, animalId: 'ente', classId: 'krieger' });
+  giveShield(w, 10, 8);
+  giveShield(w, 12, 8);
+  assertEqual(w.hero.shield.hp, 12);
+  stepWorld(w, 8.1, { moveX: 0, moveZ: 0 });
+  assertEqual(w.hero.shield, null);
+});
+
+test('world: Lebensraub heilt einen Anteil des Schadens, höchstens bis zum höchsten Leben; ohne nichts', () => {
+  const w = createWorld({ seed: 1, animalId: 'ente', classId: 'krieger' });
+  const e = spawnEnemy(w, 'ratte', 5, 0, { hpMul: 100 });
+  w.hero.hp = 50;
+  damageEnemy(w, e, { amount: 20, crit: false }, 'schwerthieb');
+  assertEqual(w.hero.hp, 50);
+  w.lifesteal = 0.1;
+  damageEnemy(w, e, { amount: 20, crit: false }, 'schwerthieb');
+  assertClose(w.hero.hp, 52);
+  w.hero.hp = w.hero.stats.maxHp - 0.5;
+  damageEnemy(w, e, { amount: 20, crit: false }, 'schwerthieb');
+  assertClose(w.hero.hp, w.hero.stats.maxHp);
 });
