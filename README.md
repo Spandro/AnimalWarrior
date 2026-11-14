@@ -118,6 +118,6 @@ Die Taverne hat vier weitere Bilder:
 | `assets/taverne/gaststube.webp` | Gaststube als Hintergrund hinter allen Taverne-Bildschirmen |
 | `assets/taverne/wirte.webp` | Affe und Elster; die Porträt-Ausschnitte stehen in `TAVERN_IMAGES.hosts.rects` in `src/data/tavern.js` |
 | `assets/taverne/beute.webp` | die 24 Gegenstände im Raster 6 × 4; welcher Gegenstand in welcher Zelle liegt, steht im Feld `icon` in `src/data/items.js` |
-| `assets/figuren/duo.webp` | Giraffe mit Erdmännchen in vier Phasen; die Ausschnitte (`SHEET_FRAMES.duo`) und die Abfolge der Bildfolge (`DUO_FRAMES`) stehen in `src/data/sprites.js`. Die Phasen müssen im Bild getrennt bleiben, weil das Spiel jedes lose Pixelgebiet dem nächsten Feld zuordnet |
+| `assets/figuren/duo.webp` | Giraffe mit Erdmännchen in vier Phasen; die Ausschnitte (`SHEET_FRAMES.duo`) und die Abfolge der Bildfolge (`DUO_FRAMES`) stehen in `src/data/sprites.js`. Im gelieferten Bild ragt manchmal ein Kopf oder Schwanz in den Ausschnitt daneben; das Spiel ordnet jedes Stück der Figur zu, zu der es gehört. Ein neues Bild geht deshalb, solange sich keine zwei Figuren berühren |
 
 Fehlt ein Bild der Taverne, zeigt das Spiel Ersatz: einen dunklen Holzton statt der Gaststube, einen Kreis mit Anfangsbuchstaben statt des Wirts, ein Symbol im Seltenheitsrahmen statt der Beute und eine einfache 3D-Figur statt des Duos.
