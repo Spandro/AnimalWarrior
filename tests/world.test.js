@@ -328,3 +328,17 @@ test('world: Igel entrollt nach 2,5 s und rollt sich 1,5 s lang nicht erneut ein
   }
   assertClose(recurledAt, 4, 0.06);
 });
+
+test('world: Wellen-Modus unverändert – fester Durchlauf über 60 s', async () => {
+  const { createSurvivorRun, stepRun, chooseCard } = await import('../src/modes/survivor.js');
+  const run = createSurvivorRun({ seed: 4242, animalId: 'hase', classId: 'krieger' });
+  for (let i = 0; i < 60 * 60; i++) {
+    if (run.state === 'levelup') chooseCard(run, 0);
+    stepRun(run, 1 / 60, { moveX: Math.cos(i / 300), moveZ: Math.sin(i / 300) });
+  }
+  const w = run.world;
+  assertClose(w.hero.x, -16.105953975668406, 1e-9);
+  assertClose(w.hero.z, 4.4388851207797675, 1e-9);
+  assertEqual(w.run.kills, 12);
+  assertEqual(w.enemies.length, 78);
+});

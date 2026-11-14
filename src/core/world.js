@@ -2,7 +2,7 @@ import { createRng } from './rng.js';
 import { computeStats } from './stats.js';
 import { resolveHit } from './combat.js';
 import { createGrid } from './spatial.js';
-import { obstaclesNear } from './terrain.js';
+import { seedTerrain } from './terrain.js';
 import { stepAbilities } from './abilities.js';
 import { CLASSES } from '../data/classes.js';
 import { bonusModifiers } from '../data/bonuses.js';
@@ -33,8 +33,8 @@ import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
  *   Gegnergeschoss: trifft nur den Held, wird von Hindernissen aufgehalten. `shadow`: vom Schatten geworfen.
  * @typedef {{ time: number, seed: number, rng: import('./rng.js').Rng, hero: Hero, enemies: Enemy[], projectiles: object[],
  *   enemyProjectiles: EnemyProjectile[], zones: object[], orbitals: object[], summons: object[], pickups: Pickup[],
- *   events: object[], run: Run, nextId: number, openedChests: Set<string> }} World
- *   `openedChests`: Kennungen der schon geöffneten Karten-Kisten (`chestInCell`).
+ *   events: object[], run: Run, nextId: number, openedChests: Set<string>, terrain: import('./terrain.js').Terrain }} World
+ *   `openedChests`: Kennungen der schon geöffneten Karten-Kisten (`chestInCell`); `terrain`: Geländequelle.
  */
 
 /** Einheitsrichtung und Abstand von a nach b; bei Deckung die Richtung `fallback`. */
@@ -462,10 +462,11 @@ function wander(world, enemy, dt) {
 }
 
 /**
- * @param {{ seed: number, animalId: string, classId: string, modifiers?: Modifier[] }} opts
+ * @param {{ seed: number, animalId: string, classId: string, modifiers?: Modifier[], terrain?: import('./terrain.js').Terrain }} opts
+ *   `terrain`: Geländequelle (Standard: zufällige Hindernisse aus dem Seed, wie im Wellen-Modus)
  * @returns {World}
  */
-export function createWorld({ seed, animalId, classId, modifiers = [] }) {
+export function createWorld({ seed, animalId, classId, modifiers = [], terrain }) {
   const stats = computeStats(animalId, classId, modifiers);
   return {
     time: 0,
@@ -481,6 +482,7 @@ export function createWorld({ seed, animalId, classId, modifiers = [] }) {
     enemies: [], projectiles: [], enemyProjectiles: [], zones: [], orbitals: [], summons: [], pickups: [], events: [],
     run: { level: 1, xp: 0, kills: 0, gold: 0, bonuses: {}, damageByAbility: {}, revivesLeft: 0 },
     openedChests: new Set(),
+    terrain: terrain ?? seedTerrain(seed),
   };
 }
 
@@ -669,7 +671,7 @@ function stepPoison(world) {
 }
 
 function pushOutOfObstacles(world, e) {
-  for (const o of obstaclesNear(world.seed, e.x, e.z, e.radius)) {
+  for (const o of world.terrain.obstaclesNear(e.x, e.z, e.radius)) {
     const dx = e.x - o.x, dz = e.z - o.z;
     const min = e.radius + o.radius;
     const d2 = dx * dx + dz * dz;
@@ -721,7 +723,8 @@ function stepEnemyProjectiles(world, dt) {
     p.x += p.dirX * p.speed * dt;
     p.z += p.dirZ * p.speed * dt;
     p.timeLeft -= dt;
-    if (p.timeLeft <= 0 || obstaclesNear(world.seed, p.x, p.z, p.radius).length > 0) return false;
+    if (p.timeLeft <= 0 || world.terrain.obstaclesNear(p.x, p.z, p.radius).length > 0) return false;
+    if (world.terrain.walkable && !world.terrain.walkable(p.x, p.z, 'shot')) return false;
     const min = p.radius + hero.radius;
     if ((p.x - hero.x) ** 2 + (p.z - hero.z) ** 2 >= min * min) return true;
     damageHero(world, p.damage);
@@ -758,6 +761,8 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
   world.events = [];
   world.time += dt;
   const hero = world.hero;
+  const walkable = world.terrain.walkable;
+  const startPos = walkable ? new Map([[hero, [hero.x, hero.z]], ...world.enemies.map((e) => [e, [e.x, e.z]])]) : null;
 
   // Held bewegen
   const len = inert ? 0 : Math.hypot(input.moveX, input.moveZ);
@@ -804,5 +809,20 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
   }
   stepPoison(world);
 
+  if (startPos) for (const [e, [x, z]] of startPos) keepWalkable(world, e, x, z);
+
   if (!inert) collectPickups(world);
+}
+
+/**
+ * Hält ein Wesen auf begehbarer Fläche: Ist seine neue Stelle gesperrt, wird achsenweise auf die Stelle vom Anfang
+ * des Schritts zurückgenommen (erst nur z, dann nur x, sonst ganz) – so gleitet es an Rändern entlang.
+ */
+function keepWalkable(world, e, oldX, oldZ) {
+  const mode = e.flying ? 'fly' : 'walk';
+  const ok = (x, z) => world.terrain.walkable(x, z, mode);
+  if (ok(e.x, e.z)) return;
+  if (ok(e.x, oldZ)) { e.z = oldZ; return; }
+  if (ok(oldX, e.z)) { e.x = oldX; return; }
+  e.x = oldX; e.z = oldZ;
 }

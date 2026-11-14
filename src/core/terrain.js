@@ -1,7 +1,13 @@
 import { createRng } from './rng.js';
 import { TERRAIN_CELL, MAX_OBSTACLES_PER_CELL, TREE_RADIUS, ROCK_RADIUS, TREE_SHARE, START_CLEAR_RADIUS } from '../data/terrain.js';
 
-/** @typedef {{ x: number, z: number, radius: number, kind: 'tree'|'rock' }} Obstacle */
+/**
+ * @typedef {{ x: number, z: number, radius: number, kind: 'tree'|'rock' }} Obstacle
+ * @typedef {{ obstaclesNear(x: number, z: number, range: number): Obstacle[],
+ *   walkable?(x: number, z: number, mode?: 'walk'|'fly'|'shot'): boolean }} Terrain
+ *   Geländequelle der Welt. Ohne `walkable` gibt es nur Hindernisse (Wellen-Modus); mit `walkable` hält die Welt
+ *   Held und Gegner auf begehbarer Fläche (Abenteuer, src/core/mapGrid.js).
+ */
 
 function cellSeed(seed, cx, cz) {
   let h = Math.imul(seed | 0, 0x9E3779B1) ^ Math.imul(cx | 0, 0x85EBCA6B) ^ Math.imul(cz | 0, 0xC2B2AE35);
@@ -63,4 +69,13 @@ export function obstaclesNear(seed, x, z, range) {
     }
   }
   return out;
+}
+
+/**
+ * Standard-Geländequelle des Wellen-Modus: zufällige Hindernisse je Zelle aus dem Seed.
+ * @param {number} seed
+ * @returns {Terrain}
+ */
+export function seedTerrain(seed) {
+  return { obstaclesNear: (x, z, range) => obstaclesNear(seed, x, z, range) };
 }

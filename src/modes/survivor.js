@@ -1,7 +1,6 @@
 import { createWorld, stepWorld, spawnEnemy, spawnShadow, cappedEnemyCount, knockback } from '../core/world.js';
 import { createRng } from '../core/rng.js';
 import { pendingLevelUps, rollCards, applyCard, openChest } from '../core/progression.js';
-import { obstaclesNear } from '../core/terrain.js';
 import { chestsNear } from '../core/chests.js';
 import { MAP_CHESTS } from '../data/chests.js';
 import { ENEMIES, ELITE } from '../data/enemies.js';
@@ -306,7 +305,7 @@ function ringPosition(run, radius, flying, force) {
   for (let i = 0; i <= SPAWN_REROLLS; i++) {
     const a = world.rng.range(0, Math.PI * 2);
     pos = { x: world.hero.x + Math.cos(a) * r, z: world.hero.z + Math.sin(a) * r };
-    if (flying || obstaclesNear(world.seed, pos.x, pos.z, radius).length === 0) return pos;
+    if (flying || world.terrain.obstaclesNear(pos.x, pos.z, radius).length === 0) return pos;
   }
   return force ? pos : null;
 }
