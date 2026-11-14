@@ -1,6 +1,8 @@
 # AnimalWarrior
 
-Ein Actionspiel für den Browser mit Draufsicht: Wähle ein Tier (Hase, Ente, Waschbär) und eine Klasse (Krieger, Magier, Dieb) und überlebe 15 Minuten gegen Gegnerwellen. Für viel Gold gibt es in der Taverne ein Duo aus Giraffe und Erdmännchen dazu.
+Ein Actionspiel für den Browser mit Draufsicht: Wähle ein Tier (Hase, Ente, Waschbär) und eine Klasse (Krieger, Magier, Dieb). Überlebe 15 Minuten gegen Gegnerwellen oder zieh im Abenteuer-Modus los, um einen größenwahnsinnigen Goldfisch aufzuhalten. Für viel Gold gibt es in der Taverne ein Duo aus Giraffe und Erdmännchen dazu.
+
+Aktuelle Version: **0.5.0** (steht auch unten auf dem Titelbildschirm).
 
 ## Was es gibt
 
@@ -11,9 +13,9 @@ Ein Actionspiel für den Browser mit Draufsicht: Wähle ein Tier (Hase, Ente, Wa
 - **Taverne:** In der Modusauswahl unter „Taverne → Zum Tresen“. Drei Tische, an denen du Gold einsetzt: Würfelbecher und Höher oder tiefer beim Affen Kasimir, Glücksrad bei der Elster Madame Funkel. Einsätze 10, 50, 100 und 500 Gold; ab 100 spielt der Wirt auch um Beute. Das Haus gewinnt im Schnitt, die Auszahlung liegt bei etwa 88 bis 95 Prozent. Jede Runde wird sofort gespeichert.
 - **Beute und Truhe:** 24 lustige Gegenstände (Helme, Hemden, Stiefel, Waffen, Schmuck) in drei Seltenheiten. Sie liegen in einer gemeinsamen Truhe für alle Helden; nicht gefundene erscheinen als Umriss. Doppelte werden für Gold verkauft. Ihre Werte wirken erst im Abenteuer-Modus.
 - **Das Duo:** Giraffe und Erdmännchen (Klasse „Hochstapler“) schaltest du im Stall der Taverne für 20.000 Gold frei. Danach legst du sie bei „Neuer Held“ an und spielst sie im Wellen-Modus, mit eigenen Fähigkeiten (Hals-Schwung, Nüsse, Stampfen, Buddelfalle, Großfamilie). Das Erdmännchen wechselt dabei seinen Platz auf der Giraffe.
-- **Erfolge:** 37, jeder mit einmaliger Goldbelohnung, darunter vier aus der Taverne.
-- **Speichern:** automatisch im Browser, dazu Export und Import als Datei. Ein Export aus dieser Version lässt sich in einer älteren Spielversion nicht laden; ältere Stände laden hier ohne Verlust.
-- **Abenteuer-Modus:** geplant, noch nicht gebaut.
+- **Erfolge:** 41, jeder mit einmaliger Goldbelohnung, darunter vier aus der Taverne und vier aus dem Abenteuer.
+- **Speichern:** automatisch im Browser (Spielstand-Version 4), dazu Export und Import als Datei. Ältere Stände laden ohne Verlust; vorher legt das Spiel eine Kopie des alten Stands ab (`animalwarrior.save.v3` usw.). Kaputte Abenteuer-Daten eines Helden werden ausgebessert, statt den ganzen Stand zu verwerfen. Ein Export aus dieser Version lässt sich in einer älteren Spielversion nicht laden. Achtung: Safari auf dem iPhone löscht Webseiten-Daten nach 7 Tagen ohne Besuch, außer das Spiel liegt auf dem Home-Bildschirm; deshalb ab und zu exportieren.
+- **Abenteuer-Modus (Kapitel 1):** Seine Durchlaucht Flossian der Erste, ein Goldfisch im Glas, will das Land fluten. Vom Dorf Bachwinkel aus geht es den steigenden Bach entlang bis zum Quellteich: fünf Hauptaufträge und drei Nebenaufträge, Gespräche mit Oma Panzerla, Krümel, Grabowski, Nussa, Pieps und Tante Amsel, Gegnergruppen, Zwischenboss Hauptmann Gräte und Kapitel-Boss Kommandant Zwickzwack. Der Held greift Gegner in der Nähe selbst an; drei Fähigkeiten und der Heiltrank liegen auf einem Knopfviereck. Level, Ausrüstung (fünf Plätze) und Fähigkeiten gehören zum Helden; Gold, Truhe und Verbesserungen teilen sich alle Helden. Händler Krümel verkauft Tränke und Kram, Schmied Grabowski verbessert Gegenstände bis +5 (ab +4 mit Flussperlen von Bossen). Gespeichert wird an Lagerfeuern und nach jedem Fortschritt; nach dem Tod oder Neuladen geht es am zuletzt benutzten Lagerfeuer weiter (Tod kostet 5 % Gold, höchstens 200). Kapitel 2 bis 4, Unterklassen mit Fähigkeitenbaum, sichtbare Ausrüstung und neue Klassen folgen in weiteren Etappen.
 
 ## Steuerung
 
@@ -26,6 +28,20 @@ Mit dem Finger oder der Maus: irgendwo auf die Spielfläche tippen und in die La
 | Esc oder der Pause-Knopf unten rechts | Pause |
 
 Fähigkeiten lösen im Wellen-Modus von selbst aus und zielen selbst.
+
+Im Abenteuer (alles geht mit Finger allein, Maus allein oder Tastatur allein):
+
+| Taste | Wirkung |
+|---|---|
+| W A S D oder Pfeiltasten | Laufen (Finger und Maus: ziehen) |
+| 1, 2, 3 | Fähigkeit auf Knopf 1 bis 3 |
+| 4 | Heiltrank (höchstens 4) |
+| E oder Enter | Sprechen, Rasten, Untersuchen, Öffnen |
+| M | große Karte (oder die Minikarte antippen) |
+| J | Aufträge |
+| Esc oder Pause-Knopf | Pausenmenü mit Ausrüstung, Fähigkeiten, Aufträgen, Karte |
+
+Das Knopfviereck liegt unten rechts; in den Einstellungen lässt es sich nach links legen.
 
 In der Taverne:
 
@@ -83,14 +99,15 @@ An die Adresse angehängt, zum Beispiel `http://localhost:8080/?debug=1&speed=4`
 | `autopick=1` | wählt Level-up-Karten automatisch |
 | `stress=1` | füllt die Welt mit 300 Ratten und zeigt die Bildrate |
 | `quality=low` | niedrige Grafikqualität |
+| `mode=adventure` | (mit `debug=1`) springt ins Abenteuer des ersten Helden; ohne Helden wird ein „Testheld“ angelegt (`animal=`, `class=` wählen Tier und Klasse). Taste `K` besiegt dort Gegner im Umkreis von 20 m |
 
 ## Aufbau
 
 | Ordner | Inhalt |
 |---|---|
-| `src/data` | Tabellen: Tiere, Klassen, Fähigkeiten, Gegner, Wellen, Boni, Erfolge, Texte, Taverne (Einsätze, Radfelder, Wirte und ihre Sprüche, Preis des Duos) und Gegenstände. Balancing ändert man hier. |
-| `src/core`, `src/modes` | Spiellogik ohne Grafik, durch Tests abgedeckt; auch die Regeln der drei Taverne-Spiele und der Beutewurf |
-| `src/save` | Spielstand mit Versionsnummer (jetzt 3, mit Umwandlung älterer Stände), Export und Import, Taverne-Runden und Freischaltungen |
+| `src/data` | Tabellen: Tiere, Klassen, Fähigkeiten, Gegner, Wellen, Boni, Erfolge, Texte, Taverne, Gegenstände; fürs Abenteuer `adventure.js` (alle Zahlen), `maps/` (Dorf und Kapitel 1), `quests.js`, `dialogues.js`, `story.js`. Balancing ändert man hier. |
+| `src/core`, `src/modes` | Spiellogik ohne Grafik, durch Tests abgedeckt; auch die Regeln der drei Taverne-Spiele und der Beutewurf; fürs Abenteuer Kartenraster (`mapGrid.js`), Aufträge, Held und Regelschicht `modes/adventure.js` |
+| `src/save` | Spielstand mit Versionsnummer (jetzt 4, mit Umwandlung älterer Stände), Export und Import, Taverne-Runden und Freischaltungen, Abenteuer (Ausbessern, Schmied, Händler) |
 | `src/render` | Darstellung mit Three.js; Figuren und Umgebung sind gemalte Bilder aus `assets/` |
 | `src/input` | Tastatur und Zeigersteuerung (Finger, Maus) |
 | `src/ui`, `src/audio` | Menüs, Anzeige im Spiel, Ton |
@@ -119,5 +136,7 @@ Die Taverne hat vier weitere Bilder:
 | `assets/taverne/wirte.webp` | Affe und Elster; die Porträt-Ausschnitte stehen in `TAVERN_IMAGES.hosts.rects` in `src/data/tavern.js` |
 | `assets/taverne/beute.webp` | die 24 Gegenstände im Raster 6 × 4; welcher Gegenstand in welcher Zelle liegt, steht im Feld `icon` in `src/data/items.js` |
 | `assets/figuren/duo.webp` | Giraffe mit Erdmännchen in vier Phasen; die Ausschnitte (`SHEET_FRAMES.duo`) und die Abfolge der Bildfolge (`DUO_FRAMES`) stehen in `src/data/sprites.js`. Im gelieferten Bild ragt manchmal ein Kopf oder Schwanz in den Ausschnitt daneben; das Spiel ordnet jedes Stück der Figur zu, zu der es gehört. Ein neues Bild geht deshalb, solange sich keine zwei Figuren berühren |
+
+Für das Abenteuer fehlen noch sechs Bilder (Bewohner, neue Gegner, Dorf, Wasser, Weg, 30 Gegenstände). Die Beschreibungen für den Bildgenerator stehen in `docs/abenteuer-bilder.md`; bis dahin zeigt das Spiel einfache Formen und gemalte Stellvertreter.
 
 Fehlt ein Bild der Taverne, zeigt das Spiel Ersatz: einen dunklen Holzton statt der Gaststube, einen Kreis mit Anfangsbuchstaben statt des Wirts, ein Symbol im Seltenheitsrahmen statt der Beute und eine einfache 3D-Figur statt des Duos.
