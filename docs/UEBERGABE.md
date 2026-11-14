@@ -2,7 +2,7 @@
 
 Diese Datei ist für die nächste Sitzung gedacht, falls die laufende abbricht. Sie wird an jedem Pausenpunkt aktualisiert.
 
-Zuletzt aktualisiert: 2026-11-14. **Abenteuer-Modus Etappe 1 ist gebaut, getestet und auf `main`** (Spielversion 0.5.0, Spielstand Version 4). Spec `docs/superpowers/specs/2026-11-14-abenteuer-etappe1-design.md`, Plan `docs/superpowers/plans/2026-11-14-abenteuer-etappe1.md` (beide freigegeben), gebaut „sparsam“ (inline, am Ende ein frischer Prüfer). Was drin ist und welche Entscheidungen beim Bau fielen, steht in Abschnitt 1 („Abenteuer Etappe 1“). **Nächste Schritte:** Bilder vom Auftraggeber einbauen (Beschreibungen in `docs/abenteuer-bilder.md`), Rückmeldung zum Spielgefühl, dann Etappe 2 (Unterklassen mit Fähigkeitenbaum).
+Zuletzt aktualisiert: 2026-11-14. **Abenteuer-Modus Etappe 1 ist gebaut, getestet und auf `main`** (Spielversion 0.5.0, Spielstand Version 4). Spec `docs/superpowers/specs/2026-11-14-abenteuer-etappe1-design.md`, Plan `docs/superpowers/plans/2026-11-14-abenteuer-etappe1.md` (beide freigegeben), gebaut „sparsam“ (inline, am Ende ein frischer Prüfer). Was drin ist und welche Entscheidungen beim Bau fielen, steht in Abschnitt 1 („Abenteuer Etappe 1“). **Etappe 2 (Unterklassen mit Fähigkeitenbaum):** Spec `docs/superpowers/specs/2026-11-14-abenteuer-etappe2-design.md` und Plan `docs/superpowers/plans/2026-11-14-abenteuer-etappe2.md` sind vom Auftraggeber freigegeben (Spec) bzw. geschrieben (Plan); **Bau noch nicht begonnen**, gedacht für eine frische Sitzung (sparsam/inline wie Etappe 1). Außerdem offen: Bilder vom Auftraggeber einbauen (`docs/abenteuer-bilder.md`), Rückmeldung zum Spielgefühl.
 
 ## 1. Was fertig ist
 
