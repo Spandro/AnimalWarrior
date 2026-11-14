@@ -19,6 +19,7 @@ import './achievements.test.js';
 import './deathSequence.test.js';
 import './chests.test.js';
 import './mapGrid.test.js';
+import './maps.test.js';
 import './cameraFit.test.js';
 import './environment.test.js';
 import './items.test.js';
