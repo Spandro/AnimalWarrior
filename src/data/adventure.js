@@ -134,3 +134,6 @@ export const CAMPFIRE_NAMES = {
 /** Sprüche am Ladentisch und in der Schmiede. */
 export const SHOP_LINES = ['Alles muss raus. Außer mir.', 'Heiltränke! Frisch abgefüllt, kaum benutzt.', 'Meine Backen sind voll. Mein Laden auch.'];
 export const SMITH_LINES = ['Das wird schön. Oder wenigstens schwer.', 'Gutes Werkzeug braucht Gold. Und Geduld. Hauptsächlich Gold.', 'Hämmern ist wie Umarmen. Nur lauter.'];
+
+/** Der Bosskampf beginnt erst so weit (m) innerhalb des Arenakreises, damit das Tor hinter dem Helden schließt. */
+export const ARENA_INSET = 2.5;

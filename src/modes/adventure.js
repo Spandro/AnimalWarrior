@@ -10,7 +10,7 @@ import { QUESTS, QUEST_DROP } from '../data/quests.js';
 import { CLASSES } from '../data/classes.js';
 import { ENEMIES, ELITE } from '../data/enemies.js';
 import {
-  MANUAL, ADVENTURE_BALANCE, PACK, DEATH, POTION, LOOT, INTERACT_RANGE, EXPLORE_RADIUS, CAMPFIRE_OFFSET,
+  MANUAL, ADVENTURE_BALANCE, PACK, DEATH, POTION, LOOT, INTERACT_RANGE, EXPLORE_RADIUS, CAMPFIRE_OFFSET, ARENA_INSET,
 } from '../data/adventure.js';
 
 /**
@@ -241,7 +241,7 @@ function drop(run, x, z, kind, value, ref) {
 function onKill(run, e) {
   const def = ENEMIES[e.enemyType];
   const pack = e.packId ? run.packs.find((p) => p.def.id === e.packId) : null;
-  const bossDef = run.activeBoss?.enemyId === e.id ? run.map.bosses.find((b) => b.id === run.activeBoss.id) : null;
+  const bossDef = e.bossId ? run.map.bosses.find((b) => b.id === e.bossId) : null;
   const level = bossDef?.level ?? pack?.def.level ?? 1;
   grantXp(run, def.xp * (e.elite ? ELITE.xpMul : 1) * enemyMultipliers(level).xpMul);
   quest(run, { type: 'kill', enemyType: e.enemyType });
@@ -277,8 +277,11 @@ function onBossDefeated(run, bossDef, e) {
   run.record.bosses.push(bossDef.id);
   run.activeBoss = null;
   emit(run, { type: 'bossDefeated', bossId: bossDef.id, name: ENEMIES[bossDef.type].name }, { type: 'arenaOpened', gate: bossDef.gate });
-  drop(run, e.x, e.z, 'item', 0, rollAdventureItem(run.rng, chapterSource(run), LOOT.bossMinRarity));
-  drop(run, e.x, e.z, 'potion_item', 1);
+  // Sichere Bossbeute direkt gutschreiben: ein liegengelassener Gegenstand wäre nach Tod oder Reise für immer weg.
+  const item = rollAdventureItem(run.rng, chapterSource(run), LOOT.bossMinRarity);
+  run.ledger.items.push(item);
+  run.record.potions = Math.min(POTION.max, run.record.potions + 1);
+  emit(run, { type: 'loot', kind: 'item', itemId: item }, { type: 'loot', kind: 'potion' });
   const pearls = LOOT.bossPearls[bossDef.id] ?? 0;
   if (pearls) { run.ledger.materials.flussperle = (run.ledger.materials.flussperle ?? 0) + pearls; emit(run, { type: 'loot', kind: 'material', id: 'flussperle', count: pearls }); }
   quest(run, { type: 'boss', bossId: bossDef.id });
@@ -291,6 +294,15 @@ function quest(run, event) {
   if (r.changed) run.dirty = true;
   for (const id of r.advanced) { emit(run, { type: 'questAdvanced', questId: id }); run.dirty = true; }
   for (const id of r.completed) completeQuest(run, id);
+  if (r.advanced.length) skipBeatenBosses(run);
+}
+
+/** Ein Bossschritt, dessen Boss schon besiegt ist (vor dem Auftrag), gilt sofort als erledigt. */
+function skipBeatenBosses(run) {
+  for (const [id, e] of Object.entries(run.record.quests)) {
+    const s = e.state === 'active' ? QUESTS[id].steps[e.step] : null;
+    if (s?.type === 'boss' && run.record.bosses.includes(s.target)) { quest(run, { type: 'boss', bossId: s.target }); return; }
+  }
 }
 
 function completeQuest(run, id) {
@@ -370,8 +382,10 @@ function updateBosses(run) {
       enemy.bossId = b.id; enemy.passive = true; enemy.home = { x: b.x, z: b.z, r: 1 };
       enemy.summonHpMul = enemyMultipliers(b.level).hpMul; enemy.summonDmgMul = enemyMultipliers(b.level).dmgMul;
     }
-    if (enemy && !run.activeBoss && dist(hero, b.arena) < b.arena.r - 0.5) {
+    if (enemy && !run.activeBoss && dist(hero, b.arena) < b.arena.r - ARENA_INSET) {
       run.activeBoss = { id: b.id, enemyId: enemy.id };
+      // Das Tor schließt erst, wenn der Held nicht mehr darin steht.
+      if (!world.terrain.walkable(hero.x, hero.z, 'walk')) { run.activeBoss = null; continue; }
       enemy.passive = false;
       emit(run, { type: 'bossStart', bossId: b.id, name: ENEMIES[b.type].name }, { type: 'arenaClosed', gate: b.gate });
     }
@@ -462,6 +476,7 @@ export function acceptOffer(run, questId) {
   if (!acceptQuest(run.record.quests, questId)) return false;
   emit(run, { type: 'questAccepted', questId });
   run.dirty = true;
+  skipBeatenBosses(run);
   return true;
 }
 

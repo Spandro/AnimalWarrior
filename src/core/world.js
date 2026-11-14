@@ -291,8 +291,9 @@ function summonHelpers(world, enemy, s) {
   const ids = [];
   for (let i = 0; i < s.count; i++) {
     const a = (i / s.count) * 2 * Math.PI;
-    const e = spawnEnemy(world, s.type, enemy.x + Math.cos(a) * (enemy.radius + s.radius), enemy.z + Math.sin(a) * (enemy.radius + s.radius),
-      { hpMul: enemy.summonHpMul ?? 1, dmgMul: enemy.summonDmgMul ?? 1 });
+    let x = enemy.x + Math.cos(a) * (enemy.radius + s.radius), z = enemy.z + Math.sin(a) * (enemy.radius + s.radius);
+    if (world.terrain.walkable && !world.terrain.walkable(x, z, 'walk')) { x = enemy.x; z = enemy.z; }
+    const e = spawnEnemy(world, s.type, x, z, { hpMul: enemy.summonHpMul ?? 1, dmgMul: enemy.summonDmgMul ?? 1 });
     if (e) ids.push(e.id);
   }
   world.events.push({ type: 'bossSummon', x: enemy.x, z: enemy.z, ids });
@@ -457,10 +458,17 @@ export function knockback(world, enemy, distance) {
   if (d < 1e-9) { dx = world.hero.facing.x; dz = world.hero.facing.z; } else { dx /= d; dz /= d; }
   const steps = Math.max(1, Math.ceil(distance / KNOCKBACK_SUBSTEP));
   for (let i = 0; i < steps; i++) {
+    const px = enemy.x, pz = enemy.z;
     enemy.x += dx * distance / steps;
     enemy.z += dz * distance / steps;
     if (!enemy.flying) pushOutOfObstacles(world, enemy);
+    if (blocked(world, enemy)) { enemy.x = px; enemy.z = pz; break; }
   }
+}
+
+/** Steht das Wesen auf gesperrter Fläche (nur mit Kartenraster, sonst nie)? */
+function blocked(world, e) {
+  return !!world.terrain.walkable && !world.terrain.walkable(e.x, e.z, e.flying ? 'fly' : 'walk');
 }
 
 /** Stößt den Helden um `distance` in Richtung (dirX, dirZ), in Teilstrecken mit Hinderniskollision. */
@@ -468,9 +476,11 @@ export function pushHero(world, dirX, dirZ, distance) {
   const hero = world.hero;
   const steps = Math.max(1, Math.ceil(distance / KNOCKBACK_SUBSTEP));
   for (let i = 0; i < steps; i++) {
+    const px = hero.x, pz = hero.z;
     hero.x += dirX * distance / steps;
     hero.z += dirZ * distance / steps;
     pushOutOfObstacles(world, hero);
+    if (blocked(world, hero)) { hero.x = px; hero.z = pz; break; }
   }
 }
 
@@ -630,7 +640,7 @@ export function damageEnemy(world, enemy, hit, abilityId) {
 
   world.enemies.splice(index, 1);
   world.run.kills++;
-  world.events.push({ type: 'kill', enemyType: enemy.type, x: enemy.x, z: enemy.z, id: enemy.id, elite: enemy.elite, boss: enemy.boss, packId: enemy.packId ?? null });
+  world.events.push({ type: 'kill', enemyType: enemy.type, x: enemy.x, z: enemy.z, id: enemy.id, elite: enemy.elite, boss: enemy.boss, packId: enemy.packId ?? null, bossId: enemy.bossId ?? null });
   if (world.drops === 'none') return;
   const def = ENEMIES[enemy.type];
   const drop = (kind, value) => world.pickups.push({ kind, x: enemy.x, z: enemy.z, value });
@@ -862,7 +872,7 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
 function keepWalkable(world, e, oldX, oldZ) {
   const mode = e.flying ? 'fly' : 'walk';
   const ok = (x, z) => world.terrain.walkable(x, z, mode);
-  if (ok(e.x, e.z)) return;
+  if (ok(e.x, e.z) || !ok(oldX, oldZ)) return; // wer schon im Gesperrten stand, darf hinaus
   if (ok(e.x, oldZ)) { e.z = oldZ; return; }
   if (ok(oldX, e.z)) { e.x = oldX; return; }
   e.x = oldX; e.z = oldZ;

@@ -1,6 +1,6 @@
 import { test, assertEqual, assertTrue, assertClose } from './runner.js';
 import {
-  createAdventureRun, stepAdventure, useAbility, drinkPotion, interact, endTalk, setPaused, rest, travel, snapshot, clearLedger,
+  createAdventureRun, stepAdventure, useAbility, drinkPotion, interact, endTalk, setPaused, rest, travel, snapshot, clearLedger, acceptOffer,
   isGateClosed,
 } from '../src/modes/adventure.js';
 import { damageEnemy } from '../src/core/world.js';
@@ -70,11 +70,12 @@ test('adventure: besiegte Gruppe bleibt weg bis zum Rasten', () => {
 
 /** Stellt den Helden in die Arena von Gräte. */
 function fightGraete(run) {
-  put(run, 322, 0); step(run, 2);
+  put(run, 326, 0); step(run, 2);
   return run.world.enemies.find((e) => e.type === 'hauptmann_graete');
 }
 
 test('adventure: Bosskampf schließt das Tor, Sieg öffnet Tor und Barrikade, Boss bleibt nach dem Rasten weg', () => {
+  // (Bossbeute liegt seit der Gesamtprüfung direkt im Ledger, siehe unten.)
   const run = setup({ campfire: 'k1_bruecke' });
   assertTrue(isGateClosed(run, 'barrikade'));
   const boss = fightGraete(run);
@@ -85,7 +86,7 @@ test('adventure: Bosskampf schließt das Tor, Sieg öffnet Tor und Barrikade, Bo
   assertTrue(!isGateClosed(run, 'arena_graete'));
   assertTrue(!isGateClosed(run, 'barrikade'));
   assertEqual(run.record.bosses, ['graete']);
-  assertTrue(run.world.pickups.some((p) => p.kind === 'item'));
+  assertTrue(run.ledger.items.length >= 1);
   assertTrue((run.ledger.materials.flussperle ?? 0) >= 2);
   rest(run, 'k1_bruecke');
   put(run, 330, 0); step(run, 2);
@@ -228,4 +229,58 @@ test('adventure: Erfahrung und Zählfortschritt eines Auftrags markieren den Lau
   killAll(run, members(run, 'p_ufer_1').slice(0, 1)); step(run);
   assertEqual(run.record.quests.nasse_pfoten.progress, 1);
   assertTrue(run.dirty);
+});
+
+// ---------------------------------------------------------------- Befunde der Gesamtprüfung
+
+test('adventure: wer über die Brücke in Grätes Arena läuft, kann danach weiter laufen', () => {
+  const run = setup({ campfire: 'k1_bruecke' });
+  put(run, 305, 0);
+  for (let i = 0; i < 120 && !run.activeBoss; i++) stepAdventure(run, 1 / 30, { moveX: 1, moveZ: 0 });
+  assertTrue(!!run.activeBoss);
+  const h = run.world.hero, x0 = h.x, z0 = h.z;
+  assertTrue(run.world.terrain.walkable(h.x, h.z, 'walk'), `${h.x},${h.z}`);
+  run.world.enemies.forEach((e) => { e.passive = true; });
+  for (let i = 0; i < 15; i++) stepAdventure(run, 1 / 30, { moveX: 0.3, moveZ: 1 });
+  assertTrue(Math.hypot(h.x - x0, h.z - z0) > 1, `stand bei ${h.x},${h.z}`);
+});
+
+test('adventure: ein schon besiegter Boss überspringt seinen Auftragsschritt', () => {
+  const run = setup({ campfire: 'k1_bruecke', mutate: (a) => {
+    a.quests = { nasse_pfoten: { state: 'done', step: 2, progress: 0 }, schmied_ohne_hammer: { state: 'done', step: 3, progress: 0 } };
+    a.bosses = ['graete'];
+  } });
+  acceptOffer(run, 'bruecke_zu');
+  put(run, 300, 0); step(run, 2);
+  assertEqual(run.record.quests.bruecke_zu.step, 2);
+});
+
+test('adventure: Rückstoß einer Fähigkeit von Hand schiebt niemanden ins Gesperrte', () => {
+  const run = setup({ mutate: (a) => { a.abilities.schildstoss = 5; a.buttons[0] = 'schildstoss'; } });
+  put(run, 54, 26); step(run, 2);
+  const h = run.world.hero;
+  const n = { x: -30 / Math.hypot(30, 66), z: 66 / Math.hypot(30, 66) }; // quer zum Weg, Richtung Rand
+  h.facing = { ...n };
+  for (const e of members(run, 'p_ufer_1')) { e.x = h.x + n.x * 1.5; e.z = h.z + n.z * 1.5; e.passive = true; e.hp = e.maxHp = 1000; }
+  useAbility(run, 0); step(run, 2);
+  for (const e of members(run, 'p_ufer_1')) assertTrue(run.world.terrain.walkable(e.x, e.z, 'walk'), `${e.x},${e.z}`);
+});
+
+test('adventure: Bossbeute (Gegenstand und Trank) geht direkt in Ledger und Tasche', () => {
+  const run = setup({ campfire: 'k1_bruecke' });
+  const boss = fightGraete(run);
+  const potions = run.record.potions;
+  damageEnemy(run.world, boss, { amount: 1e6, crit: false }, 'test'); step(run);
+  assertEqual(run.ledger.items.length, 1);
+  assertEqual(run.record.potions, Math.min(POTION.max, potions + 1));
+  assertTrue(!run.world.pickups.some((p) => p.kind === 'item'));
+});
+
+test('adventure: ein Boss, der außerhalb des Kampfes fällt, zählt trotzdem als besiegt', () => {
+  const run = setup({ campfire: 'k1_bruecke' });
+  put(run, 300, 0); step(run, 2);
+  const boss = run.world.enemies.find((e) => e.type === 'hauptmann_graete');
+  assertTrue(!!boss && !run.activeBoss);
+  damageEnemy(run.world, boss, { amount: 1e6, crit: false }, 'test'); step(run);
+  assertEqual(run.record.bosses, ['graete']);
 });

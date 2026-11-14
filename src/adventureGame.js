@@ -152,7 +152,7 @@ export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quali
     if (busy || run.state !== 'playing' || !run.interactable) return;
     const r = interact(run);
     if (!r) return;
-    handleEvents();
+    // Die Ereignisse der Aktion kommen mit dem nächsten Schritt (run.events), hier nicht noch einmal behandeln.
     if (r.kind === 'talk') {
       busy = true; keys.clear(); pointer.reset();
       commit(true);
@@ -168,7 +168,6 @@ export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quali
       const target = await openCampfire(ctx, r);
       if (target) travel(run, target); else closeMenu(run);
       busy = false;
-      handleEvents();
       commit(true);
     } else {
       commit(true);
