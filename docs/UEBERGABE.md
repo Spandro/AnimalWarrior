@@ -2,7 +2,7 @@
 
 Diese Datei ist für die nächste Sitzung gedacht, falls die laufende abbricht. Sie wird an jedem Pausenpunkt aktualisiert.
 
-Zuletzt aktualisiert: 2026-11-13, Sicherungspunkt im Bau der Taverne (90 % des 5-Stunden-Fensters, Rücksetzung gegen 23:40 UTC). Aufgabe 7 ist gebaut (`efbadaf`, 456 Tests grün), ihre Prüfung steht noch aus; das Prüfpaket liegt unter `.superpowers/sdd/2026-11-13-taverne/review-cbffc5d..efbadaf.diff`. Danach: Aufgabe 8, Gesamtprüfung. **Die Taverne wird im Worktree `.claude/worktrees/taverne` auf dem Zweig `worktree-taverne` gebaut** (auch nach `origin/worktree-taverne` gepusht; der Stand von „Neue Gegner“ ist dort schon hineingeführt). Aufgaben 1–6 des Plans sind fertig und geprüft, Aufgabe 7 (die drei Spieltische) und 8 (Abschluss) sowie die Gesamtprüfung fehlen. Arbeitsprotokoll mit allen Entscheidungen: `.superpowers/sdd/2026-11-13-taverne/progress.md` im Worktree (nicht in Git). Tests im Worktree auf Port 8081 (`preview_start` „animalwarrior-taverne“, Eintrag in `.claude/launch.json` nur lokal): 455 grün. Danach wird der Zweig nach `main` zusammengeführt (nur mit Zustimmung des Auftraggebers). **Paket „Neue Gegner und wechselnde Bosse“ ist abgeschlossen, geprüft und gepusht** (Abschnitt 1). Stand davor: während Paket 3 (Taverne, wird vor Paket 2 entworfen). Spec `docs/superpowers/specs/2026-11-13-taverne-design.md` ist **freigegeben**; Plan `docs/superpowers/plans/2026-11-13-taverne.md` (acht Aufgaben) ist **freigegeben**. Nächster Schritt: Bau mit Subagenten (je Aufgabe Bauer und Prüfer), nicht gleichzeitig mit dem Paket „Neue Gegner“ im selben Ordner. Wirte der Taverne: der Affe Kasimir (Würfelbecher und Höher oder tiefer) und die Elster Madame Funkel (Glücksrad), so entschieden vom Auftraggeber.
+Zuletzt aktualisiert: 2026-11-14, Abschluss des Baus der Taverne. **Die Aufgaben 1–9 der Taverne sind gebaut und einzeln geprüft** (letzter Commit `477419f`, 458 Tests grün, Handprobe gemacht, siehe Abschnitt 1). **Nächster Schritt: die Gesamtprüfung über den ganzen Zweig mit einer Korrekturrunde. Danach wird `worktree-taverne` nach `main` zusammengeführt, aber nur mit Zustimmung des Auftraggebers.** Die Taverne wird im Worktree `.claude/worktrees/taverne` auf dem Zweig `worktree-taverne` gebaut (auch nach `origin/worktree-taverne` gepusht; der Stand von „Neue Gegner“ ist dort schon hineingeführt). Arbeitsprotokoll mit allen Entscheidungen: `.superpowers/sdd/2026-11-13-taverne/progress.md` im Worktree (nicht in Git); was darin zählt, steht schon hier in den Abschnitten 1 und 8. Tests im Worktree auf Port 8081 (`preview_start` „animalwarrior-taverne“, Eintrag in `.claude/launch.json` nur lokal, nie committen). Das Paket „Neue Gegner und wechselnde Bosse“ ist abgeschlossen, geprüft und gepusht (Abschnitt 1). Spec der Taverne: `docs/superpowers/specs/2026-11-13-taverne-design.md`, Plan: `docs/superpowers/plans/2026-11-13-taverne.md` (beide freigegeben).
 
 ## 1. Was fertig ist
 
@@ -13,7 +13,7 @@ Zuletzt aktualisiert: 2026-11-13, Sicherungspunkt im Bau der Taverne (90 % des 5
 - Schatten-Boss bei 3:30, 8:00, 12:30 (unbesiegbar, vertreibbar)
 - 15 Fähigkeiten und 7 Boni mit lustigen Namen, Dauerboni gegen Gold, 22 Erfolge
 - Gemalte Figuren aus `assets/figuren/helden.webp` und `gegner.webp`
-- Speichern im Browser (Version 2), Export/Import, Einstellungen, Ton
+- Speichern im Browser (damals Version 2, seit der Taverne Version 3), Export/Import, Einstellungen, Ton
 - Spec: `docs/superpowers/specs/2026-11-12-kern-und-wellenmodus-design.md`
 - Plan: `docs/superpowers/plans/2026-11-12-kern-und-wellenmodus.md`
 
@@ -83,23 +83,36 @@ Die kleinen Befunde stehen unten in Abschnitt 8.
 - Gesamtprüfung: keine kritischen Befunde; behoben: Druckwelle stieß auch ohne gelandeten Treffer weg; Ansturmstreifen
   war kleiner als die Trefferfläche; Gift endete nicht mit Sterbephase/Sieg. Kleinigkeiten stehen in Abschnitt 8.
 
+**Paket 3 „Taverne“ (gebaut und einzeln geprüft, 2026-11-14; Gesamtprüfung und Zusammenführung stehen noch aus):**
+
+- Spec: `docs/superpowers/specs/2026-11-13-taverne-design.md`, Plan: `docs/superpowers/plans/2026-11-13-taverne.md`. Gebaut im Worktree `.claude/worktrees/taverne`, Zweig `worktree-taverne`, je Aufgabe ein Bauer und ein Prüfer. Teststand: **458 Tests grün**.
+- **Taverne:** Aus der Modusauswahl („Taverne → Zum Tresen“), nicht aus dem Hauptmenü. Eine Gaststube mit drei Tischen: Würfelbecher und Höher oder tiefer mit dem Affen Kasimir, Glücksrad mit der Elster Madame Funkel. Einsätze 10/50/100/500, Beute erst ab Einsatz 100. Jede Runde wird vor der Animation verrechnet und gespeichert; Neuladen mitten in einer Runde verliert nichts und erfindet nichts.
+- **Beute und Truhe:** 24 Gegenstände (12 gewöhnlich, 8 selten, 4 legendär), gemeinsame Truhe für alle Helden, nicht gefundene als Umriss („X von 24 gefunden“), „Neu“-Marke, Detailansicht. Doppelte werden für Gold verkauft. Die Werte der Gegenstände wirken erst im Abenteuer-Modus; gespeichert werden nur Kennungen.
+- **Stall und Duo:** Giraffe & Erdmännchen (Klasse „Hochstapler“) kosten 20.000 Gold und sind danach in der Heldenerstellung wählbar und im Wellen-Modus spielbar. Eigene Fähigkeiten: Langer Hals, kurzer Prozess (Start), Nüsse von oben, Stampede für Arme, Hier wurde gebuddelt, Großfamilie. Das Bild hat vier Phasen (Erdmännchen auf dem Rücken, hochklettern, oben stehen, herunterrutschen). Im Durchgang läuft die Bildfolge, in Stall und Heldenerstellung steht ein Standbild, bei „Bewegung reduzieren“ bleibt die Figur auf dem Rücken-Bild stehen.
+- **Spielstand Version 3** mit Umwandlung 2 → 3 (neu: `inventory`, `seenItems`, `unlocks`, `stats.tavernRounds`, `stats.hiLoBestStreak`). Alte Stände und Exporte der Versionen 1 und 2 laden ohne Verlust. Ein Export der Version 3 lässt sich in einer älteren Spielversion nicht laden.
+- **Erfolge:** vier neue (Taverne-Stammgast, Riecher, Sammelwut, Hochstapler), jetzt **37**. „Zoo-Direktor“ bleibt bei den drei Ursprungstieren.
+- **Bilder** (alle am 2026-11-13 geliefert und eingebaut, Commit `477419f`). Wo die Ausschnitte stehen, falls ein Bild ausgetauscht wird und neu ausgemessen werden muss:
+
+| Datei | Wofür | Ausschnitt-Felder |
+|---|---|---|
+| `assets/taverne/gaststube.webp` | Hintergrund hinter allen Taverne-Bildschirmen | keine, das ganze Bild; Pfad in `TAVERN_IMAGES.room` (`src/data/tavern.js`) |
+| `assets/taverne/wirte.webp` | Porträts von Affe und Elster (1536 × 1024) | `TAVERN_IMAGES.hosts.rects.affe` und `.elster` in `src/data/tavern.js`, je ein Quadrat (Kopf und Schultern, 360 × 360 Pixel) |
+| `assets/taverne/beute.webp` | die 24 Gegenstände, Raster 6 × 4 (Zellen 256 Pixel) | `TAVERN_IMAGES.loot` (`cols`, `rows`) in `src/data/tavern.js`; welcher Gegenstand in welcher Zelle liegt, steht im Feld `icon` jedes Eintrags in `src/data/items.js` (0 bis 23, zeilenweise) |
+| `assets/figuren/duo.webp` | Giraffe mit Erdmännchen, vier Phasen nebeneinander | `SHEET_FRAMES.duo` (linke Kante `x` je Phase, `y`, `w`, `h`) und `DUO_FRAMES` (Abfolge, Dauer, Standbild, Bild bei „Bewegung reduzieren“) in `src/data/sprites.js`; Startpunkte für eingeschlossenes Papierweiß in `SHEET_HOLES.duo` ebenda |
+
+  - Die Phasen des Duos überlappen sich im gelieferten Bild (Kopf und Schwanz ragen in die Nachbarfelder). Deshalb schneidet der Code (`cutFrames`) jedes lose Pixelgebiet dem nächstgelegenen Feld zu und legt die vier Phasen sauber nebeneinander. **Wird `duo.webp` neu geliefert, müssen die vier Phasen getrennt bleiben**, sonst landen Pixel im falschen Feld. Spielreihenfolge ist Bildposition 4 → 3 → 1 → 2 (im Code `order: [3, 2, 0, 1]`).
+  - Fehlt eines der Bilder, gibt es Ersatz: dunkler Holzton, Kreis mit Anfangsbuchstaben, Symbol der Art im Seltenheitsrahmen, 3D-Ersatzfigur. Kein Bildschirm scheitert an einem fehlenden Bild.
+  - Die Porträts der Wirte sind Kopf-Ausschnitte. Will der Auftraggeber ganze Figuren zeigen, sind es nur zwei Ausschnitte in `src/data/tavern.js`.
+- **Handprobe (2026-11-14, Port 8081):** alle drei Spiele mehrfach bei 390 × 844 und am PC; Doppeltippen spielt nur eine Runde; Neuladen mitten in einer Runde (Einsatz abgebucht und gespeichert, nichts doppelt); Höher oder tiefer: Abbrechen mit Rückfrage, Auszahlen mit Taste A; Truhe und Detailansicht; Duo freischalten (mit Rückfrage, Gold abgezogen); Held anlegen und einen Durchgang spielen (Fähigkeiten, Level-up, Niederlage, Ergebnis, gespeichert); ein von Hand gebauter Spielstand der Version 2 wird auf 3 gehoben (Helden und Gold bleiben, neue Listen leer); Taverne ohne Bilder (Ersatz überall sichtbar). Nicht im Browser prüfbar: „Bewegung reduzieren“ (nur im Code geprüft).
+- **Keine neuen Konsolenhilfen oder Adress-Schalter** durch die Taverne. Einzige Änderung: `?animal=giraffe&class=hochstapler` startet mit `autostart=1` das Duo (nur gültige Paare gelten). Es gibt auch keinen Testschalter für Gold. Für Handproben mit `?debug=1`: in der Konsole `__app.update((s) => { s.gold += 15000; })`; der offene Bildschirm zeigt das neue Gold erst nach Verlassen und Wiederbetreten.
+
 ## 2. Was noch fehlt (vom Auftraggeber gewünscht, noch nicht entworfen)
 
 Reihenfolge wie vereinbart; jedes Paket bekommt eigenen Entwurf, Spec und Plan.
 
 **Paket 2 – Mehr Welten:** Nach einem Boss geht es auf eine neue Karte mit neuen Tieren (Idee des Auftraggebers: z. B. Unterwasserwelt). Dafür braucht er wieder Beschreibungen für den Bildgenerator. Die sechs Landschaftsbilder in `assets/umgebung/szenen.webp` (Waldweg, Steinbrücke, Höhle, Wasserfall, Baum auf der Wiese, Teich) stehen seit Aufgabe 6 als Hintergrund hinter den Menüs und sind weiter als Titelbilder möglicher Welten vorgemerkt.
 
-**Paket 3 – Taverne:** Eigener Punkt in der Modusauswahl. Minispiele und Glücksspiel, bei denen man mit dem gesammelten Gold um Beute spielt – auch Ausrüstung und Waffen für den Abenteuer-Modus. Dort ist außerdem ein weiterer Held für viel Gold freischaltbar, vorerst geschwärzt dargestellt: ein Kombo-Team aus Giraffe und Erdmännchen. Nur Spielgold, kein echtes Geld.
-
-*Spec freigegeben am 2026-11-13* (`docs/superpowers/specs/2026-11-13-taverne-design.md`, einschließlich „Höher oder tiefer“ mit Faktor nach Risiko). Plan: `docs/superpowers/plans/2026-11-13-taverne.md`, freigegeben am 2026-11-13. Die Beschreibungen für den Bildgenerator (Gaststube, Wirte, Beute-Bogen, Duo) stehen in der Spec, Anhang A. Das parallele Paket „Neue Gegner“ plant Fuchs und Dachs als Gegner. Deshalb hat der Auftraggeber die Taverne-Wirte Dachs und Fuchs durch einen einzigen Affen (Kasimir) ersetzt, die Elster bleibt. Beide Pakete ändern Erfolge und Bildbögen und werden nacheinander gebaut. Vom Auftraggeber entschieden:
-
-- Gewinne sind vor allem Gold; Ausrüstung und Waffen selten, aber lustig. Später kommt evtl. noch mehr, was man mit Gold kaufen kann.
-- Drei Spiele, alle glücksbasiert: Würfelbecher, Glücksrad, Höher oder tiefer.
-- Duo Giraffe + Erdmännchen wird in diesem Paket **freischaltbar und spielbar** (Wellen-Modus): eigene Sonderklasse mit eigenen Fähigkeiten; das Erdmännchen reitet auf der Giraffe (eine Figur, ein Bild). Preis **20.000 Gold**.
-- Beute kommt in eine **gemeinsame Truhe** für alle Helden (wie das Gold); gespeichert werden nur Kennungen, Werte stehen in den Daten.
-- Beute bekommt **gemalte Symbole** je Gegenstand (Bogen mit etwa 24 Stück; Beschreibungen für den Bildgenerator liefern).
-
-Vom Auftraggeber bestätigt („Passt so“): Auszahlung im Schnitt 90–95 % des Einsatzes; Einsätze 10/50/100/500; höchstens fünf Schritte bei „Höher oder tiefer“; Wirtstiere an den Tischen; Beute zeigt Seltenheit und Werte („wirkt im Abenteuer-Modus“), Doppelte werden für Gold verkauft; Duo-Fähigkeiten legt der Entwurf fest; einige Taverne-Erfolge. Ansatz gewählt: **A – Taverne als Menü** (gemalte Gaststube als Hintergrund, je Spiel ein Bildschirm). Der Entwurf ändert eine Sache gegenüber der Auswahl: „Höher oder tiefer“ zahlt nach Risiko statt immer doppelt (sonst ausnutzbar) – das muss der Auftraggeber bei der Freigabe ausdrücklich sehen.
+**Paket 3 – Taverne:** gebaut, siehe Abschnitt 1. Offen sind die Gesamtprüfung über den Zweig `worktree-taverne` (eine Korrekturrunde) und die Zusammenführung nach `main`, nur mit Zustimmung des Auftraggebers. Die Beschreibungen für den Bildgenerator stehen in der Spec, Anhang A (für neue oder ersetzte Bilder). Vom Auftraggeber entschieden: Gewinne sind vor allem Gold, Ausrüstung selten, aber lustig; drei glücksbasierte Spiele; das Duo ist freischaltbar und spielbar für 20.000 Gold; Beute in einer gemeinsamen Truhe; nur Spielgold, kein echtes Geld; ein einziger Affe (Kasimir) betreut zwei Tische, weil „Neue Gegner“ Fuchs und Dachs als Gegner hat. „Höher oder tiefer“ zahlt nach Risiko statt immer doppelt (sonst ausnutzbar); das hat der Auftraggeber mit der Spec freigegeben.
 
 **Paket 4 – Abenteuer-Modus mit Story:** Der zweite Modus (in Richtung Action-Rollenspiel: Level durchlaufen, Erfahrung, Ausrüstung mit Werten). Neuer Wunsch: ein Held für alle Modi. Das widerspricht der früheren Wahl „getrennter Fortschritt je Modus" und muss beim Entwurf neu geklärt werden. Namen für Ausrüstung sollen lustig sein („Helm der mäßigen Zuversicht", „Stiefel des übereilten Rückzugs").
 
@@ -127,7 +140,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/serve.ps1 -Port 8080
 - Tests: `http://localhost:8080/tests.html`, Ergebnis in `window.__testResults` (`failed === 0` heißt bestanden), `?filter=<text>` grenzt ein
 - **Achtung:** Hält der Browser trotzdem alte Module fest (Testlauf meldet „does not provide an export named …"), hilft ein Wechsel zwischen `localhost` und `127.0.0.1` – das sind getrennte Zwischenspeicher
 - In Claude Code startet `preview_start` mit dem Namen `animalwarrior` denselben Server (`.claude/launch.json`); `animalwarrior-windows` ist die PowerShell-Variante
-- Schalter zum Ausprobieren stehen in `README.md` (`?debug=1`, `?speed=`, `?autostart=1`, `?animal=`, `?class=`, `?autopick=1`, `?stress=1`, `?quality=low`, Tasten K und L)
+- Schalter zum Ausprobieren stehen in `README.md` (`?debug=1`, `?speed=`, `?autostart=1`, `?animal=` (auch `giraffe`), `?class=` (auch `hochstapler`), `?autopick=1`, `?stress=1`, `?quality=low`, Tasten K und L)
+- Die Taverne wird im Worktree `.claude/worktrees/taverne` gebaut und getestet: Server dort auf Port 8081 (`preview_start` „animalwarrior-taverne“), Tests unter `http://127.0.0.1:8081/tests.html`. Port 8080 gehört einer anderen Sitzung
+- Läuft ein Durchgang im Vorschaufenster, geht er bei Fokusverlust in die Pause; dann „Weiter“ anklicken
 
 ## 4. Regeln im Code (gelten für alles Weitere)
 
@@ -173,6 +188,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/serve.ps1 -Port 8080
 
 ## 8. Zurückgestellte Kleinigkeiten (bekannt, nicht dringend)
 
+Aus dem Bau der Taverne (bewusst zurückgestellt, für die Gesamtprüfung):
+
+- Höher oder tiefer: Die Erfolge werden nach dem Aufdecken einer Karte geprüft, nicht erst nach dem Auszahlen (bewusst so entschieden). Neuladen mitten in einer Runde kostet den Einsatz; der laufende Topf wird nicht gespeichert (wie in der Spec)
+- Verrechnen einer Runde ist nicht ganz atomar, wenn eine unbekannte Beute-Kennung übergeben wird; kein Schutz gegen einen ungültigen Auszahlungswert (NaN). Im Spiel kommt beides nicht vor
+- Der Satz „Verdiene erst Gold“ am Tisch steht fest in der Oberfläche statt in `src/data`; bei abgelehnter Runde gibt es keine Rückmeldung
+- Bei „Bewegung reduzieren“ kann ein Animationsgriff übrig bleiben (nur Darstellung); `backOnEscape` wird exportiert, aber nicht genutzt; die Hilfsfunktion `svg()` gibt es doppelt; die Tastenprüfung `e.key` ohne Absicherung
+- Die Truhen-Detailansicht hängt nicht am Aufräumen des Bildschirms
+- Aussehen der Duo-Figur: einige Zahlen stehen im Darstellungscode statt in den Daten; veraltete Beschreibung bei `createHeroView`; Teilausfall beim Laden der Bilder ist nicht getestet; der Titel des gesperrten Duos hat wenig Kontrast; die Großfamilie ignoriert das Ausblenden beim Tod
+- Der Stall rechnet Freistellung und Bildausschnitt für das ganze Duo-Bild noch einmal (könnte `app.sprites.canvases.duo` nutzen); `frameCanvas` schneidet alle vier Phasen, braucht aber nur eine; scheitert `cutFrames`, fallen alle Bögen aus statt nur der optionale; zwischen den ausgeschnittenen Feldern ist kein Abstand; die Zuordnung loser Pixelgebiete ist bei einem neuen Bild fragil
+- Tests fehlen für die Wahl der Duo-Phase und für „Bewegung reduzieren“; ein Test trägt einen veralteten Titel („stride“)
+- Auf dem Entwicklungsrechner meldete der Testserver beim Neuladen einmal `ERR_CONNECTION_RESET`; ein zweites Laden ging sofort (Server, nicht Spiel)
+
 Aus der Gesamtprüfung von „Neue Gegner und wechselnde Bosse“ (bewusst zurückgestellt):
 
 - Wird ein Luchs mitten im Sprung betäubt oder verwirrt, landet er nach Ende der Betäubung sofort am Ziel und trifft;
@@ -208,4 +235,6 @@ Aus der Gesamtprüfung von Paket 1 (bewusst zurückgestellt):
 - Spielgefühl auf einem echten Handy (Daumen, Bildrate, Ton)
 - Ob 15 Minuten ausgewogen sind
 - Ob Ton und Bilder gefallen
+- Ob die Spiele der Taverne Spaß machen, ob Beute selten genug ist und ob 20.000 Gold für das Duo sich richtig anfühlen
+- Ob die Wirte als Kopf-Porträts gefallen oder ganze Figuren besser wären
 - Die veröffentlichte Seite auf GitHub Pages
