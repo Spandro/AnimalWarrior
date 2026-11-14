@@ -24,6 +24,7 @@ import './cameraFit.test.js';
 import './environment.test.js';
 import './items.test.js';
 import './loot.test.js';
+import './quests.test.js';
 import './tavern.test.js';
 import './roster.test.js';
 import './tavernSave.test.js';
