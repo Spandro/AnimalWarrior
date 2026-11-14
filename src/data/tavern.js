@@ -3,8 +3,16 @@
  * @typedef {{ name: string, animal: string, lines: Record<string, string[]> }} Host
  */
 
-/** Einsätze, Beute-Schwelle und Preis des Duos. */
-export const TAVERN = { stakes: [10, 50, 100, 500], lootMinStake: 100, duoPrice: 20000 };
+/**
+ * Einsätze, Beute-Schwelle und Preis des Duos. `brokeLine`: Spruch beider Wirte bei weniger Gold als dem kleinsten
+ * Einsatz; `{min}` steht für diesen Einsatz.
+ */
+export const TAVERN = {
+  stakes: [10, 50, 100, 500],
+  lootMinStake: 100,
+  duoPrice: 20000,
+  brokeLine: 'Ohne Gold kein Spiel. Verdien dir erst ein paar Münzen im Wellen-Modus, ab {min} Gold bist du dabei.',
+};
 
 /** Bekannte Freischaltungen des Spielstands (`save.unlocks`). Tiere nennen sie im Feld `unlock`. */
 export const UNLOCKS = ['duo'];
@@ -97,7 +105,6 @@ export const TAVERN_IMAGES = {
     rects: { affe: { x: 240, y: 28, w: 360, h: 360 }, elster: { x: 956, y: 62, w: 360, h: 360 } },
   },
   loot: { sheet: 'assets/taverne/beute.webp', cols: 6, rows: 4 },
-  duo: 'assets/figuren/duo.webp',
 };
 
 /**

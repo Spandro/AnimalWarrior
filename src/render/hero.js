@@ -34,8 +34,8 @@ const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
  * 3D-Figur aus `character.js`. Das gemalte Duo wechselt dazu seine Phasen nach der Uhr (`DUO_FRAMES`), bei
  * `reducedMotion` bleibt es auf `DUO_FRAMES.reducedMotion` stehen.
  * @param {THREE.Scene} scene
- * @param {'hase'|'ente'|'waschbaer'} animalId
- * @param {'krieger'|'magier'|'dieb'} classId
+ * @param {'hase'|'ente'|'waschbaer'|'giraffe'} animalId
+ * @param {'krieger'|'magier'|'dieb'|'hochstapler'} classId
  * @param {{ sprites?: import('./sprites.js').SpriteSheets, camera?: THREE.Camera, reducedMotion?: boolean }} [options]
  */
 export function createHeroView(scene, animalId, classId, { sprites, camera, reducedMotion = false } = {}) {

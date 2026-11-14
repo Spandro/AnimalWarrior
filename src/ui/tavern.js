@@ -7,8 +7,8 @@ import { chestSlots, foundCount, itemKindLabel } from './tavernText.js';
 import { TAVERN, HOSTS, TABLE_HOST, TAVERN_IMAGES } from '../data/tavern.js';
 import { ITEMS, RARITIES } from '../data/items.js';
 import { unlockDuo, markItemsSeen } from '../save/tavern.js';
-import { BACKGROUND, SHEET_HOLES, SHEET_FRAMES, DUO_FRAMES } from '../data/sprites.js';
-import { imageDataOf, removeBackground, frameCanvas } from '../render/sprites.js';
+import { HERO_SPRITES } from '../data/sprites.js';
+import { cropCanvas } from '../render/sprites.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const TOTAL_ITEMS = Object.keys(ITEMS).length;
@@ -162,19 +162,20 @@ function duoSvg() {
 }
 
 /**
- * Das Duo im Stall, als Standbild die Phase `DUO_FRAMES.still` aus der Bildfolge. Gesperrt als schwarzer Umriss
- * (CSS-Filter auf Bild oder Ersatzfigur), danach in Farbe.
+ * Das Duo im Stall, als Standbild die Phase `DUO_FRAMES.still` (Erdmännchen oben). Das Bild kommt aus dem Bogen, den
+ * das Spiel schon aufbereitet hat (`canvases.duo`, Rechteck des Eintrags `giraffe-hochstapler`); bis er da ist oder
+ * wenn er fehlt, zeigt der Stall die Ersatzfigur. Gesperrt als schwarzer Umriss (CSS-Filter), danach in Farbe.
  * @param {boolean} unlocked
+ * @param {Promise<import('../render/sprites.js').SpriteSheets>} sprites
  */
-function duoFigure(unlocked) {
+function duoFigure(unlocked, sprites) {
   const box = el('div', { class: unlocked ? 'duo-figure' : 'duo-figure duo-black', role: 'img',
     'aria-label': unlocked ? 'Giraffe und Erdmännchen' : 'Ein Umriss: Giraffe mit etwas auf dem Kopf' }, duoSvg());
-  probeImage(TAVERN_IMAGES.duo).then((img) => {
-    if (!img || !box.isConnected) return;
-    // Das Bild liegt auf weißem Grund: wie bei den Spielfiguren wird er entfernt, damit der Umriss nur die Figur zeigt.
-    const data = imageDataOf(img);
-    removeBackground(data, BACKGROUND, SHEET_HOLES.duo);
-    const canvas = frameCanvas(data, SHEET_FRAMES.duo, DUO_FRAMES.still);
+  const def = HERO_SPRITES['giraffe-hochstapler'];
+  sprites.then((s) => {
+    const sheet = s?.canvases?.[def?.sheet];
+    if (!sheet || !box.isConnected) return;
+    const canvas = cropCanvas(sheet, def);
     canvas.setAttribute('aria-hidden', 'true');
     box.replaceChildren(canvas);
   });
@@ -219,18 +220,15 @@ export function renderTavern(c, props, app) {
 
   function tableCard({ table, screen, title, text }) {
     const host = HOSTS[TABLE_HOST[table]];
-    const open = app.screens.has(screen);
     return el('button', {
-      class: open ? 'card table-card' : 'card table-card locked', type: 'button', disabled: !open,
-      'data-table': table,
+      class: 'card table-card', type: 'button', 'data-table': table,
       onclick: () => app.screens.show(screen, { heroId: hero.id }),
     },
     hostPortrait(TABLE_HOST[table]),
     el('span', { class: 'table-text' },
       el('span', { class: 'card-title', text: title }),
       el('span', { class: 'card-text', text }),
-      el('span', { class: 'table-host muted', text: `${host.name} · ${host.animal}` }),
-      open ? null : el('span', { class: 'badge', text: 'gleich geöffnet' })));
+      el('span', { class: 'table-host muted', text: `${host.name} · ${host.animal}` })));
   }
 
   function chestCard() {
@@ -256,7 +254,7 @@ export function renderTavern(c, props, app) {
       ? 'Freigeschaltet! Lege bei ‚Neuer Held‘ ein Duo an.'
       : `Ein ungewöhnliches Gespann wartet im Stall. ${price}.`;
     return el('section', { class: 'stable-card', 'aria-labelledby': 'stable-title', id: 'stable', tabindex: '-1' },
-      duoFigure(unlocked),
+      duoFigure(unlocked, app.spritesWith('duo')),
       el('div', { class: 'stable-text' },
         el('h2', { id: 'stable-title', text: unlocked ? 'Stall: Giraffe & Erdmännchen' : 'Stall' }),
         el('p', { class: 'stable-line', text }),

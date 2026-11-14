@@ -1,5 +1,8 @@
 import { test, assertEqual, assertClose, assertTrue } from './runner.js';
-import { removeBackground, spriteUv, spriteMotion, heroSpriteDef, usedSheets, duoFrameAt, cutFrames } from '../src/render/sprites.js';
+import {
+  removeBackground, spriteUv, spriteMotion, heroSpriteDef, usedSheets, duoFrameAt, cutFrames, loadSpriteSheets, addSheet, deferredSheets,
+} from '../src/render/sprites.js';
+import { defaultSave } from '../src/save/store.js';
 import { lookYaw } from '../src/render/hero.js';
 import { buildCharacter, animateCharacter } from '../src/render/character.js';
 import * as THREE from '../vendor/three.module.min.js';
@@ -271,6 +274,63 @@ test('sprites: cutFrames gibt jeder Phase nur ihre eigenen Pixel', () => {
   assertEqual(a(6, 4), 255, 'Bs Schwanz gehört zu Phase 1');
   assertEqual(Array.from(out.data.slice((4 * 12 + 6) * 4, (4 * 12 + 6) * 4 + 3)), [10, 10, 202]);
   for (let y = 0; y < 5; y++) assertEqual(a(11, y), 0, 'rechts außerhalb ist durchsichtig');
+});
+
+/**
+ * Ersatz für Bildladen und Aufbereiten der Bögen: merkt sich die geholten Pfade. `missing`: Pfade, die nicht laden;
+ * `broken`: Pfade, deren Aufbereitung wirft.
+ */
+function fakeSheets({ missing = [], broken = [] } = {}) {
+  const loaded = [];
+  return {
+    loaded,
+    load: (url) => { loaded.push(url); return missing.includes(url) ? Promise.reject(new Error('fehlt')) : Promise.resolve({ url }); },
+    prepare: (image) => {
+      if (broken.includes(image.url)) throw new Error('kaputt');
+      return { texture: { dispose() {} }, canvas: { url: image.url }, size: { width: 1, height: 1 } };
+    },
+  };
+}
+
+test('sprites: scheitert nur das Aufbereiten des Duo-Bilds, behalten alle anderen ihr Bild', async () => {
+  const f = fakeSheets({ broken: [SHEETS.duo] });
+  const s = await loadSpriteSheets(f);
+  assertTrue(s.ok, 'ok');
+  assertEqual(Object.keys(s.textures).sort(), usedSheets().filter((id) => id !== 'duo').sort());
+  assertEqual(heroSpriteDef(s, 'hase', 'krieger'), HERO_SPRITES['hase-krieger']);
+  assertEqual(heroSpriteDef(s, 'giraffe', 'hochstapler'), null);
+  // Ein Bogen der Gegner bleibt Pflicht: scheitert er, zeigt alles 3D-Figuren.
+  const g = fakeSheets({ broken: [SHEETS.gegner] });
+  const all = await loadSpriteSheets(g);
+  assertEqual([all.ok, Object.keys(all.textures).length, Object.keys(all.canvases).length], [false, 0, 0]);
+});
+
+test('sprites: das Duo-Bild wird erst geladen, wenn der Spielstand es braucht', async () => {
+  const save = defaultSave();
+  assertEqual(deferredSheets(save), ['duo']);
+  assertEqual(deferredSheets({ ...save, unlocks: ['duo'] }), []);
+  assertEqual(deferredSheets({ ...save, heroes: [{ id: 'h1', name: 'G', animal: 'giraffe', class: 'hochstapler' }] }), []);
+  const f = fakeSheets();
+  const s = await loadSpriteSheets({ ...f, skip: ['duo'] });
+  assertTrue(s.ok && !f.loaded.includes(SHEETS.duo), 'ohne Duo-Bild gestartet');
+  assertEqual(heroSpriteDef(s, 'hase', 'krieger'), HERO_SPRITES['hase-krieger']);
+  assertEqual(heroSpriteDef(s, 'giraffe', 'hochstapler'), null);
+  // Nachladen ergänzt dieselben Bögen, genau einmal.
+  assertTrue((await addSheet(s, 'duo', f)) === s, 'gleiches Objekt');
+  assertEqual(heroSpriteDef(s, 'giraffe', 'hochstapler'), HERO_SPRITES[DUO_KEY]);
+  assertEqual(s.canvases.duo, { url: SHEETS.duo });
+  await addSheet(s, 'duo', f);
+  assertEqual(f.loaded.filter((u) => u === SHEETS.duo).length, 1);
+  // Fehlt das Bild beim Nachladen oder scheitert es, bleibt alles andere, ohne Fehler.
+  for (const bad of [fakeSheets({ missing: [SHEETS.duo] }), fakeSheets({ broken: [SHEETS.duo] })]) {
+    const t = await loadSpriteSheets({ ...bad, skip: ['duo'] });
+    assertTrue((await addSheet(t, 'duo', bad)) === t);
+    assertEqual([t.ok, heroSpriteDef(t, 'giraffe', 'hochstapler'), !!t.textures.helden], [true, null, true]);
+  }
+  // Sind die Bilder insgesamt nicht verfügbar, bleibt es bei 3D-Figuren.
+  const none = await loadSpriteSheets({ ...fakeSheets({ missing: [SHEETS.gegner] }), skip: ['duo'] });
+  await addSheet(none, 'duo', f);
+  assertEqual([none.ok, Object.keys(none.textures).length], [false, 0]);
 });
 
 test('hero: die Figur dreht sich beim Zielen in die Zielrichtung, sonst in die Laufrichtung', () => {

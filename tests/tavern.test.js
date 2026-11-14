@@ -1,6 +1,6 @@
 import { test, assertEqual, assertClose, assertTrue, assertThrows } from './runner.js';
 import { createRng } from '../src/core/rng.js';
-import { ITEMS } from '../src/data/items.js';
+import { ITEMS, RARITIES } from '../src/data/items.js';
 import { TAVERN, DICE, WHEEL, HILO, HOSTS, TABLE_HOST } from '../src/data/tavern.js';
 import {
   playDice, spinWheel, hiLoFactor, hiLoStart, hiLoGuess, hiLoCashOut,
@@ -21,7 +21,10 @@ function scripted(values) {
 }
 
 test('tavern: Daten – Einsätze, Rad-Felder, Wirte', () => {
-  assertEqual(TAVERN, { stakes: [10, 50, 100, 500], lootMinStake: 100, duoPrice: 20000 });
+  assertEqual(TAVERN, {
+    stakes: [10, 50, 100, 500], lootMinStake: 100, duoPrice: 20000,
+    brokeLine: 'Ohne Gold kein Spiel. Verdien dir erst ein paar Münzen im Wellen-Modus, ab {min} Gold bist du dabei.',
+  });
   assertEqual(DICE, { winMul: 2, tieMul: 0.5 });
   assertEqual(WHEEL.fields.length, 20);
   assertEqual(HILO.ranks, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
@@ -128,6 +131,53 @@ test('tavern: Höher oder tiefer – für jede Karte liegt die bessere Wahl zwis
       assertTrue(hiLoStepReturn(card, dir) < 0.97, `Joker Karte ${card} ${dir}`);
     }
   }
+});
+
+/** Mittlerer Gegenwert einer Beute, wenn jeder Fund ein Doppelter ist: 0,7 · 10 + 0,25 · 30 + 0,05 · 100. */
+function resalePerLoot() {
+  const all = Object.values(RARITIES);
+  const weight = all.reduce((sum, r) => sum + r.weight, 0);
+  return all.reduce((sum, r) => sum + (r.weight / weight) * r.resale, 0);
+}
+
+/** Rng, dessen `int`-Würfe der Reihe nach `ints` liefern (danach den letzten); übrige Würfe wie `scripted`. */
+function ints(values) {
+  let i = 0;
+  return { ...scripted([0.5]), int: () => values[Math.min(i++, values.length - 1)] };
+}
+
+test('tavern: mit dem Gegenwert der Doppelten bleibt jede Runde unter 97 %', () => {
+  const resale = resalePerLoot();
+  assertClose(resale, 19.5, 1e-12);
+  // Würfelbecher: Beute gibt es genau bei einem von 36 Würfen des Spielers (Sechserpasch).
+  for (const stake of [100, 500]) {
+    let loot = 0;
+    for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) if (playDice(ints([a, b, 1, 1]), stake).loot) loot++;
+    assertEqual(loot, 1, `Würfel ${stake}`);
+    const total = diceReturn() + (loot / 36) * resale / stake;
+    assertClose(total, { 100: 0.9490895061728395, 500: 0.9447561728395062 }[stake], 1e-12);
+    assertTrue(total < 0.97, `Würfel ${stake}: ${total}`);
+  }
+  // Glücksrad: ein Beutefeld von 20.
+  for (const stake of [100, 500]) {
+    let loot = 0;
+    for (let i = 0; i < WHEEL.fields.length; i++) if (spinWheel(ints([i]), stake).loot) loot++;
+    assertEqual(loot, 1, `Rad ${stake}`);
+    const total = wheelReturn(stake) + (loot / WHEEL.fields.length) * resale / stake;
+    assertClose(total, { 100: 0.90975, 500: 0.90195 }[stake], 1e-12);
+    assertTrue(total < 0.97, `Rad ${stake}: ${total}`);
+  }
+  // Höher oder tiefer: der Joker bringt die Beute. Der Topf ist nie kleiner als der Einsatz (Faktoren ≥ 1),
+  // also ist der Gegenwert beim kleinsten Einsatz mit Beute am größten.
+  for (const card of HILO.ranks) {
+    for (const dir of ['up', 'down']) {
+      if (hiLoFactor(card, dir) === 0) continue;
+      assertTrue(hiLoFactor(card, dir) >= 1, `Faktor Karte ${card} ${dir}`);
+      const total = hiLoStepReturn(card, dir) + HILO.jokerChance * resale / TAVERN.lootMinStake;
+      assertTrue(total < 0.97, `Karte ${card} ${dir}: ${total}`);
+    }
+  }
+  assertClose(hiLoStepReturn(8, 'up') + HILO.jokerChance * resale / TAVERN.lootMinStake, 0.98 * (6 / 13) * 2.0 + 0.02 + 0.0039, 1e-12);
 });
 
 test('tavern: Beute nur ab 100', () => {

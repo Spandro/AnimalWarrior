@@ -6,7 +6,7 @@
 // Bildrate oben links), ?autopick=1 (Level-up-Karten automatisch), Tasten K (alle Gegner besiegen), L (ein Level).
 import { isWebGLAvailable, createRenderer } from './render/renderer.js';
 import { initialQuality } from './render/quality.js';
-import { loadSpriteSheets } from './render/sprites.js';
+import { loadSpriteSheets, addSheet, deferredSheets } from './render/sprites.js';
 import { loadEnvironment } from './render/environment.js';
 import { startGame } from './game.js';
 import { createStore, addHero, deleteHero, settleRun, STORAGE_KEY } from './save/store.js';
@@ -102,6 +102,15 @@ function startApp() {
   // ?quality=low gilt, bis die Einstellungen etwas anderes sagen (Qualität dort wählen oder Spielstand importieren).
   const quality = params.get('quality') === 'low' ? 'low' : initial.data.settings.quality;
 
+  // Gemalte Figuren: Bögen, die der Spielstand noch nicht braucht (das Duo vor dem Freischalten), lädt der Start
+  // nicht. Sie kommen dazu, sobald jemand sie anfordert (`spritesWith`) oder der Spielstand sie braucht (`sprites`).
+  const skippedSheets = new Set(deferredSheets(initial.data));
+  let spritesLoad = loadSpriteSheets({ skip: [...skippedSheets] });
+  const requestSheet = (id) => {
+    if (skippedSheets.delete(id)) spritesLoad = spritesLoad.then((sprites) => addSheet(sprites, id));
+    return spritesLoad;
+  };
+
   const app = {
     store,
     /** Aktueller Spielstand; fällt beim Speichern etwas aus, wird nur im Speicher weitergeführt. */
@@ -120,10 +129,24 @@ function startApp() {
     sfx: createUnlockedSfx(initial.data.settings.volume),
     /**
      * Gemalte Figuren, einmal beim Start geladen. Menüs erscheinen schon vorher; Vorschau und Durchgang
-     * warten darauf. Schlägt das Laden fehl, `ok: false` (3D-Figuren).
+     * warten darauf. Schlägt das Laden fehl, `ok: false` (3D-Figuren). Braucht der Spielstand inzwischen einen
+     * beim Start übersprungenen Bogen (Duo freigeschaltet, auch per Import), wird er erst nachgeladen.
      * @type {Promise<import('./render/sprites.js').SpriteSheets>}
      */
-    sprites: loadSpriteSheets(),
+    get sprites() {
+      const deferred = deferredSheets(app.save);
+      for (const id of skippedSheets) if (!deferred.includes(id)) requestSheet(id);
+      return spritesLoad;
+    },
+    /**
+     * Wie `sprites`, lädt aber den Bogen `id` in jedem Fall nach (der Stall zeigt das Duo auch gesperrt als Umriss).
+     * @param {string} id
+     * @returns {Promise<import('./render/sprites.js').SpriteSheets>}
+     */
+    spritesWith(id) {
+      requestSheet(id);
+      return app.sprites;
+    },
     /**
      * Gemalte Umgebung (Boden, Bäume, Deko, Truhen, Aufsammelbares), einmal beim Start geladen.
      * Schlägt das Laden fehl, `ok: false` (bisherige 3D-Darstellung).

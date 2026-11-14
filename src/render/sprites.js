@@ -4,6 +4,7 @@ import {
   SHEETS, SHEET_HOLES, SHEET_FRAMES, HERO_SPRITES, ENEMY_SPRITES, BACKGROUND, BILLBOARD, MOTION, IDLE, ATTACK, MOTION_FULL_SPEED,
   HOP_BACK_LEAN, DUO_FRAMES,
 } from '../data/sprites.js';
+import { animalUnlocked } from '../core/roster.js';
 
 /**
  * @typedef {{ width: number, height: number, data: Uint8ClampedArray|Uint8Array }} ImageDataLike
@@ -293,17 +294,16 @@ export function prepareSheet(image, holes = [], frames) {
 }
 
 /**
- * Eine Phase eines Bogens mit Bildfolge als eigenes Canvas, mit nur ihren eigenen Pixeln (für Standbilder im Menü).
- * @param {ImageDataLike} img nach {@link removeBackground}
- * @param {{ x: number[], y: number, w: number, h: number }} layout siehe `SHEET_FRAMES`
- * @param {number} index Bildposition
+ * Ein Rechteck eines Canvas als eigenes, kleines Canvas (kopiert nur dieses Rechteck), etwa das Standbild des Duos
+ * aus dem schon aufbereiteten Bogen für den Stall.
+ * @param {HTMLCanvasElement} source
+ * @param {{ x: number, y: number, w: number, h: number }} rect
  * @returns {HTMLCanvasElement}
  */
-export function frameCanvas(img, layout, index) {
-  const one = cutFrames(img, layout);
+export function cropCanvas(source, { x, y, w, h }) {
   const canvas = document.createElement('canvas');
-  canvas.width = layout.w; canvas.height = layout.h;
-  canvas.getContext('2d').putImageData(new ImageData(one.data, one.width, one.height), -index * layout.w, 0);
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(source, x, y, w, h, 0, 0, w, h);
   return canvas;
 }
 
@@ -313,6 +313,21 @@ export function frameCanvas(img, layout, index) {
  */
 export function usedSheets() {
   return [...new Set([...Object.values(HERO_SPRITES), ...Object.values(ENEMY_SPRITES)].map((s) => s.sheet))];
+}
+
+/**
+ * Bögen, die nur Helden eines Tiers nutzen, das der Spielstand weder freigeschaltet noch als Held hat (das Duo vor
+ * dem Freischalten). Sie werden beim Start übersprungen und erst bei Bedarf nachgeladen ({@link addSheet}).
+ * @param {{ unlocks: string[], heroes: { animal: string }[] }} save
+ * @returns {string[]}
+ */
+export function deferredSheets(save) {
+  const needed = new Set(Object.values(ENEMY_SPRITES).map((s) => s.sheet));
+  for (const [key, def] of Object.entries(HERO_SPRITES)) {
+    const animal = key.slice(0, key.indexOf('-'));
+    if (animalUnlocked(save, animal) || save.heroes.some((h) => h.animal === animal)) needed.add(def.sheet);
+  }
+  return usedSheets().filter((id) => !needed.has(id));
 }
 
 /**
@@ -329,28 +344,40 @@ export function heroSpriteDef(sprites, animalId, classId) {
 }
 
 /**
+ * @typedef {{ load?: (url: string) => Promise<HTMLImageElement>, prepare?: typeof prepareSheet }} SheetSource
+ * Woher Bilder kommen und wie sie aufbereitet werden (in Tests ersetzbar).
+ */
+
+/** Bereitet einen geladenen Bogen auf und trägt ihn in `result` ein. */
+function storeSheet(result, id, image, prepare) {
+  const sheet = prepare(image, SHEET_HOLES[id] || [], SHEET_FRAMES[id]);
+  result.textures[id] = sheet.texture;
+  result.sizes[id] = sheet.size;
+  result.canvases[id] = sheet.canvas;
+}
+
+/**
  * Lädt die genutzten Bildbögen, entfernt den Hintergrund und legt je Bogen eine Textur und ein 2D-Canvas
- * (für die Menüvorschau) an. Wirft nie: fehlt ein Bogen der Gegner, `ok: false` (alles in 3D); fehlt einer, den nur
- * Helden nutzen, zeigen diese Helden ihre 3D-Ersatzfigur ({@link heroSpriteDef}).
+ * (für die Menüvorschau) an. Wirft nie: scheitert ein Bogen der Gegner, `ok: false` (alles in 3D); scheitert einer,
+ * den nur Helden nutzen (Laden oder Aufbereiten), zeigen nur diese Helden ihre 3D-Ersatzfigur ({@link heroSpriteDef}).
+ * @param {SheetSource & { skip?: string[] }} [options] `skip`: Bögen, die erst später nachgeladen werden ({@link deferredSheets})
  * @returns {Promise<SpriteSheets>}
  */
-export async function loadSpriteSheets() {
+export async function loadSpriteSheets({ load = loadImage, prepare = prepareSheet, skip = [] } = {}) {
   const result = { ok: false, textures: {}, sizes: {}, canvases: {} };
   try {
-    const ids = usedSheets();
+    const ids = usedSheets().filter((id) => !skip.includes(id));
     const required = new Set(Object.values(ENEMY_SPRITES).map((s) => s.sheet));
-    const images = await Promise.allSettled(ids.map((id) => loadImage(SHEETS[id])));
+    const images = await Promise.allSettled(ids.map((id) => load(SHEETS[id])));
     ids.forEach((id, k) => {
-      const loaded = images[k];
-      if (loaded.status === 'rejected') {
-        if (required.has(id)) throw loaded.reason;
-        console.warn(`Figurenbild ${SHEETS[id]} nicht verfügbar, zeige dafür 3D-Figuren.`);
-        return;
+      try {
+        const loaded = images[k];
+        if (loaded.status === 'rejected') throw loaded.reason;
+        storeSheet(result, id, loaded.value, prepare);
+      } catch (e) {
+        if (required.has(id)) throw e;
+        console.warn(`Figurenbild ${SHEETS[id]} nicht verfügbar, zeige dafür 3D-Figuren.`, e);
       }
-      const sheet = prepareSheet(loaded.value, SHEET_HOLES[id] || [], SHEET_FRAMES[id]);
-      result.textures[id] = sheet.texture;
-      result.sizes[id] = sheet.size;
-      result.canvases[id] = sheet.canvas;
     });
     result.ok = true;
   } catch (e) {
@@ -359,6 +386,30 @@ export async function loadSpriteSheets() {
     result.textures = {}; result.sizes = {}; result.canvases = {};
   }
   return result;
+}
+
+/** Laufendes oder fertiges Nachladen je Bögen-Objekt und Bogen, damit jeder Bogen nur einmal geholt wird. */
+const pendingSheets = new WeakMap();
+
+/**
+ * Lädt einen beim Start übersprungenen Bogen nach und trägt ihn in dieselben `sprites` ein. Wirft nie: fehlt das
+ * Bild oder scheitert das Aufbereiten, bleibt es bei der Ersatzfigur. Ohne geladene Bögen (`ok: false`) geschieht
+ * nichts, dann zeigt ohnehin alles 3D-Figuren.
+ * @param {SpriteSheets} sprites
+ * @param {string} id
+ * @param {SheetSource} [source]
+ * @returns {Promise<SpriteSheets>} dieselben `sprites`
+ */
+export function addSheet(sprites, id, { load = loadImage, prepare = prepareSheet } = {}) {
+  if (!sprites.ok || sprites.textures[id]) return Promise.resolve(sprites);
+  let pending = pendingSheets.get(sprites);
+  if (!pending) { pending = new Map(); pendingSheets.set(sprites, pending); }
+  if (!pending.has(id)) {
+    pending.set(id, load(SHEETS[id]).then((image) => storeSheet(sprites, id, image, prepare)).catch((e) => {
+      console.warn(`Figurenbild ${SHEETS[id]} nicht verfügbar, zeige dafür 3D-Figuren.`, e);
+    }).then(() => sprites));
+  }
+  return pending.get(id);
 }
 
 /**

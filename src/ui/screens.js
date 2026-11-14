@@ -77,7 +77,7 @@ function setTavernRoom(root) {
 /**
  * @param {HTMLElement} root Menüebene
  * @param {any} app App-Objekt aus main.js (Spielstand, Aktionen, gemeinsamer Renderer)
- * @returns {{ show(name: ScreenName, props?: Record<string, any>): void, has(name: string): boolean, current(): ScreenName | null, props(): Record<string, any> }}
+ * @returns {{ show(name: ScreenName, props?: Record<string, any>): void, current(): ScreenName | null, props(): Record<string, any> }}
  */
 export function createScreens(root, app) {
   /** @type {ScreenName | null} */
@@ -109,7 +109,7 @@ export function createScreens(root, app) {
     }
   }
 
-  return { show, has: (name) => Object.hasOwn(BUILDERS, name), current: () => currentName, props: () => currentProps };
+  return { show, current: () => currentName, props: () => currentProps };
 }
 
 const NOTICE_TIMEOUT = 7000;

@@ -85,7 +85,11 @@ function createTable(c, app, { table, title, onBack }) {
   const lines = host.lines[table];
   let lineIndex = -1;
   let busy = false;
-  let cooldownUntil = 0;
+  /** Kurze Pause nach einer Runde oder einem Schritt (gegen Doppeltippen); die Knöpfe sind solange gesperrt. */
+  let cooling = false;
+  let cooldownTimer = 0;
+  /** Gleicht die Knöpfe des Spiels an, wenn die Pause endet ({@link api.onIdle}). */
+  let onIdle = () => {};
   let pendingAchievements = false;
   let stakesLocked = false;
   /** Laufende Animation (abkürzbar) */
@@ -127,7 +131,7 @@ function createTable(c, app, { table, title, onBack }) {
   /** Neuer Spruch, nicht derselbe wie eben. Ohne Gold sagt der Wirt, man solle erst Gold verdienen. */
   function speak() {
     if (broke()) {
-      hostLine.textContent = `„Ohne Gold kein Spiel. Verdien dir erst ein paar Münzen im Wellen-Modus, ab ${formatNumber(TAVERN.stakes[0])} Gold bist du dabei.“`;
+      hostLine.textContent = `„${TAVERN.brokeLine.replace('{min}', formatNumber(TAVERN.stakes[0]))}“`;
       hostLine.classList.add('host-broke');
       return;
     }
@@ -193,8 +197,12 @@ function createTable(c, app, { table, title, onBack }) {
     actions,
     get stake() { return stake; },
     get busy() { return busy; },
+    /** Animation oder kurze Pause danach: die Spielknöpfe sind gesperrt. */
+    get locked() { return busy || cooling; },
     /** Darf jetzt eine neue Runde (oder ein Tipp) starten? */
-    ready() { return !busy && performance.now() >= cooldownUntil && !document.querySelector('.dialog-backdrop'); },
+    ready() { return !busy && !cooling && !document.querySelector('.dialog-backdrop'); },
+    /** `sync` des Spiels: gleicht die Knöpfe an, sobald die Pause nach einem Schritt vorbei ist. */
+    onIdle(fn) { onIdle = fn; },
     setGold,
     speak,
     showLoot,
@@ -211,11 +219,13 @@ function createTable(c, app, { table, title, onBack }) {
       showLoot(null);
       renderStakes();
     },
-    /** Ende einer Runde oder eines Schritts: Sperre lösen, kurze Pause gegen Doppeltippen. */
+    /** Ende einer Runde oder eines Schritts: Animation vorbei, dann kurze Pause gegen Doppeltippen (Knöpfe gesperrt). */
     end() {
       busy = false;
       anim = null;
-      cooldownUntil = performance.now() + TABLE_MOTION.cooldownMs;
+      cooling = true;
+      clearTimeout(cooldownTimer);
+      cooldownTimer = setTimeout(() => { cooling = false; onIdle(); }, TABLE_MOTION.cooldownMs);
     },
     run(ms, frame, done) { anim = animate(ms, frame, done); },
     checkAchievements,
@@ -231,6 +241,7 @@ function createTable(c, app, { table, title, onBack }) {
     dispose() {
       anim?.cancel();
       anim = null;
+      clearTimeout(cooldownTimer);
       if (pendingAchievements) checkAchievements();
     },
   };
@@ -274,7 +285,7 @@ function playButton(label, onPlay) {
   return el('button', { class: 'btn btn-primary btn-large table-play', type: 'button', onclick: onPlay }, label);
 }
 
-/** Nach dem Abbau der Sperre den Fokus auf den Spielknopf zurück, falls er verloren ging (für die Tastatur). */
+/** Nach der Pause den Fokus auf den Spielknopf zurück, falls er verloren ging, als der Knopf gesperrt war (für die Tastatur). */
 function keepFocus(c, button) {
   if (!c.contains(document.activeElement) || document.activeElement === document.body) button?.focus({ preventScroll: true });
 }
@@ -317,7 +328,8 @@ export function renderDice(c, props, app) {
 
   const button = playButton('Würfeln!', play);
   t.actions.append(button);
-  const sync = () => { button.disabled = t.busy || t.broke() || !canStake(app.save, t.stake); };
+  const sync = () => { button.disabled = t.locked || t.broke() || !canStake(app.save, t.stake); };
+  t.onIdle(() => { sync(); keepFocus(c, button); });
   sync();
 
   function play() {
@@ -365,7 +377,6 @@ export function renderDice(c, props, app) {
     t.refresh();
     t.speak();
     sync();
-    keepFocus(c, button);
   }
 
   const unbind = tableKeys(t, { onBack: goBack, onPlay: play });
@@ -441,7 +452,8 @@ export function renderWheel(c, props, app) {
 
   const button = playButton('Drehen!', play);
   t.actions.append(button);
-  const sync = () => { button.disabled = t.busy || t.broke() || !canStake(app.save, t.stake); };
+  const sync = () => { button.disabled = t.locked || t.broke() || !canStake(app.save, t.stake); };
+  t.onIdle(() => { sync(); keepFocus(c, button); });
   sync();
 
   const fieldAt = (deg) => Math.floor((((-deg % 360) + 360) % 360) / FIELD_DEG) % WHEEL.fields.length;
@@ -498,7 +510,6 @@ export function renderWheel(c, props, app) {
     t.refresh();
     t.speak();
     sync();
-    keepFocus(c, button);
   }
 
   const unbind = tableKeys(t, { onBack: goBack, onPlay: play });
@@ -559,13 +570,13 @@ export function renderHiLo(c, props, app) {
       const fDown = hiLoFactor(card, 'down');
       upBtn.textContent = fUp > 0 ? `↑ Höher ${formatFactor(fUp)}` : '↑ Höher';
       downBtn.textContent = fDown > 0 ? `↓ Tiefer ${formatFactor(fDown)}` : '↓ Tiefer';
-      upBtn.disabled = t.busy || fUp === 0;
-      downBtn.disabled = t.busy || fDown === 0;
-      cashBtn.disabled = t.busy || hits === 0;
+      upBtn.disabled = t.locked || fUp === 0;
+      downBtn.disabled = t.locked || fDown === 0;
+      cashBtn.disabled = t.locked || hits === 0;
       if (t.actions.firstChild !== guessRow) t.actions.replaceChildren(guessRow, cashBtn);
       potLine.textContent = `Topf: ${formatNumber(round.state.pot)} Gold · Treffer ${hits} von ${HILO.maxHits}`;
     } else {
-      startBtn.disabled = t.busy || t.broke() || !canStake(app.save, t.stake);
+      startBtn.disabled = t.locked || t.broke() || !canStake(app.save, t.stake);
       if (t.actions.firstChild !== startBtn) t.actions.replaceChildren(startBtn);
       if (!round) potLine.textContent = `Gleicher Wert verliert. Höchstens ${HILO.maxHits} Treffer, dann wird ausgezahlt.`;
     }
@@ -597,7 +608,6 @@ export function renderHiLo(c, props, app) {
       t.end();
       openSlot.firstChild?.classList.remove('card-reveal');
       sync();
-      keepFocus(c, upBtn.disabled ? downBtn : upBtn);
     });
   }
 
@@ -640,7 +650,6 @@ export function renderHiLo(c, props, app) {
     }
     if (state.done) finishRound(state, item);
     else sync();
-    keepFocus(c, upBtn.disabled ? downBtn : upBtn);
   }
 
   function cashOut() {
@@ -648,9 +657,9 @@ export function renderHiLo(c, props, app) {
     const state = hiLoCashOut(round.state);
     round.state = state;
     settle(state, null);
+    t.end();
     t.setResult(`Ausgezahlt: ${formatNumber(state.pot)} Gold.`, 'win');
     finishRound(state, null);
-    t.end();
   }
 
   /** Runde vorbei: Beute zeigen, Ton, Erfolge prüfen, Einsätze wieder frei. */
@@ -664,7 +673,6 @@ export function renderHiLo(c, props, app) {
     t.refresh();
     t.speak();
     sync();
-    keepFocus(c, startBtn);
   }
 
   /** Bricht eine laufende Runde ab: der Topf ist verloren, die Trefferserie zählt (als Fehltipp gespeichert). */
@@ -694,6 +702,11 @@ export function renderHiLo(c, props, app) {
     leave();
   }
 
+  // Nach der Pause: Knöpfe freigeben und den Fokus zurück auf den nächsten sinnvollen Knopf (für die Tastatur).
+  t.onIdle(() => {
+    sync();
+    keepFocus(c, !round || round.state.done ? startBtn : upBtn.disabled ? downBtn : upBtn);
+  });
   sync();
   const unbind = tableKeys(t, {
     onBack: goBack,
