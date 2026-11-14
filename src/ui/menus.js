@@ -5,6 +5,8 @@ import { CLASSES } from '../data/classes.js';
 import { RUN_DURATION } from '../data/waves.js';
 import { MAX_HEROES } from '../save/schema.js';
 import { exportText } from '../save/store.js';
+import { SAVE_HINT } from '../data/texts.js';
+import { GAME_VERSION } from '../data/version.js';
 
 /** Kopfzeile eines Bildschirms mit Titel und optionaler Unterzeile. */
 export function screenHeader(title, subtitle) {
@@ -100,6 +102,8 @@ export function renderMain(c, props, app) {
         el('button', { class: 'btn', type: 'button', onclick: () => fileInput.click() }, 'Spielstand importieren')),
       fileInput),
     el('p', { class: 'gold-line' }, 'Gold: ', el('strong', { text: formatNumber(save.gold) })),
+    el('p', { class: 'save-hint', text: SAVE_HINT }),
+    el('p', { class: 'game-version', text: `Version ${GAME_VERSION}` }),
   );
 }
 

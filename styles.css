@@ -125,6 +125,8 @@ p { margin: 0; }
 .menu-row .btn { font-size: 0.9rem; padding: 8px 10px; }
 .gold-line { color: var(--muted); }
 .gold-line strong { color: var(--accent-hi); }
+.save-hint { color: var(--muted); font-size: 0.8rem; max-width: 34rem; margin: 0.5rem auto 0; text-align: center; }
+.game-version { color: var(--muted); font-size: 0.75rem; opacity: 0.8; margin-top: 0.25rem; text-align: center; }
 
 /* ---------------------------------------------------------------- Karten */
 

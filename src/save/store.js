@@ -20,6 +20,14 @@ const isNewer = (parsed) =>
   parsed !== null && typeof parsed === 'object' && Number.isInteger(parsed.version) && parsed.version > SAVE_VERSION;
 
 /**
+ * Schlüssel der Sicherungskopie, die vor dem Umwandeln eines Stands der Version `version` angelegt wird.
+ * @param {number} version
+ */
+export function versionBackupKey(version) {
+  return `${STORAGE_KEY}.v${version}`;
+}
+
+/**
  * Speicher für den Spielstand über ein injiziertes Storage-Objekt.
  * @param {StorageLike} storage
  */
@@ -40,12 +48,25 @@ export function createStore(storage) {
       return corrupt(raw);
     }
     if (isNewer(parsed)) return { data: defaultSave(), status: 'newer' };
+    backupBeforeUpgrade(parsed, raw);
     try {
       const data = migrate(parsed);
       if (!validate(data).ok) return corrupt(raw);
       return { data, status: 'ok' };
     } catch (e) {
       return corrupt(raw);
+    }
+  }
+
+  /** Legt vor dem Umwandeln eines älteren Stands den Rohtext einmal je Version ab; eine vorhandene Kopie bleibt. */
+  function backupBeforeUpgrade(parsed, raw) {
+    const v = parsed?.version;
+    if (!Number.isInteger(v) || v < 1 || v >= SAVE_VERSION) return;
+    try {
+      const key = versionBackupKey(v);
+      if (storage.getItem(key) === null) storage.setItem(key, raw);
+    } catch (e) {
+      // Ohne Kopie weiter: Laden darf daran nicht scheitern.
     }
   }
 

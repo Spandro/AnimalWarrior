@@ -94,6 +94,8 @@ function createUnlockedSfx(volume) {
 
 function startApp() {
   const store = createStore(safeStorage);
+  // Den Browser einmal bitten, den Spielstand nicht von selbst zu löschen; eine Ablehnung ändert nichts.
+  try { navigator.storage?.persist?.().catch(() => {}); } catch { /* nicht verfügbar */ }
   const initial = store.load();
   // Allererster Start ohne Spielstand: Fingergeräte beginnen sparsam. Danach gilt immer die Einstellung.
   if (initial.status === 'empty') {

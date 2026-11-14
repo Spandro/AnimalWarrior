@@ -1,7 +1,7 @@
 import { test, assertEqual, assertTrue, assertThrows } from './runner.js';
 import {
   SAVE_VERSION, STORAGE_KEY, BACKUP_KEY, defaultSave, validate, migrate, createStore,
-  normalizeHeroName, addHero, deleteHero, recordRun, settleRun, exportText,
+  normalizeHeroName, addHero, deleteHero, recordRun, settleRun, exportText, versionBackupKey,
 } from '../src/save/store.js';
 
 function memoryStorage(initial = {}) {
@@ -498,4 +498,35 @@ test('save: validate lehnt Helden mit unbekanntem Tier oder unbekannter Klasse a
   assertTrue(validate({ ...s, heroes: [hero({})] }).ok);
   assertEqual(validate({ ...s, heroes: [hero({ animal: 'drache' })] }).ok, false);
   assertEqual(validate({ ...s, heroes: [hero({ class: 'barde' })] }).ok, false);
+});
+
+// ---------------------------------------------------------------- Sicherungskopie vor der Umwandlung
+
+const v2Raw = () => JSON.stringify({ ...migrate({ version: 1, heroes: [], gold: 5, metaUpgrades: {}, settings: { volume: 70, quality: 'high' } }), version: 2 });
+
+test('store: älterer Stand legt vor der Umwandlung eine Kopie unter animalwarrior.save.v<alt> ab', () => {
+  const raw = JSON.stringify({ version: 1, heroes: [], gold: 5, metaUpgrades: {}, settings: { volume: 70, quality: 'high' } });
+  const storage = memoryStorage({ [STORAGE_KEY]: raw });
+  assertEqual(createStore(storage).load().status, 'ok');
+  assertEqual(storage.getItem(versionBackupKey(1)), raw);
+  assertEqual(versionBackupKey(2), 'animalwarrior.save.v2');
+});
+
+test('store: vorhandene Kopie wird nicht überschrieben', () => {
+  const storage = memoryStorage({ [STORAGE_KEY]: v2Raw(), [versionBackupKey(2)]: 'alt' });
+  createStore(storage).load();
+  assertEqual(storage.getItem(versionBackupKey(2)), 'alt');
+});
+
+test('store: aktueller Stand legt keine Kopie an', () => {
+  const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify(defaultSave()) });
+  createStore(storage).load();
+  assertEqual(storage.getItem(versionBackupKey(SAVE_VERSION)), null);
+});
+
+test('store: scheitert das Anlegen der Kopie, lädt der Stand trotzdem', () => {
+  const storage = memoryStorage({ [STORAGE_KEY]: v2Raw() });
+  const set = storage.setItem;
+  storage.setItem = (k, v) => { if (k === versionBackupKey(2)) throw new Error('voll'); set(k, v); };
+  assertEqual(createStore(storage).load().status, 'ok');
 });

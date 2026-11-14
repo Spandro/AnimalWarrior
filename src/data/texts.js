@@ -22,3 +22,6 @@ export const VICTORY_LINES = [
   'Heute Abend gibt es Siegesbeeren.',
   'Alle besiegt. Du bist nur ein bisschen müde.',
 ];
+
+/** Hinweis im Hauptmenü: Der Spielstand liegt nur im Browser. */
+export const SAVE_HINT = 'Dein Spielstand liegt nur in diesem Browser. Sichere ihn ab und zu mit „Exportieren“. Auf dem iPhone hilft „Zum Home-Bildschirm“.';
