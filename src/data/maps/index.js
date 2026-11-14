@@ -14,7 +14,7 @@ import { KAPITEL1 } from './kapitel1.js';
  *   spots: { id: string, kind: string, x: number, z: number }[],
  *   chests: { id: string, x: number, z: number, gold: number, item?: string, pearls?: number }[],
  *   packs: { id: string, x: number, z: number, level: number, enemies: Record<string, number>, elite?: string }[],
- *   bosses: { id: string, type: string, x: number, z: number, arena: { x: number, z: number, r: number }, gate: string }[],
+ *   bosses: { id: string, type: string, level: number, x: number, z: number, arena: { x: number, z: number, r: number }, gate: string }[],
  *   exits: { id: string, x: number, z: number, r: number, to: { map: string, campfire: string } }[],
  *   props: { kind: string, x: number, z: number, faceX?: number }[], start: { campfire: string } }} MapDef
  *   Der erste Eintrag in `paths` ist der Hauptweg. Tore: `arena` schließt sich im Bosskampf, `barrier` ist zu, bis

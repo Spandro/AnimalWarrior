@@ -825,7 +825,7 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
     const dx = e.x - hero.x, dz = e.z - hero.z;
     const min = e.radius + hero.radius + CONTACT_TOLERANCE;
     if (dx * dx + dz * dz <= min * min && world.time >= e.contactReadyAt) {
-      e.contactReadyAt = world.time + CONTACT_INTERVAL;
+      e.contactReadyAt = world.time + (world.contactInterval ?? CONTACT_INTERVAL);
       if (damageHero(world, e.damage) && ENEMIES[e.type]?.venom) poisonHero(world, e);
     }
   }

@@ -27,9 +27,10 @@ const EPS = 1e-9;
  * @param {string} id
  * @param {number} level
  * @param {import('./stats.js').Stats} heroStats
+ * @param {import('../data/adventure.js').MANUAL | null} [manual] Faktoren für Fähigkeiten von Hand (Abenteuer)
  * @returns {AbilityParams}
  */
-export function abilityParams(id, level, heroStats) {
+export function abilityParams(id, level, heroStats, manual = null) {
   const def = ABILITIES[id];
   if (!def) throw new Error(`Unbekannte Fähigkeit: ${id}`);
   const p = { ...def.base };
@@ -41,7 +42,46 @@ export function abilityParams(id, level, heroStats) {
   }
   p.cooldown = (p.cooldown || 0) * heroStats.cooldown;
   for (const k of AREA_KEYS) if (k in p) p[k] *= heroStats.area;
+  if (manual) {
+    for (const k of DAMAGE_KEYS) if (k in p) p[k] *= manual.damageMul;
+    if (def.shape === 'orbit') { p.cooldown = manual.orbitCooldown; p.duration = manual.orbitSeconds; }
+    else p.cooldown = Math.max(manual.minCooldown, p.cooldown * manual.cooldownMul);
+    if (def.shape === 'buff') p.duration = manual.buffSeconds;
+  }
   return p;
+}
+
+/** Werte, die bei Fähigkeiten von Hand mit `damageMul` wachsen. */
+const DAMAGE_KEYS = ['damage', 'tickDamage', 'explodeDamage'];
+
+/**
+ * Reichweite, in der die Grundattacke im Abenteuer zuschlägt (`gate: 'engage'`): Hiebe ihr Radius plus Spielraum,
+ * Linien ihre Länge, alles mit Ziel seine Suchweite.
+ * @param {import('../data/abilities.js').AbilityDef} def
+ * @param {AbilityParams} p
+ */
+export function engageRange(def, p) {
+  if (def.shape === 'arc') return p.radius + (def.aim?.extra ?? 1.5);
+  if (def.shape === 'line') return p.length;
+  if (def.shape === 'ring') return p.radius;
+  return p.range ?? p.radius ?? 0;
+}
+
+/**
+ * Löst eine Fähigkeit von Hand aus (`manual: true` am Helden), wenn sie bereit ist und ein Ziel findet; setzt dann
+ * die Abklingzeit. Faktoren aus `world.abilityMods`.
+ * @param {World} world
+ * @param {string} abilityId
+ * @returns {boolean}
+ */
+export function castManual(world, abilityId) {
+  const a = world.hero.abilities.find((h) => h.id === abilityId && h.manual);
+  if (!a || a.cooldownLeft > 0) return false;
+  const p = cast(createContext(world), a.id, a.level, undefined, world.abilityMods ?? null);
+  if (!p) return false;
+  a.cooldownLeft = p.cooldown;
+  if (ABILITIES[a.id].shape === 'orbit') for (const o of world.orbitals) if (o.abilityId === a.id) o.until = world.time + p.duration;
+  return true;
 }
 
 /**
@@ -79,6 +119,11 @@ export function stepAbilities(world, dt, fire = true) {
   for (const a of fire ? world.hero.abilities : []) {
     const def = ABILITIES[a.id];
     if (def.trigger !== 'auto') continue;
+    if (a.manual) { a.cooldownLeft = Math.max(0, a.cooldownLeft - dt); continue; }
+    if (a.gate === 'engage' && a.cooldownLeft <= dt) {
+      const p = abilityParams(a.id, a.level, world.hero.stats);
+      if (!nearestEnemy(ctx, world.hero.x, world.hero.z, engageRange(def, p))) { a.cooldownLeft = Math.max(0, a.cooldownLeft - dt); continue; }
+    }
     if (def.shape === 'orbit') {
       if (orbitOutdated(world, a)) cast(ctx, a.id, a.level);
       continue;
@@ -200,9 +245,9 @@ function resolveTarget(ctx, def, p, aim) {
 }
 
 /** @returns {AbilityParams|null} */
-function cast(ctx, abilityId, level, aim) {
+function cast(ctx, abilityId, level, aim, manual = null) {
   const world = ctx.world, def = ABILITIES[abilityId];
-  const p = abilityParams(abilityId, level, world.hero.stats);
+  const p = abilityParams(abilityId, level, world.hero.stats, manual);
   const t = resolveTarget(ctx, def, p, aim);
   if (!t) return null;
   const event = { type: 'cast', abilityId, shape: def.shape, x: world.hero.x, z: world.hero.z, dirX: t.dirX, dirZ: t.dirZ, params: p };
@@ -393,6 +438,7 @@ function placeOrbitals(world) {
 
 function updateOrbitals(ctx, dt) {
   const world = ctx.world;
+  removeWhere(world.orbitals, (o) => o.until !== undefined && world.time >= o.until);
   for (const o of world.orbitals) o.angle += o.orbitSpeed * dt;
   placeOrbitals(world);
   for (const o of world.orbitals) {

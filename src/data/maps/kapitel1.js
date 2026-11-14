@@ -89,8 +89,8 @@ export const KAPITEL1 = {
     { id: 'p_quelle_3', x: 985, z: -26, level: 10, enemies: { helmfisch: 4, krebs: 2 }, elite: 'helmfisch' },
   ],
   bosses: [
-    { id: 'graete', type: 'hauptmann_graete', x: 334, z: 0, arena: { x: 330, z: 0, r: 13 }, gate: 'arena_graete' },
-    { id: 'zwickzwack', type: 'kommandant_zwickzwack', x: 1068, z: -20, arena: { x: 1064, z: -20, r: 16 }, gate: 'arena_zwickzwack' },
+    { id: 'graete', type: 'hauptmann_graete', level: 4, x: 334, z: 0, arena: { x: 330, z: 0, r: 13 }, gate: 'arena_graete' },
+    { id: 'zwickzwack', type: 'kommandant_zwickzwack', level: 10, x: 1068, z: -20, arena: { x: 1064, z: -20, r: 16 }, gate: 'arena_zwickzwack' },
   ],
   exits: [{ id: 'zum_dorf', x: -4, z: 0, r: 3, to: { map: 'dorf', campfire: 'dorf_platz' } }],
   props: [

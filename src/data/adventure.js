@@ -59,3 +59,24 @@ export const SHOP = {
 
 /** Höchstes Abenteuer-Level (Etappe 1). */
 export const MAX_ADVENTURE_LEVEL = 30;
+
+/**
+ * Level im Abenteuer (Spec §7.2/§7.3): Fähigkeiten der Klasse werden mit diesen Leveln frei (Reihenfolge `abilityPool`),
+ * Zuwachs je Level über 1, Erfahrungskurve `xpToNextAdventure(level) = xp.base + xp.step × (level − 1)`.
+ */
+export const ADVENTURE_LEVEL = { unlockAt: [2, 4, 6, 8], perLevel: { maxHp: 0.06, damage: 0.04 }, xp: { base: 70, step: 50 } };
+
+/**
+ * Fähigkeiten von Hand (Spec §7.3): Schaden × `damageMul`, Abklingzeit × `cooldownMul`, mindestens `minCooldown`;
+ * Umlauf wirkt `orbitSeconds` und hat `orbitCooldown`; Stärkungen wirken `buffSeconds`.
+ */
+export const MANUAL = { damageMul: 2.5, cooldownMul: 2.5, minCooldown: 6, orbitSeconds: 8, orbitCooldown: 16, buffSeconds: 8 };
+
+/**
+ * „Nicht so schnell sterben“ (Spec §8.1): Leben des Helden (+ Anteil, also × 3), Schaden der Gegner, Abstand der
+ * Berührungstreffer eines Gegners (s, Wellen-Modus 0,5).
+ */
+export const ADVENTURE_BALANCE = { heroHpMul: 2, enemyDamageMul: 0.28, contactInterval: 1 };
+
+/** Gebietsstufe (Spec §8.2): Zuwachs je Stufe über 1 für Leben, Schaden und Erfahrung der Gegner. */
+export const AREA_SCALE = { hp: 0.18, damage: 0.12, xp: 0.15 };
