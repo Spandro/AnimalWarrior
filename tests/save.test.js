@@ -21,7 +21,7 @@ test('save: leerer Speicher liefert Standard und Status empty', () => {
   const r = createStore(memoryStorage()).load();
   assertEqual(r.status, 'empty');
   assertEqual(r.data, defaultSave());
-  assertEqual(r.data.settings, { volume: 70, quality: 'high' });
+  assertEqual(r.data.settings, { volume: 70, quality: 'high', buttonSide: 'right' });
 });
 
 test('save: update gefolgt von load liefert dieselben Daten', () => {
@@ -219,7 +219,7 @@ test('save: validate lehnt ungültige Paare und Duo-Helden ohne Freischaltung ab
 test('save: migrate lässt die aktuelle Version unverändert und wirft sonst', () => {
   const s = defaultSave();
   assertEqual(migrate(s), s);
-  assertEqual(SAVE_VERSION, 3);
+  assertEqual(SAVE_VERSION, 4);
   assertThrows(() => migrate({ version: 99 }));
   assertThrows(() => migrate({ version: 0 }));
   assertThrows(() => migrate(null));
@@ -233,19 +233,19 @@ const v1Save = () => ({
   heroes: [v1Hero(1, 'hase', 5, 1), v1Hero(2, 'ente', 7, 2)],
 });
 
-test('save: migrate hebt Version 1 auf 3 mit leeren Erfolgen und Zählern aus den Helden', () => {
+test('save: migrate hebt Version 1 auf die aktuelle Version mit leeren Erfolgen und Zählern aus den Helden', () => {
   const old = v1Save();
   const copy = JSON.parse(JSON.stringify(old));
   const s = migrate(old);
   assertEqual(old, copy, 'Eingabe bleibt unverändert');
-  assertEqual(s.version, 3);
+  assertEqual(s.version, SAVE_VERSION);
   assertEqual(s.achievements, {});
-  assertEqual(s.stats, { kills: {}, runs: 12, wins: 3, winsByAnimal: { hase: 1, ente: 2 }, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0 });
+  assertEqual(s.stats, { kills: {}, runs: 12, wins: 3, winsByAnimal: { hase: 1, ente: 2 }, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0 });
   assertEqual([s.inventory, s.seenItems, s.unlocks], [[], [], []]);
   assertEqual(s.gold, 340);
-  assertEqual(s.heroes, old.heroes);
+  assertEqual(s.heroes, old.heroes.map((h) => ({ ...h, adventure: null })));
   assertEqual(s.metaUpgrades, { leben: 2 });
-  assertEqual(s.settings, { volume: 40, quality: 'low' });
+  assertEqual(s.settings, { volume: 40, quality: 'low', buttonSide: 'right' });
   assertTrue(validate(s).ok);
 });
 
@@ -265,20 +265,20 @@ test('save: migrate leitet Siege je Tier aus den Helden ab, nur positive Zahlen 
 
 test('save: migrate einer Version 1 ohne Helden ergibt Nullzähler', () => {
   const s = migrate({ version: 1, gold: 0, metaUpgrades: {}, settings: { volume: 70, quality: 'high' }, heroes: [] });
-  assertEqual(s.stats, { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0 });
+  assertEqual(s.stats, { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0 });
   assertTrue(validate(s).ok);
 });
 
-test('save: Spielstand der Version 1 im Speicher wird beim Laden migriert und dann als Version 3 gespeichert', () => {
+test('save: Spielstand der Version 1 im Speicher wird beim Laden migriert und dann in der aktuellen Version gespeichert', () => {
   const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify(v1Save()) });
   const store = createStore(storage);
   const r = store.load();
   assertEqual(r.status, 'ok');
-  assertEqual(r.data.version, 3);
+  assertEqual(r.data.version, SAVE_VERSION);
   assertEqual(r.data.heroes.length, 2);
   assertEqual(r.data.gold, 340);
   store.update((s) => { s.gold += 1; });
-  assertEqual(JSON.parse(storage.getItem(STORAGE_KEY)).version, 3);
+  assertEqual(JSON.parse(storage.getItem(STORAGE_KEY)).version, SAVE_VERSION);
   assertEqual(JSON.parse(storage.getItem(STORAGE_KEY)).gold, 341);
 });
 
@@ -286,7 +286,7 @@ test('save: importJson nimmt den Export einer älteren Version 1 an und migriert
   const store = createStore(memoryStorage());
   const r = store.importJson(JSON.stringify(v1Save(), null, 2));
   assertTrue(r.ok, r.error);
-  assertEqual(r.data.version, 3);
+  assertEqual(r.data.version, SAVE_VERSION);
   assertEqual(store.load().data.stats.runs, 12);
   assertEqual(store.load().data.heroes.length, 2);
 });
@@ -296,7 +296,7 @@ test('save: Version 3 mit Erfolgen und Statistik übersteht Speichern, Export un
   store.update((s) => {
     s.gold = 80;
     s.achievements = { 'erste-schritte': 1700000000000, pazifist: 1700000005000 };
-    s.stats = { kills: { ratte: 12, baer: 1 }, runs: 3, wins: 1, winsByAnimal: { hase: 1 }, shadowsRouted: 2, tavernRounds: 4, hiLoBestStreak: 2 };
+    s.stats = { kills: { ratte: 12, baer: 1 }, runs: 3, wins: 1, winsByAnimal: { hase: 1 }, shadowsRouted: 2, tavernRounds: 4, hiLoBestStreak: 2, campfireRests: 0 };
   });
   const loaded = store.load();
   assertEqual(loaded.status, 'ok');
@@ -308,9 +308,9 @@ test('save: Version 3 mit Erfolgen und Statistik übersteht Speichern, Export un
 
 test('save: defaultSave enthält Erfolge, Nullstatistik und leere Taverne-Felder', () => {
   const s = defaultSave();
-  assertEqual(s.version, 3);
+  assertEqual(s.version, SAVE_VERSION);
   assertEqual(s.achievements, {});
-  assertEqual(s.stats, { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0 });
+  assertEqual(s.stats, { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0 });
   assertEqual([s.inventory, s.seenItems, s.unlocks], [[], [], []]);
 });
 
@@ -412,7 +412,7 @@ test('save: exportText enthält den Spielstand im Speicher und lässt sich wiede
   addHero(save, spec, ctx(1));
   addHero(save, { name: 'Quak', animal: 'ente', class: 'magier' }, ctx(2));
   save.achievements['erste-schritte'] = 5;
-  save.stats = { kills: { ratte: 12 }, runs: 3, wins: 1, winsByAnimal: { hase: 1 }, shadowsRouted: 2, tavernRounds: 0, hiLoBestStreak: 0 };
+  save.stats = { kills: { ratte: 12 }, runs: 3, wins: 1, winsByAnimal: { hase: 1 }, shadowsRouted: 2, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0 };
   const text = exportText(save);
   assertEqual(JSON.parse(text), save);
   const back = createStore(memoryStorage()).importJson(text);
@@ -444,16 +444,16 @@ const v2Save = () => ({
   stats: { kills: { ratte: 9 }, runs: 12, wins: 3, winsByAnimal: { hase: 1, ente: 2 }, shadowsRouted: 1 },
 });
 
-test('save: migrate hebt Version 2 auf 3, ergänzt leere Listen und Zähler und lässt alles andere unverändert', () => {
+test('save: migrate hebt Version 2 auf die aktuelle Version, ergänzt leere Listen und Zähler und lässt alles andere unverändert', () => {
   const old = v2Save();
   const copy = JSON.parse(JSON.stringify(old));
   const s = migrate(old);
   assertEqual(old, copy, 'Eingabe bleibt unverändert');
-  assertEqual(s.version, 3);
+  assertEqual(s.version, SAVE_VERSION);
   assertEqual([s.inventory, s.seenItems, s.unlocks], [[], [], []]);
-  assertEqual(s.stats, { ...old.stats, tavernRounds: 0, hiLoBestStreak: 0 });
+  assertEqual(s.stats, { ...old.stats, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0 });
   assertEqual([s.gold, s.metaUpgrades, s.settings, s.heroes, s.achievements],
-    [340, { leben: 2 }, { volume: 40, quality: 'low' }, old.heroes, old.achievements]);
+    [340, { leben: 2 }, { volume: 40, quality: 'low', buttonSide: 'right' }, old.heroes.map((h) => ({ ...h, adventure: null })), old.achievements]);
   assertTrue(validate(s).ok);
 });
 
@@ -461,7 +461,7 @@ test('save: importJson nimmt den Export einer Version 2 an und migriert ihn', ()
   const store = createStore(memoryStorage());
   const r = store.importJson(JSON.stringify(v2Save(), null, 2));
   assertTrue(r.ok, r.error);
-  assertEqual(r.data.version, 3);
+  assertEqual(r.data.version, SAVE_VERSION);
   assertEqual(store.load().data.heroes.length, 2);
   assertEqual(store.load().data.stats.runs, 12);
 });

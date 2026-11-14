@@ -33,3 +33,29 @@ export const LOOT = {
   goldChance: 0.25,
   gold: [1, 4],
 };
+
+/** Heiltränke (Spec §7.4): höchstens, Heilung (Anteil am höchsten Leben), Sperre danach (s), Preis, Startbestand. */
+export const POTION = { max: 4, heal: 0.4, lockSeconds: 2, price: 25, start: 2 };
+
+/** Waffenart je Klasse; `null` = jede Waffenart (Spec §11.2). */
+export const CLASS_WEAPON = { krieger: 'nahkampf', magier: 'zauber', dieb: 'wurf', hochstapler: null };
+
+/**
+ * Schmied (Spec §11.3): Zuwachs je Stufe (Anteil des Grundwerts), Gold je Seltenheit für die Stufen +1 bis +5,
+ * Flussperlen je Stufe.
+ */
+export const SMITH = {
+  stepPct: 0.2,
+  gold: { gewoehnlich: [20, 40, 80, 160, 320], selten: [40, 80, 160, 320, 640], legendaer: [100, 200, 400, 800, 1600] },
+  pearls: [0, 0, 0, 1, 2],
+  maxLevel: 5,
+};
+
+/** Händler Krümel (Spec §11.4): Preis = Gegenwert × `priceFactor`; feste Auswahl gewöhnlicher Stücke aus Kapitel 1. */
+export const SHOP = {
+  priceFactor: 5,
+  stock: ['eimerhelm', 'regenponcho', 'gummistiefel', 'paddel', 'treibholzstab', 'angel'],
+};
+
+/** Höchstes Abenteuer-Level (Etappe 1). */
+export const MAX_ADVENTURE_LEVEL = 30;

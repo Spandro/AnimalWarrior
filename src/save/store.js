@@ -1,4 +1,5 @@
 import { ANIMALS } from '../data/animals.js';
+import { repairSave } from './adventure.js';
 import { CLASSES } from '../data/classes.js';
 import { RUN_DURATION } from '../data/waves.js';
 import { isValidPair, animalUnlocked } from '../core/roster.js';
@@ -50,7 +51,7 @@ export function createStore(storage) {
     if (isNewer(parsed)) return { data: defaultSave(), status: 'newer' };
     backupBeforeUpgrade(parsed, raw);
     try {
-      const data = migrate(parsed);
+      const data = repairSave(migrate(parsed));
       if (!validate(data).ok) return corrupt(raw);
       return { data, status: 'ok' };
     } catch (e) {
@@ -137,7 +138,7 @@ export function createStore(storage) {
       if (isNewer(parsed)) return { ok: false, error: 'Der Spielstand stammt aus einer neueren Spielversion.' };
       let data;
       try {
-        data = migrate(parsed);
+        data = repairSave(migrate(parsed));
       } catch (e) {
         return { ok: false, error: 'Der Spielstand hat eine unbekannte Version.' };
       }
@@ -195,6 +196,7 @@ export function addHero(save, spec, { now, id }) {
     class: spec.class,
     createdAt: now,
     survivor: { bestTime: 0, wins: 0, runs: 0 },
+    adventure: null,
   };
   save.heroes.push(hero);
   return hero;

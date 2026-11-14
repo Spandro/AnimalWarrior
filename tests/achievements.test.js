@@ -15,7 +15,7 @@ const facts = (o = {}) => ({
   shadowsRouted: 0, revived: 0, hpFractionAtEnd: 1, longestNoKillStreak: 0, maxedAbilities: 0, chestsOpened: 0,
   animalId: 'hase', classId: 'krieger', ...o,
 });
-const stats = (o = {}) => ({ kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0, ...o });
+const stats = (o = {}) => ({ kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0, ...o });
 const ctx = ({ run, stats: s, save } = {}) => ({ run: facts(run), stats: stats(s), save: { ...defaultSave(), ...save } });
 const byId = (id) => ACHIEVEMENTS.find((a) => a.id === id);
 
@@ -198,7 +198,7 @@ test('achievements: applyRunToStats addiert Tötungen je Art, Durchgänge, Siege
     ended: true, won: true, animalId: 'ente', killsByType: { ratte: 3, wolf: 2 }, shadowsRouted: 2,
   }));
   assertTrue(out === st, 'mutiert und gibt dasselbe Objekt zurück');
-  assertEqual(st, { kills: { ratte: 8, wolf: 2 }, runs: 3, wins: 2, winsByAnimal: { hase: 1, ente: 1 }, shadowsRouted: 3, tavernRounds: 0, hiLoBestStreak: 0 });
+  assertEqual(st, { kills: { ratte: 8, wolf: 2 }, runs: 3, wins: 2, winsByAnimal: { hase: 1, ente: 1 }, shadowsRouted: 3, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0 });
   applyRunToStats(st, facts({ ended: true, won: false, animalId: 'hase', killsByType: { baer: 1 } }));
   assertEqual([st.runs, st.wins, st.winsByAnimal, st.kills.baer], [4, 2, { hase: 1, ente: 1 }, 1]);
 });

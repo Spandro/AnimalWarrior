@@ -4,21 +4,26 @@ import { ENEMIES } from '../data/enemies.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
 import { ITEMS } from '../data/items.js';
 import { UNLOCKS } from '../data/tavern.js';
+import { MATERIALS } from '../data/adventure.js';
 import { isValidPair, animalUnlocked } from '../core/roster.js';
 
 /**
  * @typedef {{ bestTime: number, wins: number, runs: number }} SurvivorRecord
- * @typedef {{ id: string, name: string, animal: string, class: string, createdAt: number, survivor: SurvivorRecord }} Hero
- * @typedef {{ volume: number, quality: 'high' | 'low' }} Settings
+ * @typedef {{ id: string, name: string, animal: string, class: string, createdAt: number, survivor: SurvivorRecord,
+ *   adventure: import('./adventure.js').AdventureRecord | null }} Hero
+ * @typedef {{ volume: number, quality: 'high' | 'low', buttonSide: 'left' | 'right' }} Settings
  * @typedef {import('../data/achievements.js').LifetimeStats} LifetimeStats
  * @typedef {{ version: number, heroes: Hero[], gold: number, metaUpgrades: Record<string, number>, settings: Settings,
- *   achievements: Record<string, number>, stats: LifetimeStats, inventory: string[], seenItems: string[], unlocks: string[] }} Save
+ *   achievements: Record<string, number>, stats: LifetimeStats, inventory: string[], seenItems: string[], unlocks: string[],
+ *   itemLevels: Record<string, number>, materials: Record<string, number> }} Save
  *   `achievements`: Erfolgs-Id → Zeitpunkt der Freischaltung (ms); `stats`: lebenslange Zähler für alle Helden;
  *   `inventory`: Kennungen der gefundenen Gegenstände (jede höchstens einmal); `seenItems`: davon in der Truhe schon
- *   angesehene; `unlocks`: Freischaltungen des Spielstands (z. B. 'duo').
+ *   angesehene; `unlocks`: Freischaltungen des Spielstands (z. B. 'duo'); `itemLevels`: Verbesserungsstufe beim Schmied
+ *   (fehlt = 0); `materials`: Material für den Schmied. Der Abenteuer-Teil wird vor der Prüfung ausgebessert
+ *   (`repairSave` in src/save/adventure.js).
  */
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 export const STORAGE_KEY = 'animalwarrior.save';
 export const BACKUP_KEY = 'animalwarrior.save.corrupt';
 export const MAX_HEROES = 6;
@@ -31,12 +36,14 @@ export function defaultSave() {
     heroes: [],
     gold: 0,
     metaUpgrades: {},
-    settings: { volume: 70, quality: 'high' },
+    settings: { volume: 70, quality: 'high', buttonSide: 'right' },
     achievements: {},
-    stats: { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0 },
+    stats: { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0 },
     inventory: [],
     seenItems: [],
     unlocks: [],
+    itemLevels: {},
+    materials: {},
   };
 }
 
@@ -46,6 +53,7 @@ const countOf = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? 
  * Migrationsschritte: Version n → n + 1; sie ändern ihre Eingabe nicht.
  * 1 → 2: Erfolge und lebenslange Zähler; Durchgänge, Siege und Siege je Tier stammen aus den Helden, der Rest beginnt bei null.
  * 2 → 3: Taverne – leere Truhe und Freischaltungen, Zähler für Runden und Trefferserie bei null; alles andere bleibt.
+ * 3 → 4: Abenteuer – kein Held hat ein Abenteuer, keine Verbesserungen, kein Material, Knöpfe rechts, Rastzähler null.
  */
 const MIGRATIONS = {
   1: (data) => {
@@ -72,6 +80,15 @@ const MIGRATIONS = {
     inventory: [],
     seenItems: [],
     unlocks: [],
+  }),
+  3: (data) => ({
+    ...data,
+    version: 4,
+    heroes: Array.isArray(data.heroes) ? data.heroes.map((h) => (h && typeof h === 'object' ? { ...h, adventure: null } : h)) : data.heroes,
+    settings: data.settings && typeof data.settings === 'object' ? { ...data.settings, buttonSide: 'right' } : data.settings,
+    stats: { ...data.stats, campfireRests: 0 },
+    itemLevels: {},
+    materials: {},
   }),
 };
 
@@ -127,6 +144,11 @@ export function validate(data) {
     if (!isObject(s) || !isNonNegNumber(s.bestTime) || !isNonNegNumber(s.wins) || !isNonNegNumber(s.runs)) {
       return fail('Ungültige Heldenwerte');
     }
+    if (h.adventure != null && !isObject(h.adventure)) return fail('Ungültiges Abenteuer');
+    if (h.adventure) {
+      const eq = Object.values(h.adventure.equipment || {});
+      if (eq.some((id) => id !== null && !data.inventory.includes(id))) return fail('Angelegter Gegenstand fehlt in der Truhe');
+    }
   }
   if (!Number.isInteger(data.gold) || data.gold < 0) return fail('Ungültiges Gold');
   if (!isObject(data.metaUpgrades)) return fail('Dauerboni fehlen');
@@ -139,6 +161,13 @@ export function validate(data) {
   if (!isObject(st)) return fail('Einstellungen fehlen');
   if (!Number.isInteger(st.volume) || st.volume < 0 || st.volume > 100) return fail('Ungültige Lautstärke');
   if (st.quality !== 'high' && st.quality !== 'low') return fail('Ungültige Qualität');
+  if (st.buttonSide !== 'left' && st.buttonSide !== 'right') return fail('Ungültige Knopfseite');
+  if (!isObject(data.itemLevels)) return fail('Verbesserungen fehlen');
+  for (const [id, l] of Object.entries(data.itemLevels)) {
+    if (!data.inventory.includes(id) || !Number.isInteger(l) || l < 1 || l > 5) return fail('Ungültige Verbesserung');
+  }
+  if (!isObject(data.materials)) return fail('Material fehlt');
+  for (const [id, n] of Object.entries(data.materials)) if (!Object.hasOwn(MATERIALS, id) || !Number.isInteger(n) || n < 0) return fail('Ungültiges Material');
   if (!isObject(data.achievements)) return fail('Erfolge fehlen');
   for (const [id, at] of Object.entries(data.achievements)) {
     if (!ACHIEVEMENTS.some((a) => a.id === id)) return fail('Unbekannter Erfolg');
@@ -146,7 +175,7 @@ export function validate(data) {
   }
   const stats = data.stats;
   if (!isObject(stats)) return fail('Statistik fehlt');
-  for (const key of ['runs', 'wins', 'shadowsRouted', 'tavernRounds', 'hiLoBestStreak']) {
+  for (const key of ['runs', 'wins', 'shadowsRouted', 'tavernRounds', 'hiLoBestStreak', 'campfireRests']) {
     if (!Number.isInteger(stats[key]) || stats[key] < 0) return fail('Ungültiger Zähler');
   }
   for (const [field, known] of [['kills', ENEMIES], ['winsByAnimal', ANIMALS]]) {
