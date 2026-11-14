@@ -6,7 +6,7 @@ import { defaultSave } from '../src/save/store.js';
 import { lookYaw } from '../src/render/hero.js';
 import { buildCharacter, animateCharacter } from '../src/render/character.js';
 import * as THREE from '../vendor/three.module.min.js';
-import { HERO_SPRITES, ENEMY_SPRITES, MOTION, IDLE, SHEETS, SHEET_HOLES, SHEET_FRAMES, DUO_HEIGHT, DUO_FRAMES } from '../src/data/sprites.js';
+import { HERO_SPRITES, ENEMY_SPRITES, MOTION, IDLE, SHEETS, SHEET_HOLES, SHEET_FRAMES, DUO_HEIGHT, DUO_FRAMES, ADVENTURE_ENEMY_SPRITES } from '../src/data/sprites.js';
 import { ENEMIES } from '../src/data/enemies.js';
 import { ANIMALS } from '../src/data/animals.js';
 import { CLASSES } from '../src/data/classes.js';
@@ -172,7 +172,8 @@ test('sprites: jede Heldenkombination und jeder Gegnertyp hat ein Bild', () => {
       check(key, HERO_SPRITES[key]);
     }
   }
-  for (const type of Object.keys(ENEMIES)) check(type, ENEMY_SPRITES[type]);
+  for (const type of Object.keys(ENEMIES)) check(type, ENEMY_SPRITES[type] || ADVENTURE_ENEMY_SPRITES[type]);
+  for (const type of Object.keys(ADVENTURE_ENEMY_SPRITES)) assertTrue(!Object.hasOwn(ENEMY_SPRITES, type), type);
 });
 
 test('sprites: stride ist eine bekannte Gangart; SHEETS.duo ist relativ; ein fehlender Duo-Eintrag ist erlaubt', () => {

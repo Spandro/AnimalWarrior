@@ -68,7 +68,7 @@ test('survivor: Freischaltminuten und Gewichte der Gegner, jeder Gegner hat eine
   });
   for (const [type, def] of Object.entries(ENEMIES)) {
     assertTrue(typeof def.name === 'string' && def.name.length > 0, `${type}: Name`);
-    if (def.behavior !== 'boss') assertTrue(type in unlockMinute && type in weights, `${type}: Welle`);
+    if (def.behavior !== 'boss' && !def.adventureOnly) assertTrue(type in unlockMinute && type in weights, `${type}: Welle`);
   }
   assertEqual(['fuchs', 'igel', 'dachs', 'kreuzotter', 'uhu', 'luchs'].map((t) => ENEMIES[t].name),
     ['Fuchs', 'Igel', 'Dachs', 'Kreuzotter', 'Uhu', 'Luchs']);
@@ -764,8 +764,9 @@ function bossUntilTelegraph(w, type, x) {
 }
 
 test('survivor: jeder Boss hat Nah- und Fernangriff; der Bär wie bisher', () => {
-  assertEqual(Object.keys(BOSS_MOVES), ['baer', 'keiler', 'hirsch', 'wisent']);
-  assertEqual(Object.values(BOSS_MOVES).map((m) => [m.near.kind, m.far.kind]),
+  const wave = Object.entries(BOSS_MOVES).filter(([id]) => ['baer', 'keiler', 'hirsch', 'wisent'].includes(id)).map(([, m]) => m);
+  assertEqual(Object.keys(BOSS_MOVES).slice(0, 4), ['baer', 'keiler', 'hirsch', 'wisent']);
+  assertEqual(wave.map((m) => [m.near.kind, m.far.kind]),
     [['swipe', 'leap'], ['swipe', 'dash'], ['ring', 'dash'], ['ring', 'dash']]);
   const b = BOSS_MOVES.baer;
   assertEqual([b.chaseTime, b.recover, b.triggerRange], [BOSS.chaseTime, BOSS.recover, BOSS.swipe.triggerRange]);

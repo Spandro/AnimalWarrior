@@ -342,3 +342,38 @@ test('world: Wellen-Modus unverändert – fester Durchlauf über 60 s', async (
   assertEqual(w.run.kills, 12);
   assertEqual(w.enemies.length, 78);
 });
+
+// ---------------------------------------------------------------- Abenteuer: neue Gegner und Bosse
+
+test('enemies: neue Gegner und Bosse nicht im Wellen-Modus', async () => {
+  const { unlockMinute, BOSS_POOL } = await import('../src/data/waves.js');
+  for (const id of ['helmfisch', 'krebs', 'frosch', 'hauptmann_graete', 'kommandant_zwickzwack']) {
+    assertTrue(!Object.hasOwn(unlockMinute, id), id);
+    assertTrue(!BOSS_POOL.includes(id), id);
+  }
+});
+
+test('world: Rüstung eines Gegners zieht flach ab, mindestens 1 Schaden', () => {
+  const world = createWorld({ seed: 1, animalId: 'hase', classId: 'krieger' });
+  const krebs = spawnEnemy(world, 'krebs', 5, 0);
+  const armor = 2;
+  const hp = krebs.hp;
+  damageEnemy(world, krebs, { amount: 10, crit: false }, 'test');
+  assertClose(krebs.hp, hp - (10 - armor));
+  damageEnemy(world, krebs, { amount: 1.5, crit: false }, 'test');
+  assertClose(krebs.hp, hp - (10 - armor) - 1);
+});
+
+test('world: Zwickzwack ruft alle 25 s drei Krebse herbei (Ereignis bossSummon)', () => {
+  const world = createWorld({ seed: 3, animalId: 'ente', classId: 'krieger' });
+  world.hero.abilities = [];
+  world.hero.invulnerableUntil = Infinity;
+  spawnEnemy(world, 'kommandant_zwickzwack', 30, 0);
+  let summons = 0;
+  for (let i = 0; i < 26 * 30; i++) {
+    stepWorld(world, 1 / 30, { moveX: 0, moveZ: 0 });
+    summons += world.events.filter((e) => e.type === 'bossSummon').length;
+  }
+  assertEqual(summons, 1);
+  assertEqual(world.enemies.filter((e) => e.type === 'krebs').length, 3);
+});

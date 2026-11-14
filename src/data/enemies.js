@@ -1,7 +1,9 @@
 /**
  * @typedef {{ id: string, name: string, hp: number, speed: number, damage: number, radius: number, xp: number, behavior: string,
- *   flying?: boolean, venom?: boolean }} EnemyDef
- *   name: Anzeigename (Bossanzeige); venom: Berührungstreffer vergiftet (siehe VENOM).
+ *   flying?: boolean, venom?: boolean, armor?: number, pounceMul?: number, adventureOnly?: boolean }} EnemyDef
+ *   name: Anzeigename (Bossanzeige); venom: Berührungstreffer vergiftet (siehe VENOM); armor: zieht flach von jedem
+ *   Treffer ab (mindestens 1 Schaden bleibt); pounceMul: Sprungschaden statt POUNCE.damageMul.
+ *   adventureOnly: nur im Abenteuer (nicht in `unlockMinute`, `weights` und `BOSS_POOL`).
  */
 
 /** @type {Record<string, EnemyDef>} */
@@ -21,6 +23,11 @@ export const ENEMIES = {
   keiler: { id: 'keiler', name: 'Riesenkeiler', hp: 1500, speed: 3.6, damage: 25, radius: 1.3, xp: 100, behavior: 'boss' },
   hirsch: { id: 'hirsch', name: 'Rothirsch', hp: 1500, speed: 3.3, damage: 25, radius: 1.3, xp: 100, behavior: 'boss' },
   wisent: { id: 'wisent', name: 'Wisent', hp: 1500, speed: 2.8, damage: 25, radius: 1.6, xp: 100, behavior: 'boss' },
+  helmfisch: { id: 'helmfisch', adventureOnly: true, name: 'Helmfisch', hp: 12, speed: 3.6, damage: 5, radius: 0.4, xp: 2, behavior: 'chase' },
+  krebs: { id: 'krebs', adventureOnly: true, name: 'Krebs', hp: 26, speed: 2.4, damage: 7, radius: 0.5, xp: 4, behavior: 'strafe', armor: 2 },
+  frosch: { id: 'frosch', adventureOnly: true, name: 'Frosch', hp: 18, speed: 3.8, damage: 6, radius: 0.45, xp: 3, behavior: 'pounce', pounceMul: 0.8 },
+  hauptmann_graete: { id: 'hauptmann_graete', adventureOnly: true, name: 'Hauptmann Gräte', hp: 600, speed: 3.4, damage: 14, radius: 1.1, xp: 150, behavior: 'boss' },
+  kommandant_zwickzwack: { id: 'kommandant_zwickzwack', adventureOnly: true, name: 'Kommandant Zwickzwack', hp: 900, speed: 2.6, damage: 18, radius: 1.5, xp: 300, behavior: 'boss', armor: 3 },
 };
 
 export const ELITE = { hpMul: 8, scale: 1.6, xpMul: 10 };
@@ -120,8 +127,11 @@ export const BOSS = {
  *   | { kind: 'ring', reach: number, windup: number, damageMul: number, push: number }
  *   | { kind: 'dash', length: number, width: number, windup: number, dashTime: number, damageMul: number,
  *       count: number, gap: number }} BossAttack
- * @typedef {{ chaseTime: number, recover: number, triggerRange: number, near: BossAttack, far: BossAttack }} BossMoves
- * @type {Record<'baer'|'keiler'|'hirsch'|'wisent', BossMoves>}
+ * @typedef {{ chaseTime: number, recover: number, triggerRange: number, near: BossAttack, far: BossAttack,
+ *   summon?: { every: number, type: string, count: number, radius: number } }} BossMoves
+ *   `summon` (nur Abenteuer): alle `every` s erscheinen `count` Gegner `type` im Abstand `radius` um den Boss,
+ *   unabhängig vom Angriffsablauf (Ereignis `bossSummon` mit ihren `ids`).
+ * @type {Record<string, BossMoves>}
  */
 export const BOSS_MOVES = {
   baer: {
@@ -143,5 +153,16 @@ export const BOSS_MOVES = {
     chaseTime: 3.5, recover: 0.8, triggerRange: 4.5,
     near: { kind: 'ring', reach: 5.5, windup: 1.1, damageMul: 1.8, push: 0 },
     far: { kind: 'dash', length: 28, width: 3.2, windup: 1.3, dashTime: 1.2, damageMul: 2, count: 1, gap: 0 },
+  },
+  hauptmann_graete: {
+    chaseTime: 2.5, recover: 0.7, triggerRange: 3.5,
+    near: { kind: 'swipe', reach: 2.8, halfAngle: Math.PI / 3, windup: 0.7, damageMul: 1 },
+    far: { kind: 'dash', length: 16, width: 2.4, windup: 0.9, dashTime: 0.7, damageMul: 1.3, count: 2, gap: 0.5 },
+  },
+  kommandant_zwickzwack: {
+    chaseTime: 3, recover: 0.8, triggerRange: 4,
+    near: { kind: 'swipe', reach: 3.2, halfAngle: Math.PI / 2.5, windup: 0.8, damageMul: 1.2 },
+    far: { kind: 'ring', reach: 7, windup: 1.2, damageMul: 1, push: 3 },
+    summon: { every: 25, type: 'krebs', count: 3, radius: 3 },
   },
 };

@@ -103,7 +103,7 @@ const BEHAVIORS = {
       enemy.z = ai.fromZ + (ai.tz - ai.fromZ) * k;
       if (k < 1) return;
       const hero = world.hero;
-      if (Math.hypot(hero.x - ai.tx, hero.z - ai.tz) <= POUNCE.radius) damageHero(world, enemy.damage * POUNCE.damageMul);
+      if (Math.hypot(hero.x - ai.tx, hero.z - ai.tz) <= POUNCE.radius) damageHero(world, enemy.damage * (ENEMIES[enemy.type]?.pounceMul ?? POUNCE.damageMul));
       ai.phase = 'chase'; ai.readyAt = t + POUNCE.cooldown;
       return;
     }
@@ -113,7 +113,7 @@ const BEHAVIORS = {
       ai.phase = 'crouch'; ai.crouchStart = t; ai.until = t + POUNCE.crouch; ai.tx = target.x; ai.tz = target.z;
       world.events.push({
         type: 'bossTelegraph', kind: 'leap', x: target.x, z: target.z, radius: POUNCE.radius,
-        delay: POUNCE.crouch + POUNCE.leapTime, dirX: to.x, dirZ: to.z, damageMul: POUNCE.damageMul,
+        delay: POUNCE.crouch + POUNCE.leapTime, dirX: to.x, dirZ: to.z, damageMul: ENEMIES[enemy.type]?.pounceMul ?? POUNCE.damageMul,
       });
       return;
     }
@@ -148,6 +148,7 @@ const BEHAVIORS = {
     const mv = BOSS_MOVES[enemy.type] || BOSS_MOVES.baer;
     const ai = enemy.ai, t = world.time;
     if (!ai.phase) { ai.phase = 'chase'; ai.until = t + mv.chaseTime; }
+    if (mv.summon) summonHelpers(world, enemy, mv.summon);
     if (ai.phase === 'chase') {
       if (t < ai.until) { BEHAVIORS.chase(world, enemy, dt); return; }
       startBossAttack(world, enemy, mv);
@@ -272,6 +273,25 @@ function shadowMelee(world, enemy, dt, c) {
   const to = towards(enemy, hero, hero.facing);
   if (t >= ai.until && to.d <= enemy.radius + c.triggerRange) { startSwipe(world, enemy, to, c); return; }
   BEHAVIORS.chase(world, enemy, dt);
+}
+
+/**
+ * Verstärkung: alle `s.every` s erscheinen `s.count` Gegner um den Boss. Sie übernehmen `enemy.summonHpMul` und
+ * `enemy.summonDmgMul` (vom Modus gesetzt, sonst 1).
+ */
+function summonHelpers(world, enemy, s) {
+  const ai = enemy.ai;
+  ai.nextSummon ??= world.time + s.every;
+  if (world.time < ai.nextSummon) return;
+  ai.nextSummon = world.time + s.every;
+  const ids = [];
+  for (let i = 0; i < s.count; i++) {
+    const a = (i / s.count) * 2 * Math.PI;
+    const e = spawnEnemy(world, s.type, enemy.x + Math.cos(a) * (enemy.radius + s.radius), enemy.z + Math.sin(a) * (enemy.radius + s.radius),
+      { hpMul: enemy.summonHpMul ?? 1, dmgMul: enemy.summonDmgMul ?? 1 });
+    if (e) ids.push(e.id);
+  }
+  world.events.push({ type: 'bossSummon', x: enemy.x, z: enemy.z, ids });
 }
 
 /** Wählt Nah- oder Fernangriff des Bosses und kündigt ihn an. */
@@ -576,7 +596,9 @@ export function spawnShadow(world, x, z, { hp, damage, expiresAt }) {
 export function damageEnemy(world, enemy, hit, abilityId) {
   const index = world.enemies.indexOf(enemy);
   if (index < 0 || enemy.untargetable) return;
-  const amount = enemy.behavior === 'curl' ? curlOnHit(world, enemy, hit.amount) : hit.amount;
+  let amount = enemy.behavior === 'curl' ? curlOnHit(world, enemy, hit.amount) : hit.amount;
+  const armor = ENEMIES[enemy.type]?.armor;
+  if (armor) amount = Math.max(1, amount - armor);
   world.events.push({ type: 'hit', x: enemy.x, z: enemy.z, amount, crit: hit.crit });
   const dbA = world.run.damageByAbility;
   if (enemy.shadow) {

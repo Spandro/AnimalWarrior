@@ -23,6 +23,7 @@ export const SHEETS = {
   gegner2: 'assets/figuren/gegner2.webp',
   bosse: 'assets/figuren/bosse.webp',
   duo: 'assets/figuren/duo.webp',
+  kapitel1: 'assets/figuren/kapitel1.webp',
 };
 
 /**
@@ -142,6 +143,21 @@ export const ENEMY_SPRITES = {
   hirsch: { sheet: 'bosse', x: 34, y: 34, w: 433, h: 538, heightM: 4.0, motion: 'trot', footOffset: 0.12 },
   keiler: { sheet: 'bosse', x: 574, y: 104, w: 416, h: 390, heightM: 2.4, motion: 'trot', footOffset: 0.1 },
   wisent: { sheet: 'bosse', x: 34, y: 684, w: 434, h: 390, heightM: 3.0, motion: 'lumber', footOffset: 0.12 },
+};
+
+/**
+ * Gegner, die es nur im Abenteuer gibt (Bogen `kapitel1`, Raster 3 × 2 zu 418 × 627 Pixeln). Nicht in `ENEMY_SPRITES`,
+ * damit der Wellen-Modus den Bogen weder lädt noch braucht; das Abenteuer lädt ihn bei Bedarf nach. Die Rechtecke
+ * sind die Rasterzellen, bis das gelieferte Bild ausgemessen ist.
+ * @type {Record<string, SpriteDef>}
+ */
+export const ADVENTURE_ENEMY_SPRITES = {
+  helmfisch: { sheet: 'kapitel1', x: 0, y: 0, w: 418, h: 627, heightM: 0.8, motion: 'scurry', footOffset: 0.04 },
+  krebs: { sheet: 'kapitel1', x: 418, y: 0, w: 418, h: 627, heightM: 0.7, motion: 'scurry', footOffset: 0.04 },
+  frosch: { sheet: 'kapitel1', x: 836, y: 0, w: 418, h: 627, heightM: 0.7, motion: 'hopSlow', footOffset: 0.04 },
+  hauptmann_graete: { sheet: 'kapitel1', x: 0, y: 627, w: 418, h: 627, heightM: 2.6, motion: 'trot', footOffset: 0.1 },
+  kommandant_zwickzwack: { sheet: 'kapitel1', x: 418, y: 627, w: 418, h: 627, heightM: 2.8, motion: 'lumber', footOffset: 0.1 },
+  flossian: { sheet: 'kapitel1', x: 836, y: 627, w: 418, h: 627, heightM: 1.6, motion: 'lumber', footOffset: 0.05 },
 };
 
 /** Eingerollter Igel: Drehung um die Bildmitte (rad/s, in Laufrichtung) und Stauchung des Bildes. */
