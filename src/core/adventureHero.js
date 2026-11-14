@@ -91,16 +91,49 @@ export function adventureModifiers(save, hero) {
     { stat: 'damage', pct: ADVENTURE_LEVEL.perLevel.damage * (a.level - 1) },
   ];
   for (const id of Object.values(a.equipment)) {
-    if (!id || !Object.hasOwn(ITEMS, id)) continue;
-    const k = 1 + SMITH.stepPct * (save.itemLevels[id] ?? 0);
-    for (const m of ITEMS[id].modifiers) {
-      const scaled = { stat: m.stat };
-      if (m.flat) scaled.flat = roundStat(m.stat, m.flat * k);
-      if (m.pct) scaled.pct = Math.round(m.pct * k * 100) / 100;
-      out.push(scaled);
-    }
+    if (id && Object.hasOwn(ITEMS, id)) out.push(...scaledModifiers(id, save.itemLevels[id] ?? 0));
   }
   return [...out, ...metaModifiers(save)];
+}
+
+/**
+ * Werte eines Gegenstands auf einer Verbesserungsstufe (0 bis 5): Grundwert × (1 + 20 % je Stufe), gerundet.
+ * @param {string} itemId
+ * @param {number} level
+ * @returns {Modifier[]}
+ */
+export function scaledModifiers(itemId, level) {
+  const k = 1 + SMITH.stepPct * level;
+  return ITEMS[itemId].modifiers.map((m) => {
+    const scaled = { stat: m.stat };
+    if (m.flat) scaled.flat = roundStat(m.stat, m.flat * k);
+    if (m.pct) scaled.pct = Math.round(m.pct * k * 100) / 100;
+    return scaled;
+  });
+}
+
+/**
+ * Vergleich für die Ausrüstung: je Wert (erst die des angelegten, dann die des neuen Stücks) bisher und danach.
+ * @param {string|null} currentId
+ * @param {string} candidateId
+ * @param {Record<string, number>} itemLevels
+ * @returns {{ stat: string, kind: 'flat'|'pct', from: number, to: number }[]}
+ */
+export function itemDelta(currentId, candidateId, itemLevels) {
+  const values = (id) => {
+    const out = new Map();
+    if (!id) return out;
+    for (const m of scaledModifiers(id, itemLevels[id] ?? 0)) {
+      if (m.flat) out.set(`${m.stat}|flat`, m.flat);
+      if (m.pct) out.set(`${m.stat}|pct`, m.pct);
+    }
+    return out;
+  };
+  const from = values(currentId), to = values(candidateId);
+  return [...new Set([...from.keys(), ...to.keys()])].map((k) => {
+    const [stat, kind] = k.split('|');
+    return { stat, kind, from: from.get(k) ?? 0, to: to.get(k) ?? 0 };
+  });
 }
 
 /**

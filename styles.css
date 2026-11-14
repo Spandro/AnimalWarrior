@@ -972,3 +972,30 @@ button.chest-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rg
 .dialogue-text { margin: 0; line-height: 1.4; min-height: 2.8em; }
 .dialogue-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .dialogue-actions .btn { min-height: 44px; }
+
+/* Abenteuer: Tafeln (Pause, Ausrüstung, Fähigkeiten, Aufträge, Karte, Laden, Schmiede, Lagerfeuer) */
+.adv-overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(10, 8, 4, 0.55); z-index: 25; pointer-events: auto; padding: 12px; }
+.adv-panel { width: min(560px, 100%); max-height: calc(100% - 24px); overflow-y: auto; background: rgba(32, 24, 14, 0.96); border: 2px solid #c9a86a; border-radius: 12px; padding: 12px 14px; color: #f3ead2; }
+.adv-panel.wide { width: min(940px, 100%); }
+.adv-panel-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.adv-panel-head h2 { margin: 0; font-size: 1.2rem; }
+.adv-panel-body { display: flex; flex-direction: column; gap: 8px; }
+.adv-panel .btn { min-height: 44px; }
+.adv-menu { display: flex; flex-direction: column; gap: 8px; }
+.adv-note { margin: 0; color: #e8dcc0; }
+.adv-muted { color: #c2b48f; font-size: 0.86rem; }
+.adv-desc { color: #d8ccb0; font-size: 0.82rem; font-style: italic; }
+.adv-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; padding: 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.05); }
+.adv-row.locked { opacity: 0.55; }
+.adv-row-main { display: flex; flex-direction: column; gap: 2px; flex: 1 1 200px; }
+.adv-row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.adv-slot { min-width: 44px; }
+.adv-slot.on, .adv-quest-row.on { background: #5f7a3a; }
+.adv-quest-row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px; min-height: 44px; border-radius: 8px; border: 2px solid rgba(201, 168, 106, 0.5); background: rgba(255, 255, 255, 0.05); color: inherit; font: inherit; cursor: pointer; }
+.adv-quest-row:disabled { cursor: default; opacity: 0.7; }
+.adv-tabs { display: flex; gap: 8px; }
+.adv-bigmap { width: 100%; height: auto; border-radius: 8px; }
+.adv-story { position: absolute; inset: 0; z-index: 40; background-color: #1b2414; background-size: 300% 200%; display: flex; align-items: flex-end; justify-content: center; padding: 16px; pointer-events: auto; }
+.adv-story-box { width: min(640px, 100%); background: rgba(20, 16, 10, 0.82); border-radius: 12px; padding: 14px 16px; color: #f6ecd2; font-size: 1.1rem; margin-bottom: env(safe-area-inset-bottom); }
+.adv-story-text p { margin: 0 0 6px; }
+.adv-story-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }

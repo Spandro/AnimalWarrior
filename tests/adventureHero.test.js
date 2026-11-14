@@ -137,3 +137,13 @@ test('adventureHero: Kapitel 1 bringt ohne Wiederholen etwa Level 9 bis 11', () 
   gainXp(a, xp, 'krieger');
   assertTrue(a.level >= 9 && a.level <= 11, `Level ${a.level} bei ${Math.round(xp)} Erfahrung`);
 });
+
+test('adventureHero: itemDelta vergleicht angelegtes und neues Stück mit Verbesserung', async () => {
+  const { itemDelta, scaledModifiers } = await import('../src/core/adventureHero.js');
+  assertEqual(scaledModifiers('helm_zuversicht', 5), [{ stat: 'armor', flat: 2 }]);
+  assertEqual(itemDelta('helm_zuversicht', 'taucherhelm_beute', {}), [{ stat: 'armor', kind: 'flat', from: 1, to: 2 }]);
+  assertEqual(itemDelta(null, 'helm_zuversicht', {}), [{ stat: 'armor', kind: 'flat', from: 0, to: 1 }]);
+  assertEqual(itemDelta('helm_zuversicht', 'helm_zuversicht', { helm_zuversicht: 5 }), [{ stat: 'armor', kind: 'flat', from: 2, to: 2 }]);
+  assertEqual(itemDelta('topf_kinnriemen', 'helm_zuversicht', {}),
+    [{ stat: 'maxHp', kind: 'pct', from: 0.05, to: 0 }, { stat: 'armor', kind: 'flat', from: 0, to: 1 }]);
+});

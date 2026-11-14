@@ -125,3 +125,12 @@ export const MAP_LOOK = {
 
 /** Minikarte: Kantenlänge in Pixeln, gezeigter Umkreis in Metern, Größe der Nebelblöcke (wie die Erkundung). */
 export const MINIMAP = { size: 112, radius: 45, block: EXPLORE_BLOCK };
+
+/** Namen der Lagerfeuer für das Reisen. */
+export const CAMPFIRE_NAMES = {
+  dorf_platz: 'Bachwinkel', k1_ufer: 'Bachufer', k1_bruecke: 'Alte Brücke', k1_wald: 'Tiefer Wald', k1_quelle: 'Quellteich',
+};
+
+/** Sprüche am Ladentisch und in der Schmiede. */
+export const SHOP_LINES = ['Alles muss raus. Außer mir.', 'Heiltränke! Frisch abgefüllt, kaum benutzt.', 'Meine Backen sind voll. Mein Laden auch.'];
+export const SMITH_LINES = ['Das wird schön. Oder wenigstens schwer.', 'Gutes Werkzeug braucht Gold. Und Geduld. Hauptsächlich Gold.', 'Hämmern ist wie Umarmen. Nur lauter.'];
