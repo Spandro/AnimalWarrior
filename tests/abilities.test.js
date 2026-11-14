@@ -257,7 +257,8 @@ test('abilities: damageByAbility zählt unter der richtigen Kennung', () => {
 });
 
 test('abilities: Daten sind vollständig und abilityPool je Klasse gefüllt', () => {
-  assertEqual(Object.keys(ABILITIES).length, 20);
+  assertEqual(Object.values(ABILITIES).filter((d) => !d.subclass).length, 20);
+  assertEqual(Object.keys(ABILITIES).length, 68); // 20 + 48 Astfähigkeiten der Unterklassen (nur Abenteuer)
   for (const def of Object.values(ABILITIES)) {
     assertEqual(def.levels.length, 4, def.id);
     assertEqual(def.trigger, 'auto');
@@ -534,7 +535,7 @@ test('abilities: Klingenfächer Stufe 5 deckt 360° ab und zentriert sich auf da
 });
 
 test('abilities: nur die sechs facing-Fähigkeiten haben ein aim-Feld', () => {
-  const withAim = Object.values(ABILITIES).filter((d) => d.aim).map((d) => d.id).sort();
+  const withAim = Object.values(ABILITIES).filter((d) => d.aim && !d.subclass).map((d) => d.id).sort();
   assertEqual(withAim, ['erdspalter', 'halsschwinger', 'klingenfaecher', 'schildstoss', 'schwerthieb', 'wurfdolche']);
   assertEqual(ABILITIES.halsschwinger.aim, { key: 'radius', extra: 1.5 });
   for (const d of Object.values(ABILITIES)) assertEqual(!!d.aim, d.target === 'facing', d.id);

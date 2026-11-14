@@ -137,3 +137,6 @@ export const SMITH_LINES = ['Das wird schön. Oder wenigstens schwer.', 'Gutes W
 
 /** Der Bosskampf beginnt erst so weit (m) innerhalb des Arenakreises, damit das Tor hinter dem Helden schließt. */
 export const ARENA_INSET = 2.5;
+
+/** Unterklassen (Etappe 2, Spec §4): Wahl ab Level, Kosten zum Freischalten einer Astfähigkeit (Punkte), Umlernen (Gold). */
+export const SUBCLASS_RULES = { chooseLevel: 10, unlockCost: 1, respecGold: 500 };
