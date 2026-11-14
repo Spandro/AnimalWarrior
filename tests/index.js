@@ -29,6 +29,7 @@ import './adventureSave.test.js';
 import './adventureHero.test.js';
 import './adventure.test.js';
 import './subclasses.test.js';
+import './signatures.test.js';
 import './minimap.test.js';
 import './tavern.test.js';
 import './roster.test.js';

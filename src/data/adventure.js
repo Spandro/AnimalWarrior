@@ -140,3 +140,10 @@ export const ARENA_INSET = 2.5;
 
 /** Unterklassen (Etappe 2, Spec §4): Wahl ab Level, Kosten zum Freischalten einer Astfähigkeit (Punkte), Umlernen (Gold). */
 export const SUBCLASS_RULES = { chooseLevel: 10, unlockCost: 1, respecGold: 500 };
+
+/**
+ * Regeln der Besonderheiten (Spec §6), soweit sie nicht in den Fähigkeitswerten stehen: Raserei erreicht ihren vollen
+ * Bonus bei diesem Anteil Leben; Abstand (m), in dem Haustier und Wolke dem Helden folgen; Abstand der Beschwörungen
+ * von „Familientreffen“ zueinander (m).
+ */
+export const SIGNATURE_RULES = { rageFullAtHp: 0.25, followDistance: 1.5, summonSpread: 1.5 };
