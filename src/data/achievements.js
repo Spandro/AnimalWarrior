@@ -1,9 +1,10 @@
 import { BOSS_POOL } from './waves.js';
+import { QUESTS } from './quests.js';
 
 /**
  * Lebenslange Zähler im Spielstand (gemeinsam für alle Helden).
  * @typedef {{ kills: Record<string, number>, runs: number, wins: number, winsByAnimal: Record<string, number>,
- *   shadowsRouted: number, tavernRounds: number, hiLoBestStreak: number }} LifetimeStats
+ *   shadowsRouted: number, tavernRounds: number, hiLoBestStreak: number, campfireRests: number }} LifetimeStats
  *
  * Zahlen eines Durchgangs (`run.facts` aus modes/survivor.js), nur einfache Werte.
  * `ended`/`won`/`hpFractionAtEnd` gelten erst, wenn der Durchgang vorbei ist; `level10At`: Spielzeit, zu der Level 10
@@ -14,9 +15,13 @@ import { BOSS_POOL } from './waves.js';
  *
  * Eingabe jeder Bedingung. `stats` enthält die Zahlen des laufenden Durchgangs schon (mitten im Durchgang nur
  * Tötungen und Schatten), `save.gold` ebenso das verdiente Gold; `save.inventory`: Kennungen der Truhe.
- * @typedef {{ run: RunFacts, stats: LifetimeStats, save: { gold: number, inventory: string[] } }} AchievementContext
+ * @typedef {{ run: RunFacts, stats: LifetimeStats, save: { gold: number, inventory: string[], heroes?: object[], itemLevels?: Record<string, number> } }} AchievementContext
+ *   Abenteuer-Erfolge lesen `save.heroes[].adventure` und `save.itemLevels`.
  * @typedef {{ id: string, title: string, condition: string, line: string, gold: number, check: (ctx: AchievementContext) => boolean }} Achievement
  */
+
+/** Nebenaufträge von Kapitel 1 (für „Hilfsbereit“). */
+const SIDE_QUESTS = Object.values(QUESTS).filter((q) => q.kind === 'side').map((q) => q.id);
 
 const killed = (type, n) => (ctx) => (ctx.stats.kills[type] || 0) >= n;
 
@@ -174,5 +179,24 @@ export const ACHIEVEMENTS = [
     id: 'hochstapler', title: 'Hochstapler', condition: 'Gewinne einen Durchgang mit dem Duo',
     line: 'Zusammen sind sie größer als jeder Bär.', gold: 100,
     check: (c) => c.run.ended && c.run.won && c.run.animalId === 'giraffe',
+  },
+  {
+    id: 'trockene-pfoten', title: 'Trockene Pfoten', condition: 'Schließe im Abenteuer Kapitel 1 ab',
+    line: 'Der Bach ist wieder ein Bach. Vorerst.', gold: 100,
+    check: (c) => (c.save.heroes ?? []).some((h) => h.adventure?.chapterDone?.includes(1)),
+  },
+  {
+    id: 'meisterstueck', title: 'Meisterstück', condition: 'Lass einen Gegenstand auf +5 verbessern',
+    line: 'Grabowski hat geweint. Vor Stolz.', gold: 50,
+    check: (c) => Object.values(c.save.itemLevels ?? {}).some((l) => l >= 5),
+  },
+  {
+    id: 'hilfsbereit', title: 'Hilfsbereit', condition: 'Erledige alle Nebenaufträge von Kapitel 1',
+    line: 'Bachwinkel schuldet dir was. Viel.', gold: 50,
+    check: (c) => (c.save.heroes ?? []).some((h) => SIDE_QUESTS.every((id) => h.adventure?.quests?.[id]?.state === 'done')),
+  },
+  {
+    id: 'lagerfeuerromantik', title: 'Lagerfeuerromantik', condition: 'Raste 20-mal an einem Lagerfeuer',
+    line: 'Marshmallows wären schön gewesen.', gold: 25, check: (c) => (c.stats.campfireRests ?? 0) >= 20,
   },
 ];
