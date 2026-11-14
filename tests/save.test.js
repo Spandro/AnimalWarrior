@@ -219,7 +219,7 @@ test('save: validate lehnt ungültige Paare und Duo-Helden ohne Freischaltung ab
 test('save: migrate lässt die aktuelle Version unverändert und wirft sonst', () => {
   const s = defaultSave();
   assertEqual(migrate(s), s);
-  assertEqual(SAVE_VERSION, 4);
+  assertEqual(SAVE_VERSION, 5);
   assertThrows(() => migrate({ version: 99 }));
   assertThrows(() => migrate({ version: 0 }));
   assertThrows(() => migrate(null));

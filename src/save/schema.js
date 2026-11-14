@@ -23,7 +23,7 @@ import { isValidPair, animalUnlocked } from '../core/roster.js';
  *   (`repairSave` in src/save/adventure.js).
  */
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 export const STORAGE_KEY = 'animalwarrior.save';
 export const BACKUP_KEY = 'animalwarrior.save.corrupt';
 export const MAX_HEROES = 6;
@@ -54,6 +54,7 @@ const countOf = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? 
  * 1 → 2: Erfolge und lebenslange Zähler; Durchgänge, Siege und Siege je Tier stammen aus den Helden, der Rest beginnt bei null.
  * 2 → 3: Taverne – leere Truhe und Freischaltungen, Zähler für Runden und Trefferserie bei null; alles andere bleibt.
  * 3 → 4: Abenteuer – kein Held hat ein Abenteuer, keine Verbesserungen, kein Material, Knöpfe rechts, Rastzähler null.
+ * 4 → 5: Unterklassen – jedes vorhandene Abenteuer bekommt `subclass: null` und `passives: {}`; Stammstufen bleiben.
  */
 const MIGRATIONS = {
   1: (data) => {
@@ -89,6 +90,14 @@ const MIGRATIONS = {
     stats: { ...data.stats, campfireRests: 0 },
     itemLevels: {},
     materials: {},
+  }),
+  4: (data) => ({
+    ...data,
+    version: 5,
+    heroes: Array.isArray(data.heroes)
+      ? data.heroes.map((h) => (h && typeof h === 'object' && h.adventure && typeof h.adventure === 'object'
+        ? { ...h, adventure: { ...h.adventure, subclass: null, passives: {} } } : h))
+      : data.heroes,
   }),
 };
 
