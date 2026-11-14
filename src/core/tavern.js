@@ -66,7 +66,9 @@ function winningRanks(card, dir) {
 }
 
 /**
- * Faktor eines Tipps: Zielauszahlung ÷ Gewinnchance, auf eine Nachkommastelle abgerundet. 0 ohne Gewinnchance.
+ * Faktor eines Tipps: Zielauszahlung ÷ Gewinnchance, auf eine Nachkommastelle abgerundet. Gleicher Wert ist
+ * unentschieden, darum zählt die Chance nur unter den 12 Werten, die entscheiden. Nie unter 1 (ein Treffer lässt den
+ * Topf nie schrumpfen), 0 ohne Gewinnchance.
  * @param {number} card
  * @param {'up'|'down'} dir
  * @returns {number}
@@ -74,8 +76,8 @@ function winningRanks(card, dir) {
 export function hiLoFactor(card, dir) {
   const n = winningRanks(card, dir);
   if (n === 0) return 0;
-  // rtp ÷ (n/13) in Zehnteln; das Epsilon fängt Gleitkommafehler knapp unter einer ganzen Zahl ab.
-  return Math.floor(((HILO.rtp * HILO.ranks.length) / n) * 10 + 1e-9) / 10;
+  // rtp ÷ (n/12) in Zehnteln; das Epsilon fängt Gleitkommafehler knapp unter einer ganzen Zahl ab.
+  return Math.max(1, Math.floor(((HILO.rtp * (HILO.ranks.length - 1)) / n) * 10 + 1e-9) / 10);
 }
 
 /**
@@ -94,8 +96,8 @@ export function hiLoStart(rng, stake) {
 }
 
 /**
- * Ein Tipp. Erst der Joker-Wurf, dann der Kartenwert. Gleicher Wert zählt als Fehltipp (Topf 0). Ein Treffer rundet
- * den Topf ab; fünf Treffer oder 50 × Einsatz beenden die Runde mit `max` (Topf gedeckelt). Der Joker beendet die Runde
+ * Ein Tipp. Erst der Joker-Wurf, dann der Kartenwert. Gleicher Wert ist unentschieden: Topf und Treffer bleiben, die
+ * Runde läuft weiter. Ein Fehltipp setzt den Topf auf 0. Ein Treffer rundet den Topf ab; fünf Treffer oder 50 × Einsatz beenden die Runde mit `max` (Topf gedeckelt). Der Joker beendet die Runde
  * mit unverändertem Topf, zählt nicht als Treffer und bringt ab 100 Gold Einsatz einen Gegenstand.
  * @param {HiLoState} state
  * @param {'up'|'down'} dir
@@ -111,6 +113,7 @@ export function hiLoGuess(state, dir, rng) {
     return { state: { ...state, done: true, result: 'joker' }, drawn: 'joker', loot };
   }
   const drawn = rng.int(HILO.ranks[0], HILO.ranks[HILO.ranks.length - 1]);
+  if (drawn === state.card) return { state: { ...state }, drawn, loot: null };
   const won = dir === 'up' ? drawn > state.card : drawn < state.card;
   if (!won) return { state: { ...state, pot: 0, card: drawn, done: true, result: 'miss' }, drawn, loot: null };
   const hits = state.hits + 1;
@@ -163,12 +166,14 @@ export function wheelReturn(stake) {
 }
 
 /**
- * Mittlere Auszahlung eines Tipps je Gold Topf, mit Joker: 0,98 × p × Faktor + 0,02 × 1. Ohne Gewinnchance 0.
+ * Mittlere Auszahlung eines Tipps je Gold Topf, mit Joker, bis er entschieden ist: Ein Unentschieden wiederholt den
+ * Tipp, also (0,98 × p × Faktor + 0,02) ÷ (1 − 0,98 × 1/13). Ohne Gewinnchance 0.
  * @param {number} card
  * @param {'up'|'down'} dir
  */
 export function hiLoStepReturn(card, dir) {
   const p = winningRanks(card, dir) / HILO.ranks.length;
   if (p === 0) return 0;
-  return (1 - HILO.jokerChance) * p * hiLoFactor(card, dir) + HILO.jokerChance;
+  const keep = 1 - HILO.jokerChance;
+  return (keep * p * hiLoFactor(card, dir) + HILO.jokerChance) / (1 - keep / HILO.ranks.length);
 }

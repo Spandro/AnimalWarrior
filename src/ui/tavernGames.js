@@ -578,7 +578,7 @@ export function renderHiLo(c, props, app) {
     } else {
       startBtn.disabled = t.locked || t.broke() || !canStake(app.save, t.stake);
       if (t.actions.firstChild !== startBtn) t.actions.replaceChildren(startBtn);
-      if (!round) potLine.textContent = `Gleicher Wert verliert. Höchstens ${HILO.maxHits} Treffer, dann wird ausgezahlt.`;
+      if (!round) potLine.textContent = `Gleicher Wert ist unentschieden. Höchstens ${HILO.maxHits} Treffer, dann wird ausgezahlt.`;
     }
   }
 
@@ -635,8 +635,11 @@ export function renderHiLo(c, props, app) {
     t.end();
     drawSlot.firstChild?.classList.remove('card-reveal');
     if (state.result === 'miss') {
-      const same = drawn === before.card ? 'Gleicher Wert zählt als verloren. ' : 'Daneben. ';
-      t.setResult(`${same}Der Topf von ${formatNumber(before.pot)} Gold ist weg.`, 'lose');
+      t.setResult(`Daneben. Der Topf von ${formatNumber(before.pot)} Gold ist weg.`, 'lose');
+    } else if (drawn === before.card) {
+      t.setResult(`Gleicher Wert: unentschieden. Dein Topf bleibt bei ${formatNumber(state.pot)} Gold.`, 'tie');
+      show(openSlot, state.card, false);
+      show(drawSlot, null, false);
     } else if (state.result === 'joker') {
       t.setResult(`Joker! Dein Topf von ${formatNumber(state.pot)} Gold wird ausgezahlt.`, 'win');
     } else if (state.result === 'max') {

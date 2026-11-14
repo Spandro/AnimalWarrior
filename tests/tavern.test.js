@@ -108,27 +108,37 @@ test('tavern: Rad zahlt Einsatz mal Faktor, Beutefeld je nach Einsatz', () => {
 });
 
 test('tavern: Faktoren', () => {
-  assertEqual(hiLoFactor(8, 'up'), 2.0);
-  assertEqual(hiLoFactor(8, 'down'), 2.0);
-  assertEqual(hiLoFactor(4, 'up'), 1.2);
-  assertEqual(hiLoFactor(4, 'down'), 6.0);
+  // Gleicher Wert ist unentschieden: die Chance zählt unter 12 Werten, 0,93 ÷ (6/12) = 1,86 -> 1,8.
+  assertEqual(hiLoFactor(8, 'up'), 1.8);
+  assertEqual(hiLoFactor(8, 'down'), 1.8);
+  assertEqual(hiLoFactor(4, 'up'), 1.1);
+  assertEqual(hiLoFactor(4, 'down'), 5.5);
   assertEqual(hiLoFactor(14, 'up'), 0);
   assertEqual(hiLoFactor(2, 'down'), 0);
+  // Bei der 2 kann „Höher“ nicht verlieren: 0,93 wird auf 1,0 angehoben, der Topf bleibt gleich.
   assertEqual(hiLoFactor(2, 'up'), 1.0);
+  assertEqual(hiLoFactor(14, 'down'), 1.0);
   assertEqual(hiLoStepReturn(14, 'up'), 0);
+  assertClose(hiLoStepReturn(2, 'up'), 1, 1e-12);
 });
+
+/** Ob ein Tipp verlieren kann (nur „Höher“ bei der 2 und „Tiefer“ beim Ass können es nicht). */
+function canLose(card, dir) {
+  return dir === 'up' ? card > HILO.ranks[0] : card < HILO.ranks[HILO.ranks.length - 1];
+}
 
 test('tavern: Höher oder tiefer – für jede Karte liegt die bessere Wahl zwischen 0,88 und 0,95, keine Wahl über 0,95', () => {
   for (const card of HILO.ranks) {
-    const rets = ['up', 'down'].map((dir) => {
+    const rets = ['up', 'down'].filter((dir) => hiLoFactor(card, dir) > 0 && canLose(card, dir)).map((dir) => {
       const n = dir === 'up' ? 14 - card : card - 2;
-      return (n / 13) * hiLoFactor(card, dir);
+      return (n / 12) * hiLoFactor(card, dir); // je entschiedenem Tipp
     });
+    if (rets.length === 0) continue;
     const best = Math.max(...rets);
     assertTrue(best >= 0.88 && best <= 0.95, `Karte ${card}: ${best}`);
     for (const r of rets) assertTrue(r <= 0.95, `Karte ${card}: ${r}`);
     for (const dir of ['up', 'down']) {
-      assertTrue(hiLoStepReturn(card, dir) < 0.97, `Joker Karte ${card} ${dir}`);
+      if (canLose(card, dir)) assertTrue(hiLoStepReturn(card, dir) < 0.97, `Joker Karte ${card} ${dir}`);
     }
   }
 });
@@ -168,16 +178,21 @@ test('tavern: mit dem Gegenwert der Doppelten bleibt jede Runde unter 97 %', () 
     assertTrue(total < 0.97, `Rad ${stake}: ${total}`);
   }
   // Höher oder tiefer: der Joker bringt die Beute. Der Topf ist nie kleiner als der Einsatz (Faktoren ≥ 1),
-  // also ist der Gegenwert beim kleinsten Einsatz mit Beute am größten.
+  // also ist der Gegenwert beim kleinsten Einsatz mit Beute am größten. Ein Unentschieden wiederholt den Tipp,
+  // darum teilt auch die Beute durch 1 − 0,98/13.
+  const repeat = 1 - (1 - HILO.jokerChance) / HILO.ranks.length;
+  const withLoot = (card, dir) => hiLoStepReturn(card, dir) + (HILO.jokerChance / repeat) * resale / TAVERN.lootMinStake;
   for (const card of HILO.ranks) {
     for (const dir of ['up', 'down']) {
       if (hiLoFactor(card, dir) === 0) continue;
       assertTrue(hiLoFactor(card, dir) >= 1, `Faktor Karte ${card} ${dir}`);
-      const total = hiLoStepReturn(card, dir) + HILO.jokerChance * resale / TAVERN.lootMinStake;
+      // Ein Tipp, der nicht verlieren kann, lässt den Topf gleich; nur der Joker kann dort Beute bringen.
+      if (!canLose(card, dir)) continue;
+      const total = withLoot(card, dir);
       assertTrue(total < 0.97, `Karte ${card} ${dir}: ${total}`);
     }
   }
-  assertClose(hiLoStepReturn(8, 'up') + HILO.jokerChance * resale / TAVERN.lootMinStake, 0.98 * (6 / 13) * 2.0 + 0.02 + 0.0039, 1e-12);
+  assertClose(withLoot(8, 'up'), (0.98 * (6 / 13) * 1.8 + 0.02 + 0.0039) / (1 - 0.98 / 13), 1e-12);
 });
 
 test('tavern: Beute nur ab 100', () => {
@@ -206,21 +221,21 @@ test('tavern: gleicher Startwert gleiches Ergebnis', () => {
 });
 
 test('tavern: hiLoGuess – Treffer rundet ab, fünf Treffer, Deckelung, Fehler', () => {
-  // Start: Karte 8, Einsatz 10; Tipp höher, kein Joker, Karte 14 -> Treffer ×2,0
+  // Start: Karte 8, Einsatz 10; Tipp höher, kein Joker, Karte 14 -> Treffer ×1,8
   const start = hiLoStart(scripted([6 / 13 + 0.01]), 10);
   assertEqual(start, { stake: 10, pot: 10, card: 8, hits: 0, done: false, result: null });
   const hit = hiLoGuess(start, 'up', scripted([0.5, 12 / 13 + 0.01]));
   assertEqual(hit.drawn, 14);
-  assertEqual(hit.state, { stake: 10, pot: 20, card: 14, hits: 1, done: false, result: null });
+  assertEqual(hit.state, { stake: 10, pot: 18, card: 14, hits: 1, done: false, result: null });
   assertEqual(start.pot, 10); // kein Mutieren
-  // Abrunden: Topf 15 × 1,2 = 18
+  // Abrunden: Topf 15 × 1,1 = 16,5 -> 16
   const s4 = { stake: 10, pot: 15, card: 4, hits: 1, done: false, result: null };
   const r4 = hiLoGuess(s4, 'up', scripted([0.5, 8 / 13 + 0.01])); // Karte 10
-  assertEqual(r4.state.pot, 18);
+  assertEqual(r4.state.pot, 16);
   assertEqual(r4.state.card, 10);
-  // Topf 7 × 1,7 (Karte 7 hoch) = 11,9 -> 11
+  // Topf 7 × 1,5 (Karte 7 hoch) = 10,5 -> 10
   const s7 = { stake: 10, pot: 7, card: 7, hits: 1, done: false, result: null };
-  assertEqual(hiLoGuess(s7, 'up', scripted([0.5, 12 / 13 + 0.01])).state.pot, 11);
+  assertEqual(hiLoGuess(s7, 'up', scripted([0.5, 12 / 13 + 0.01])).state.pot, 10);
   // Fünf Treffer -> max
   const four = { stake: 10, pot: 10, card: 2, hits: 4, done: false, result: null };
   const fifth = hiLoGuess(four, 'up', scripted([0.5, 12 / 13 + 0.01]));
@@ -229,20 +244,27 @@ test('tavern: hiLoGuess – Treffer rundet ab, fünf Treffer, Deckelung, Fehler'
   assertEqual(fifth.state.result, 'max');
   // Deckelung bei 50 × Einsatz
   const big = { stake: 10, pot: 400, card: 4, hits: 2, done: false, result: null };
-  const capped = hiLoGuess(big, 'down', scripted([0.5, 0.0])); // Karte 2: ×6,0 -> 2400 -> 500
+  const capped = hiLoGuess(big, 'down', scripted([0.5, 0.0])); // Karte 2: ×5,5 -> 2200 -> 500
   assertEqual(capped.state.pot, 500);
   assertEqual(capped.state.done, true);
   assertEqual(capped.state.result, 'max');
   assertEqual(capped.state.hits, 3);
-  // Fehltipp, auch bei gleichem Wert
-  const miss = hiLoGuess(s7, 'up', scripted([0.5, 5 / 13 + 0.01])); // Karte 7 = gleich
-  assertEqual(miss.drawn, 7);
+  // Gleicher Wert ist unentschieden: Topf, Treffer und Karte bleiben, die Runde läuft weiter
+  for (const dir of ['up', 'down']) {
+    const same = hiLoGuess(s7, dir, scripted([0.5, 5 / 13 + 0.01])); // Karte 7 = gleich
+    assertEqual(same.drawn, 7);
+    assertEqual(same.state, s7);
+    assertEqual(same.loot, null);
+  }
+  const two = { stake: 10, pot: 10, card: 2, hits: 0, done: false, result: null };
+  assertEqual(hiLoGuess(two, 'up', scripted([0.5, 0.0])).state, two); // „Höher“ bei der 2, wieder eine 2
+  // Fehltipp
+  const miss = hiLoGuess(s7, 'up', scripted([0.5, 0.0])); // Karte 2
+  assertEqual(miss.drawn, 2);
   assertEqual(miss.state.done, true);
   assertEqual(miss.state.result, 'miss');
   assertEqual(miss.state.pot, 0);
   assertEqual(miss.state.hits, 1);
-  const lower = hiLoGuess(s7, 'up', scripted([0.5, 0.0])); // Karte 2
-  assertEqual(lower.state.result, 'miss');
 });
 
 test('tavern: hiLoGuess – Ausnahmen', () => {

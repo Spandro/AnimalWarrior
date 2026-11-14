@@ -124,9 +124,10 @@ Man betritt die Taverne immer mit einem gewählten Helden. Der Held spielt aber 
 Ein Kartenstapel mit 2 bis 10, Bube, Dame, König und Ass (13 Werte). Die Farben spielen keine Rolle.
 
 - Nach dem Einsatz liegt eine Karte offen. Der Spieler tippt „Höher“ oder „Tiefer“, dann wird die nächste Karte aufgedeckt.
-- **Gleicher Wert zählt als verloren.**
-- **Der Gewinn wächst nach Risiko, nicht immer ums Doppelte.** Auf jedem Knopf steht der Faktor, zum Beispiel bei einer 8: „Höher ×2,0“ und „Tiefer ×2,0“; bei einer 4: „Höher ×1,2“ und „Tiefer ×6,0“.
-  - Faktor = 0,93 ÷ Gewinnchance, auf eine Nachkommastelle abgerundet.
+- **Gleicher Wert ist unentschieden** (Wunsch des Auftraggebers vom 2026-11-14; vorher zählte er als verloren): Der Topf bleibt, es zählt kein Treffer, die gezogene Karte liegt offen und man tippt erneut.
+- **Der Gewinn wächst nach Risiko, nicht immer ums Doppelte.** Auf jedem Knopf steht der Faktor, zum Beispiel bei einer 8: „Höher ×1,8“ und „Tiefer ×1,8“; bei einer 4: „Höher ×1,1“ und „Tiefer ×5,5“.
+  - Faktor = 0,93 ÷ Gewinnchance unter den 12 Werten, die entscheiden (der gleiche Wert zählt nicht mit), auf eine Nachkommastelle abgerundet, nie unter 1,0.
+  - Eine Wahl, die nicht verlieren kann („Höher“ bei der 2, „Tiefer“ beim Ass), zahlt ×1,0: Der Topf bleibt gleich, der Tipp zählt aber als Treffer.
   - Eine Wahl ohne Gewinnchance (Höher bei Ass) ist gesperrt.
   - Grund: Mit festem Verdoppeln könnte man bei einer 2 fast sicher „Höher“ tippen und Gold vermehren. Gold würde wertlos.
 - Nach jedem Treffer: **„Auszahlen“** oder **weiterspielen**. Höchstens **fünf Treffer** pro Runde. Nach dem fünften wird automatisch ausgezahlt, ebenso, sobald der Topf das **50-Fache des Einsatzes** erreicht.

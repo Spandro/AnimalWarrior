@@ -66,7 +66,7 @@ export const HOSTS = {
       hilo: [
         'Höher oder tiefer. Mehr Auswahl hat das Leben selten.',
         'Ich mische nicht. Ich ziehe einfach nach Gefühl.',
-        'Gleicher Wert verliert. Das steht klein irgendwo.',
+        'Gleicher Wert? Unentschieden. Ich bin heute großzügig.',
         'Der Joker beendet die Runde. Dein Topf bleibt dein.',
         'Eine Karte noch? Mutig. Oder müde.',
         'Wer früh auszahlt, schläft ruhig.',
