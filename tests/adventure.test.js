@@ -3,7 +3,7 @@ import {
   createAdventureRun, stepAdventure, useAbility, drinkPotion, interact, endTalk, setPaused, rest, travel, snapshot, clearLedger, acceptOffer,
   isGateClosed,
 } from '../src/modes/adventure.js';
-import { damageEnemy } from '../src/core/world.js';
+import { damageEnemy, spawnEnemy } from '../src/core/world.js';
 import { defaultSave, addHero } from '../src/save/store.js';
 import { newAdventure } from '../src/save/adventure.js';
 import { acceptQuest } from '../src/core/quests.js';
@@ -284,3 +284,72 @@ test('adventure: ein Boss, der außerhalb des Kampfes fällt, zählt trotzdem al
   damageEnemy(run.world, boss, { amount: 1e6, crit: false }, 'test'); step(run);
   assertEqual(run.record.bosses, ['graete']);
 });
+
+// ---------------------------------------------------------------- Etappe 2: Unterklassen in der Regelschicht
+
+/** Erfahrung bis knapp unter Level 10. */
+function xpTo(level) { let n = 0; for (let l = 1; l < level; l++) n += 70 + 50 * (l - 1); return n; }
+
+test('adventure: subclassAvailable genau einmal beim Erreichen von Level 10 ohne Unterklasse', () => {
+  const run = setup({ mutate: (a) => { a.xp = 0; } });
+  const events = [];
+  run.record.level = 9; run.record.skillPoints = 8; run.record.xp = xpTo(10) - xpTo(9) - 1;
+  const rat = spawnEnemyAt(run, 'ratte');
+  killAll(run, [rat]);
+  step(run, 1);
+  events.push(...run.events);
+  for (let i = 0; i < 5; i++) { killAll(run, [spawnEnemyAt(run, 'ratte')]); step(run, 1); events.push(...run.events); }
+  assertEqual(run.record.level, 10);
+  assertEqual(events.filter((e) => e.type === 'subclassAvailable').length, 1);
+});
+
+test('adventure: Klauen-Gold landet im Ledger (gedeckelt), Dauer-Boni und Lebensraub wirken in der Welt', () => {
+  const run = setup({ cls: 'dieb', mutate: (a) => {
+    Object.assign(a, { level: 12, skillPoints: 0, subclass: 'taschendieb', abilities: { wurfdolche: 1, langefinger: 3 }, buttons: ['langefinger', null, null] });
+  } });
+  assertTrue(useAbility(run, 0));
+  const target = spawnEnemyAt(run, 'ratte', 1e4);
+  const before = run.ledger.gold;
+  for (let i = 0; i < 300; i++) { damageEnemy(run.world, target, { amount: 1, crit: false }, 'wurfdolche'); step(run, 1); }
+  assertEqual(run.ledger.gold - before, 30);
+  const k = setup({ mutate: (a) => { Object.assign(a, { level: 12, skillPoints: 0, subclass: 'kneipenschlaeger', passives: { zapfhahn: 2 } }); } });
+  assertClose(k.world.lifesteal, 0.04);
+  const t = setup({ mutate: (a) => { Object.assign(a, { level: 12, skillPoints: 0, subclass: 'tuersteher', passives: { kreuzbreiter: 3 } }); } });
+  assertEqual(t.world.abilityMods.specials, [{ special: 'shieldPct', value: 0.15000000000000002, shape: 'shield' }]);
+});
+
+test('adventure: nach Tod, Kartenwechsel und Rasten keine Fallen, Begleiter, Schild, Stärkungen oder Unsichtbarkeit', () => {
+  const dirty = (run) => {
+    const w = run.world;
+    w.traps.push({ abilityId: 'baerenfalle', x: 0, z: 0, radius: 1, damage: 1, stun: 1, until: 99 });
+    w.followers.push({ kind: 'pet', abilityId: 'erdmaennchen', x: 0, z: 0, until: 99 });
+    w.hero.shield = { hp: 50, until: 99 };
+    w.hero.stealthUntil = 99;
+    w.hero.steal = { until: 99, chance: 1, min: 1, max: 1, cap: 30, given: 0 };
+    w.hero.buffs.push({ abilityId: 'roteruebe', modifiers: [], timeLeft: 99, rage: 0.6 });
+  };
+  const clean = (run, why) => {
+    const w = run.world, h = w.hero;
+    assertEqual([w.traps.length, w.followers.length, h.shield, h.stealthUntil > w.time, h.steal, h.buffs.length], [0, 0, null, false, null, 0], why);
+  };
+  const run = setup();
+  dirty(run);
+  run.world.hero.hp = 0;
+  step(run, Math.ceil(DEATH.seconds * 30) + 5);
+  clean(run, 'Tod');
+  dirty(run);
+  rest(run, 'k1_ufer');
+  clean(run, 'Rasten');
+  dirty(run);
+  const exit = run.map.exits[0];
+  put(run, exit.x, exit.z);
+  step(run, 1);
+  clean(run, 'Kartenwechsel');
+});
+
+function spawnEnemyAt(run, type, hpMul = 1) {
+  const h = run.world.hero;
+  const e = spawnEnemy(run.world, type, h.x + 30, h.z + 30, { hpMul });
+  e.passive = true;
+  return e;
+}
