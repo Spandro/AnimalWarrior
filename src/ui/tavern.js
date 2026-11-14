@@ -7,8 +7,8 @@ import { chestSlots, foundCount, itemKindLabel } from './tavernText.js';
 import { TAVERN, HOSTS, TABLE_HOST, TAVERN_IMAGES } from '../data/tavern.js';
 import { ITEMS, RARITIES } from '../data/items.js';
 import { unlockDuo, markItemsSeen } from '../save/tavern.js';
-import { BACKGROUND } from '../data/sprites.js';
-import { imageDataOf, removeBackground } from '../render/sprites.js';
+import { BACKGROUND, SHEET_HOLES, SHEET_FRAMES, DUO_FRAMES } from '../data/sprites.js';
+import { imageDataOf, removeBackground, frameCanvas } from '../render/sprites.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const TOTAL_ITEMS = Object.keys(ITEMS).length;
@@ -162,7 +162,8 @@ function duoSvg() {
 }
 
 /**
- * Das Duo im Stall. Gesperrt als schwarzer Umriss (CSS-Filter auf Bild oder Ersatzfigur), danach in Farbe.
+ * Das Duo im Stall, als Standbild die Phase `DUO_FRAMES.still` aus der Bildfolge. Gesperrt als schwarzer Umriss
+ * (CSS-Filter auf Bild oder Ersatzfigur), danach in Farbe.
  * @param {boolean} unlocked
  */
 function duoFigure(unlocked) {
@@ -172,10 +173,10 @@ function duoFigure(unlocked) {
     if (!img || !box.isConnected) return;
     // Das Bild liegt auf weißem Grund: wie bei den Spielfiguren wird er entfernt, damit der Umriss nur die Figur zeigt.
     const data = imageDataOf(img);
-    removeBackground(data, BACKGROUND);
-    data.canvas.getContext('2d').putImageData(data, 0, 0);
-    data.canvas.setAttribute('aria-hidden', 'true');
-    box.replaceChildren(data.canvas);
+    removeBackground(data, BACKGROUND, SHEET_HOLES.duo);
+    const canvas = frameCanvas(data, SHEET_FRAMES.duo, DUO_FRAMES.still);
+    canvas.setAttribute('aria-hidden', 'true');
+    box.replaceChildren(canvas);
   });
   return box;
 }

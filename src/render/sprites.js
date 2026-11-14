@@ -1,6 +1,9 @@
 // Gemalte Figuren: Bildbögen laden, weißen Hintergrund entfernen, Texturen anlegen, Bewegung berechnen.
 import * as THREE from '../../vendor/three.module.min.js';
-import { SHEETS, SHEET_HOLES, HERO_SPRITES, ENEMY_SPRITES, BACKGROUND, BILLBOARD, MOTION, IDLE, ATTACK, MOTION_FULL_SPEED, HOP_BACK_LEAN } from '../data/sprites.js';
+import {
+  SHEETS, SHEET_HOLES, SHEET_FRAMES, HERO_SPRITES, ENEMY_SPRITES, BACKGROUND, BILLBOARD, MOTION, IDLE, ATTACK, MOTION_FULL_SPEED,
+  HOP_BACK_LEAN, DUO_FRAMES,
+} from '../data/sprites.js';
 
 /**
  * @typedef {{ width: number, height: number, data: Uint8ClampedArray|Uint8Array }} ImageDataLike
@@ -149,6 +152,69 @@ function bleedColors(img, rings) {
   }
 }
 
+/**
+ * Schneidet die Phasen eines Bogens mit Bildfolge aus und legt sie nebeneinander in einen neuen Bogen (Phase k bei
+ * x = k · w, y = 0). Jede Phase bekommt nur ihre eigenen Pixel: Jede zusammenhängende sichtbare Fläche (Deckkraft > 0,
+ * Nachbarn auch über Eck) gehört der Phase, deren Ausschnittsmitte der Mitte ihres Umrisses am nächsten liegt; was aus
+ * einer Nachbarphase in einen Ausschnitt ragt, bleibt dort durchsichtig. Außerhalb des Bildes ist es durchsichtig.
+ * Erwartet ein Bild nach {@link removeBackground}. Ohne DOM, daher testbar.
+ * @param {ImageDataLike} img
+ * @param {{ x: number[], y: number, w: number, h: number }} layout siehe `SHEET_FRAMES`
+ * @returns {{ width: number, height: number, data: Uint8ClampedArray }}
+ */
+export function cutFrames(img, { x: lefts, y: top, w, h }) {
+  const { width: W, height: H, data } = img;
+  const n = W * H;
+  // Flächen markieren (1, 2, …) und je Fläche die Phase bestimmen.
+  const label = new Int32Array(n);
+  const stack = new Int32Array(n);
+  /** @type {number[]} Phase je Fläche, Index = Marke */
+  const frameOf = [-1];
+  const centers = lefts.map((x) => x + w / 2);
+  for (let s = 0; s < n; s++) {
+    if (label[s] || data[s * 4 + 3] === 0) continue;
+    const id = frameOf.length;
+    let sp = 0, minX = W, maxX = -1;
+    stack[sp++] = s; label[s] = id;
+    while (sp > 0) {
+      const i = stack[--sp];
+      const x = i % W, y = (i - x) / W;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      for (let dy = -1; dy <= 1; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= H) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= W) continue;
+          const j = yy * W + xx;
+          if (!label[j] && data[j * 4 + 3]) { label[j] = id; stack[sp++] = j; }
+        }
+      }
+    }
+    const mid = (minX + maxX) / 2;
+    let best = 0;
+    for (let k = 1; k < centers.length; k++) if (Math.abs(centers[k] - mid) < Math.abs(centers[best] - mid)) best = k;
+    frameOf.push(best);
+  }
+  const outW = w * lefts.length;
+  const out = new Uint8ClampedArray(outW * h * 4);
+  lefts.forEach((left, k) => {
+    for (let y = 0; y < h; y++) {
+      const sy = top + y;
+      if (sy < 0 || sy >= H) continue;
+      for (let x = 0; x < w; x++) {
+        const sx = left + x;
+        if (sx < 0 || sx >= W) continue;
+        const i = sy * W + sx;
+        if (!label[i] || frameOf[label[i]] !== k) continue;
+        out.set(data.subarray(i * 4, i * 4 + 4), (y * outW + k * w + x) * 4);
+      }
+    }
+  });
+  return { width: outW, height: h, data: out };
+}
+
 /** @param {string} url @returns {Promise<HTMLImageElement>} */
 export function loadImage(url) {
   return new Promise((resolve, reject) => {
@@ -198,19 +264,47 @@ export function dataTexture(img) {
 }
 
 /**
- * Ein Bildbogen: Hintergrund entfernen, Flecken tilgen, Farben auffüllen, Textur und Canvas anlegen.
+ * Pixel auf ein (neues) Canvas legen.
+ * @param {{ width: number, height: number, data: Uint8ClampedArray }} img
+ * @returns {HTMLCanvasElement}
+ */
+function canvasOf(img) {
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width; canvas.height = img.height;
+  canvas.getContext('2d').putImageData(new ImageData(img.data, img.width, img.height), 0, 0);
+  return canvas;
+}
+
+/**
+ * Ein Bildbogen: Hintergrund entfernen, Flecken tilgen, bei einer Bildfolge die Phasen ausschneiden
+ * ({@link cutFrames}), Farben auffüllen, Textur und Canvas anlegen.
  * @param {HTMLImageElement} image
  * @param {Array<[number, number]>} [holes] Startpunkte für eingeschlossenes Papierweiß
+ * @param {{ x: number[], y: number, w: number, h: number }} [frames] Phasen einer Bildfolge (`SHEET_FRAMES`)
  * @returns {{ texture: THREE.DataTexture, canvas: HTMLCanvasElement, size: { width: number, height: number } }}
  */
-export function prepareSheet(image, holes = []) {
-  const imageData = imageDataOf(image);
-  const { canvas } = imageData;
+export function prepareSheet(image, holes = [], frames) {
+  let imageData = imageDataOf(image);
   removeBackground(imageData, BACKGROUND, holes);
   removeSpecks(imageData, BACKGROUND.minSpeck);
+  if (frames) imageData = cutFrames(imageData, frames);
   bleedColors(imageData, BACKGROUND.bleed);
-  canvas.getContext('2d').putImageData(imageData, 0, 0);
-  return { texture: dataTexture(imageData), canvas, size: { width: imageData.width, height: imageData.height } };
+  return { texture: dataTexture(imageData), canvas: canvasOf(imageData), size: { width: imageData.width, height: imageData.height } };
+}
+
+/**
+ * Eine Phase eines Bogens mit Bildfolge als eigenes Canvas, mit nur ihren eigenen Pixeln (für Standbilder im Menü).
+ * @param {ImageDataLike} img nach {@link removeBackground}
+ * @param {{ x: number[], y: number, w: number, h: number }} layout siehe `SHEET_FRAMES`
+ * @param {number} index Bildposition
+ * @returns {HTMLCanvasElement}
+ */
+export function frameCanvas(img, layout, index) {
+  const one = cutFrames(img, layout);
+  const canvas = document.createElement('canvas');
+  canvas.width = layout.w; canvas.height = layout.h;
+  canvas.getContext('2d').putImageData(new ImageData(one.data, one.width, one.height), -index * layout.w, 0);
+  return canvas;
 }
 
 /**
@@ -253,7 +347,7 @@ export async function loadSpriteSheets() {
         console.warn(`Figurenbild ${SHEETS[id]} nicht verfügbar, zeige dafür 3D-Figuren.`);
         return;
       }
-      const sheet = prepareSheet(loaded.value, SHEET_HOLES[id] || []);
+      const sheet = prepareSheet(loaded.value, SHEET_HOLES[id] || [], SHEET_FRAMES[id]);
       result.textures[id] = sheet.texture;
       result.sizes[id] = sheet.size;
       result.canvases[id] = sheet.canvas;
@@ -466,4 +560,22 @@ export function spriteMotion(motion, { speed = 0, time = 0, attackT } = {}) {
     tilt += ATTACK.tilt * a;
   }
   return { offsetY, tilt, scaleX: 1 - stretch * 0.6, scaleY: 1 + stretch, lunge };
+}
+
+/** Länge eines Umlaufs der Duo-Bildfolge (s). */
+const DUO_CYCLE = DUO_FRAMES.seconds.reduce((a, b) => a + b, 0);
+
+/**
+ * Bildposition des Duos zur Zeit `t` (s): läuft `DUO_FRAMES.order` mit den Dauern `DUO_FRAMES.seconds` immer wieder durch,
+ * nach der Uhr und unabhängig vom Laufen. Rein, damit prüfbar; ungültige Zeiten zählen als 0.
+ * @param {number} t
+ * @returns {number}
+ */
+export function duoFrameAt(t) {
+  let rest = Number.isFinite(t) ? ((t % DUO_CYCLE) + DUO_CYCLE) % DUO_CYCLE : 0;
+  for (let k = 0; k < DUO_FRAMES.order.length; k++) {
+    if (rest < DUO_FRAMES.seconds[k]) return DUO_FRAMES.order[k];
+    rest -= DUO_FRAMES.seconds[k];
+  }
+  return DUO_FRAMES.order[0];
 }

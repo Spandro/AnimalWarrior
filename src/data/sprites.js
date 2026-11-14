@@ -3,10 +3,11 @@
 /**
  * @typedef {'hop'|'waddle'|'scurry'|'trot'|'fly'|'hopSlow'|'lope'|'lumber'|'slither'|'stride'} MotionId
  * @typedef {{ sheet: 'helden'|'gegner'|'gegner2'|'bosse'|'duo', x: number, y: number, w: number, h: number, heightM: number, motion: MotionId,
- *   footOffset: number }} SpriteDef
+ *   footOffset: number, frames?: Array<{ x: number, y: number, w: number, h: number }> }} SpriteDef
  *   Pixelrechteck der Figur im Bogen (x, y von links oben; enge Umrandung plus 6 px Rand), Höhe in Weltmetern,
  *   footOffset: Höhe des Standpunkts (Mitte der Fußsohlen in der Schrägansicht) über der Bildunterkante in Metern
  *   (bei heightM); dieser Punkt steht auf der Bodenposition, über Bodenschatten und Heldenring.
+ *   frames: nur bei einer Bildfolge, gleich große Rechtecke je Bildposition (siehe `SHEET_FRAMES`).
  * @typedef {{ freq: number, bob: number, tilt: number, squash: number, tiltRate?: number }} MotionDef
  *   freq Schrittzyklen je Sekunde, bob Hubhöhe (m), tilt Neigung (rad), squash Stauchung (Anteil),
  *   tiltRate Neigungsfrequenz relativ zu freq.
@@ -26,7 +27,8 @@ export const SHEETS = {
 
 /**
  * Eingeschlossenes Papierweiß je Bogen: Startpunkte (x, y von links oben), von denen das Freistellen zusätzlich
- * füllt, weil diese weißen Lücken ringsum vom Tier umschlossen sind (ausgemessen in `docs/neue-gegner-bilder.md`).
+ * füllt, weil diese weißen Lücken ringsum vom Tier umschlossen sind (Gegner und Bosse ausgemessen in
+ * `docs/neue-gegner-bilder.md`; Duo beim Einbau: alle umschlossenen weißen Flächen ab 20 Pixeln).
  * @type {Record<string, Array<[number, number]>>}
  */
 export const SHEET_HOLES = {
@@ -34,6 +36,9 @@ export const SHEET_HOLES = {
   gegner2: [[290, 921], [753, 516], [172, 904]],
   // zwischen den Hirschbeinen, zwischen den Wisent-Vorderbeinen, zwei Lücken im Hirschgeweih
   bosse: [[198, 427], [302, 1011], [296, 165], [388, 127]],
+  // Duo, Phasen 0–3: zwischen den Giraffenbeinen; dann Lücken an Erdmännchen, Schleuder und Schwanz (alle ab 20 Pixeln)
+  duo: [[160, 669], [567, 674], [898, 673], [1337, 673], [340, 121], [1203, 512], [915, 499], [296, 243], [223, 191],
+    [1176, 546], [241, 176], [279, 261], [1191, 530]],
 };
 
 /**
@@ -67,6 +72,31 @@ const HERO_HEIGHT = 1.6;
 export const DUO_HEIGHT = 2.6;
 
 /**
+ * Bögen mit Bildfolge: Phasen in gleich großen Ausschnitten. `x`: linke Kante je Phase im gelieferten Bild (Pixel, von
+ * links nach rechts die Bildpositionen 0–3; darf außerhalb des Bildes beginnen, dort ist es durchsichtig), `y`, `w`, `h`
+ * für alle gleich. In jedem Ausschnitt steht die Giraffe an derselben Stelle (ausgemessen an Beinen, Bauch und Hufen).
+ * Weil Kopf und Schwanz benachbarter Phasen in die Ausschnitte der anderen ragen, schneidet das Laden jede Phase mit nur
+ * ihren eigenen Pixeln aus und legt sie nebeneinander in einen neuen Bogen (Phase k bei x = k · w, y = 0).
+ * `duo.webp` (1536 × 1024): 0 Erdmännchen oben auf dem Kopf, 1 rutscht herunter, 2 klettert den Hals hinauf, 3 sitzt
+ * auf dem Rücken.
+ * @type {Record<string, { x: number[], y: number, w: number, h: number }>}
+ */
+export const SHEET_FRAMES = {
+  duo: { x: [-37, 330, 703, 1093], y: 97, w: 443, h: 834 },
+};
+
+/**
+ * Bildfolge des Duos (Spec 7.5); alle Zahlen sind Bildpositionen aus `SHEET_FRAMES.duo`. `order`: Abfolge im Spiel
+ * (Rücken → hochklettern → oben stehen → herunterrutschen, dann von vorn), `seconds`: Dauer je Schritt von `order`,
+ * `still`: Standbild in Stall und Heldenerstellung, `reducedMotion`: Phase, auf der die Figur bei „Bewegung reduzieren“
+ * stehen bleibt.
+ */
+export const DUO_FRAMES = { order: [3, 2, 0, 1], seconds: [2.5, 1.2, 2.5, 0.8], still: 0, reducedMotion: 3 };
+
+/** Phasen des Duos im ausgeschnittenen Bogen, nach Bildposition. */
+const DUO_CELLS = SHEET_FRAMES.duo.x.map((_, k) => ({ x: k * SHEET_FRAMES.duo.w, y: 0, w: SHEET_FRAMES.duo.w, h: SHEET_FRAMES.duo.h }));
+
+/**
  * Darstellung der Duo-Fähigkeiten: Wurfhöhe der Nüsse (m, Kopfhöhe, statt 0,9 m), Strecke (m), auf der eine Nuss auf
  * Treffhöhe sinkt, Treffhöhe (m), Nussgröße (m, Radius) und Farbe; Erdhaufen der Buddelfalle (Radius und Höhe in m,
  * Standzeit in s, Farbe und hellere Kuppe); Erdmännchen der Großfamilie (Anzahl, Abstand zur Lockstelle in m, Höhe in m).
@@ -79,8 +109,8 @@ export const DUO_FX = {
 
 /**
  * @type {Record<string, SpriteDef>} Schlüssel `<tier>-<klasse>`. Das Duo (`giraffe-hochstapler`, Bogen `duo`, Gangart
- * `stride`, Höhe `DUO_HEIGHT`) bekommt seinen Eintrag erst, wenn das Bild geliefert und ausgemessen ist; bis dahin
- * zeigt das Spiel die 3D-Ersatzfigur.
+ * `stride`, Höhe `DUO_HEIGHT`) hat als einziger Held eine Bildfolge (`frames`); sein eigenes Rechteck ist das
+ * Standbild `DUO_FRAMES.still`. Fehlt das Bild, zeigt das Spiel die 3D-Ersatzfigur.
  */
 export const HERO_SPRITES = {
   'hase-krieger': { sheet: 'helden', x: 113, y: 8, w: 279, h: 411, heightM: HERO_HEIGHT, motion: 'hop', footOffset: 0.08 },
@@ -92,6 +122,7 @@ export const HERO_SPRITES = {
   'waschbaer-krieger': { sheet: 'helden', x: 45, y: 822, w: 379, h: 410, heightM: HERO_HEIGHT, motion: 'scurry', footOffset: 0.06 },
   'waschbaer-magier': { sheet: 'helden', x: 441, y: 826, w: 352, h: 407, heightM: HERO_HEIGHT, motion: 'scurry', footOffset: 0.06 },
   'waschbaer-dieb': { sheet: 'helden', x: 863, y: 825, w: 342, h: 408, heightM: HERO_HEIGHT, motion: 'scurry', footOffset: 0.06 },
+  'giraffe-hochstapler': { sheet: 'duo', ...DUO_CELLS[DUO_FRAMES.still], heightM: DUO_HEIGHT, motion: 'stride', footOffset: 0.05, frames: DUO_CELLS },
 };
 
 /** @type {Record<string, SpriteDef>} */

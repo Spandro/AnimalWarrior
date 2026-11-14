@@ -1,9 +1,9 @@
 import { test, assertEqual, assertClose, assertTrue } from './runner.js';
-import { removeBackground, spriteUv, spriteMotion, heroSpriteDef, usedSheets } from '../src/render/sprites.js';
+import { removeBackground, spriteUv, spriteMotion, heroSpriteDef, usedSheets, duoFrameAt, cutFrames } from '../src/render/sprites.js';
 import { lookYaw } from '../src/render/hero.js';
 import { buildCharacter, animateCharacter } from '../src/render/character.js';
 import * as THREE from '../vendor/three.module.min.js';
-import { HERO_SPRITES, ENEMY_SPRITES, MOTION, IDLE, SHEETS, SHEET_HOLES, DUO_HEIGHT } from '../src/data/sprites.js';
+import { HERO_SPRITES, ENEMY_SPRITES, MOTION, IDLE, SHEETS, SHEET_HOLES, SHEET_FRAMES, DUO_HEIGHT, DUO_FRAMES } from '../src/data/sprites.js';
 import { ENEMIES } from '../src/data/enemies.js';
 import { ANIMALS } from '../src/data/animals.js';
 import { CLASSES } from '../src/data/classes.js';
@@ -66,10 +66,12 @@ test('sprites: Startpunkt auf dunklem Pixel ändert nichts', () => {
   assertEqual([alphaAt(img, 1, 1), alphaAt(img, 3, 3)], [255, 255]);
 });
 
-test('sprites: SHEET_HOLES enthält die sieben Punkte aus der Bilder-Doku', () => {
+test('sprites: SHEET_HOLES enthält die sieben Punkte aus der Bilder-Doku und die Lücken des Duos', () => {
   assertEqual(SHEET_HOLES, {
     gegner2: [[290, 921], [753, 516], [172, 904]],
     bosse: [[198, 427], [302, 1011], [296, 165], [388, 127]],
+    duo: [[160, 669], [567, 674], [898, 673], [1337, 673], [340, 121], [1203, 512], [915, 499], [296, 243], [223, 191],
+      [1176, 546], [241, 176], [279, 261], [1191, 530]],
   });
   for (const id of Object.keys(SHEET_HOLES)) assertTrue(!!SHEETS[id], `Bogen ${id} fehlt in SHEETS`);
 });
@@ -217,6 +219,58 @@ test('sprites: alle Gegnerausschnitte liegen im Bogen; die neuen wie ausgemessen
   assertEqual(cut('kreuzotter'), ['gegner2', 54, 707, 319, 266]);
   assertEqual(cut('igel'), ['gegner2', 441, 714, 317, 269]);
   assertEqual(cut('luchs'), ['gegner2', 791, 683, 428, 326]);
+});
+
+test('sprites: Duo-Bildfolge', () => {
+  const duo = HERO_SPRITES[DUO_KEY];
+  assertTrue(duo, 'Duo-Eintrag fehlt');
+  assertEqual([duo.sheet, duo.motion, duo.heightM], ['duo', 'stride', DUO_HEIGHT]);
+  // Vier gleich große Ausschnitte nebeneinander im ausgeschnittenen Bogen; der Eintrag selbst ist das Standbild.
+  assertEqual(duo.frames.length, 4);
+  duo.frames.forEach((f, k) => assertEqual([f.x, f.y, f.w, f.h], [k * duo.w, 0, duo.w, duo.h], `Phase ${k}`));
+  const still = duo.frames[DUO_FRAMES.still];
+  assertEqual([duo.x, duo.y], [still.x, still.y]);
+  // Ausgemessen im gelieferten Bild (1536 × 1024): gleiche Größe, Giraffe am selben Fußpunkt.
+  assertEqual(SHEET_FRAMES.duo, { x: [-37, 330, 703, 1093], y: 97, w: 443, h: 834 });
+  assertEqual([duo.w, duo.h], [SHEET_FRAMES.duo.w, SHEET_FRAMES.duo.h]);
+  for (const x of SHEET_FRAMES.duo.x) assertTrue(x + SHEET_FRAMES.duo.w <= 1536, `Phase bei ${x} ragt rechts heraus`);
+  // Reihenfolge ist eine Umstellung von 0–3, alle Dauern positiv.
+  assertEqual(DUO_FRAMES.order.length, 4);
+  assertEqual([...DUO_FRAMES.order].sort(), [0, 1, 2, 3]);
+  assertEqual(DUO_FRAMES.seconds.length, 4);
+  for (const s of DUO_FRAMES.seconds) assertTrue(s > 0, `Dauer ${s}`);
+  assertEqual([DUO_FRAMES.still, DUO_FRAMES.reducedMotion], [0, 3]);
+  // Rücken 2,5 s → Klettern 1,2 s → oben 2,5 s → Rutschen 0,8 s, Umlauf 7 s.
+  assertEqual(duoFrameAt(0), 3);
+  assertEqual(duoFrameAt(2.4), 3);
+  assertEqual(duoFrameAt(2.6), 2);
+  assertEqual(duoFrameAt(3.8), 0);
+  assertEqual(duoFrameAt(6.3), 1);
+  assertEqual(duoFrameAt(7), 3);
+  assertEqual(duoFrameAt(7 * 40 + 2.6), 2);
+  for (const t of [-1, NaN, Infinity]) assertTrue([0, 1, 2, 3].includes(duoFrameAt(t)), `t = ${t}`);
+});
+
+test('sprites: cutFrames gibt jeder Phase nur ihre eigenen Pixel', () => {
+  // 10 × 5, durchsichtig: Figur A (x 1–3, y 1–2); Figur B (x 6–9, y 1–3) mit Schwanz (x 4–5, y 4), der in As Ausschnitt ragt.
+  const W = 10, H = 5;
+  const data = new Uint8ClampedArray(W * H * 4);
+  const put = (x, y, rgb) => data.set([...rgb, 255], (y * W + x) * 4);
+  for (let y = 1; y <= 2; y++) for (let x = 1; x <= 3; x++) put(x, y, [200, 10, 10]);
+  for (let y = 1; y <= 3; y++) for (let x = 6; x <= 9; x++) put(x, y, [10, 10, 200]);
+  put(4, 4, [10, 10, 201]); put(5, 4, [10, 10, 202]);
+  // Phase 0 beginnt links außerhalb, Phase 1 endet rechts außerhalb des Bogens.
+  const out = cutFrames({ width: W, height: H, data }, { x: [-1, 5], y: 0, w: 6, h: 5 });
+  assertEqual([out.width, out.height], [12, 5]);
+  assertTrue(out.data instanceof Uint8ClampedArray, 'Uint8ClampedArray');
+  const a = (x, y) => out.data[(y * 12 + x) * 4 + 3];
+  for (let y = 1; y <= 2; y++) for (let x = 2; x <= 4; x++) assertEqual(a(x, y), 255, `A ${x},${y}`);
+  assertEqual(a(5, 4), 0, 'Bs Schwanz bleibt aus Phase 0 heraus');
+  assertEqual(a(0, 1), 0, 'links außerhalb ist durchsichtig');
+  for (let y = 1; y <= 3; y++) for (let x = 7; x <= 10; x++) assertEqual(a(x, y), 255, `B ${x},${y}`);
+  assertEqual(a(6, 4), 255, 'Bs Schwanz gehört zu Phase 1');
+  assertEqual(Array.from(out.data.slice((4 * 12 + 6) * 4, (4 * 12 + 6) * 4 + 3)), [10, 10, 202]);
+  for (let y = 0; y < 5; y++) assertEqual(a(11, y), 0, 'rechts außerhalb ist durchsichtig');
 });
 
 test('hero: die Figur dreht sich beim Zielen in die Zielrichtung, sonst in die Laufrichtung', () => {

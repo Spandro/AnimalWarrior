@@ -5,7 +5,7 @@ import { buildCharacter, animateCharacter } from '../render/character.js';
 import { spriteMotion, heroSpriteDef } from '../render/sprites.js';
 import { ANIMALS } from '../data/animals.js';
 import { CLASSES } from '../data/classes.js';
-import { MOTION_FULL_SPEED, DUO_HEIGHT } from '../data/sprites.js';
+import { MOTION_FULL_SPEED, DUO_HEIGHT, DUO_FRAMES } from '../data/sprites.js';
 
 const BACKGROUND = 0x2c3a2a;
 const GROUND = 0x4a5a3c;
@@ -98,7 +98,10 @@ export function createFigurePreview(shared, { width = 240, height = 260, sprites
   };
 }
 
-/** Gemalte Figur aus dem bearbeiteten Bildbogen, mit Boden, weichem Schatten und Ruhebewegung. */
+/**
+ * Gemalte Figur aus dem bearbeiteten Bildbogen, mit Boden, weichem Schatten und Ruhebewegung. Eine Bildfolge (das Duo)
+ * zeigt hier nur ihr Standbild `DUO_FRAMES.still`.
+ */
 function createSpritePainter(ctx, element, sprites) {
   let def = null;
   return {
@@ -138,7 +141,8 @@ function createSpritePainter(ctx, element, sprites) {
       ctx.rotate(m.tilt);
       ctx.scale(scale * m.scaleX, scale * m.scaleY);
       ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(sprites.canvases[def.sheet], def.x, def.y, def.w, def.h, -def.w / 2, -def.h, def.w, def.h);
+      const r = def.frames?.[DUO_FRAMES.still] ?? def;
+      ctx.drawImage(sprites.canvases[def.sheet], r.x, r.y, r.w, r.h, -def.w / 2, -def.h, def.w, def.h);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
     },
     dispose() {},

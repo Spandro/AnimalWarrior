@@ -72,15 +72,15 @@ export function startGame({
   const terrain = createTerrainView(view.scene, world.seed, { env, camera: view.camera });
   const enemyView = createEnemyView(view.scene, { sprites, camera: view.camera, env });
   const chestView = createChestView(view.scene, world.seed, sprites, { env, camera: view.camera });
-  const heroView = createHeroView(view.scene, animalId, classId, { sprites, camera: view.camera });
+  /** Weniger Bewegung gewünscht: kein Wackeln, Sterbephase sofort beendet, kürzere Abblende, Duo ohne Bildfolge. */
+  const reducedMotion = (() => {
+    try { return !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+  })();
+  const heroView = createHeroView(view.scene, animalId, classId, { sprites, camera: view.camera, reducedMotion });
   const effects = createEffects(view.scene, uiLayer, { quality, camera: view.camera });
   const hud = createHud(uiLayer, { onPause: () => togglePause() });
   const chestHint = createChestHint(uiLayer);
   const deathOverlay = createDeathOverlay(uiLayer, { canvas });
-  /** Weniger Bewegung gewünscht: kein Wackeln, Sterbephase sofort beendet, kürzere Abblende. */
-  const reducedMotion = (() => {
-    try { return !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
-  })();
   const levelUp = createLevelUpDialog(uiLayer, { onChoose: (i) => chooseCard(run, i) });
   const pauseMenu = createPauseMenu(uiLayer, { onResume: resume, onAbandon: abandon });
 

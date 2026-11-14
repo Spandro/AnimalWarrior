@@ -3,9 +3,10 @@ import { buildCharacter, animateCharacter, buildMeerkat, animateMeerkat } from '
 import { createTracker } from './enemies.js';
 import {
   billboardOrientation, spriteGeometry, spriteWidth, spriteMaterial, shadowMaterial, composeSprite, spriteMotion, heroSpriteDef,
+  duoFrameAt,
 } from './sprites.js';
 import { CLASSES } from '../data/classes.js';
-import { DUO_FX, BILLBOARD, AIM_TURN_DURATION, HERO_FLASH, HERO_POISON_TINT, DYING_TILT } from '../data/sprites.js';
+import { DUO_FX, DUO_FRAMES, BILLBOARD, AIM_TURN_DURATION, HERO_FLASH, HERO_POISON_TINT, DYING_TILT } from '../data/sprites.js';
 import { ABILITIES } from '../data/abilities.js';
 
 /** Dauer der Hiebanimation in Weltsekunden. */
@@ -30,15 +31,16 @@ const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
  *
  * Mit geladenen Bildbögen ist der Held ein gemaltes Bild auf einer Tafel (Füße am Boden, zur Kamera
  * gewandt, nach links gespiegelt, wenn er nach links blickt) mit weichem Bodenschatten; sonst die
- * 3D-Figur aus `character.js`.
+ * 3D-Figur aus `character.js`. Das gemalte Duo wechselt dazu seine Phasen nach der Uhr (`DUO_FRAMES`), bei
+ * `reducedMotion` bleibt es auf `DUO_FRAMES.reducedMotion` stehen.
  * @param {THREE.Scene} scene
  * @param {'hase'|'ente'|'waschbaer'} animalId
  * @param {'krieger'|'magier'|'dieb'} classId
- * @param {{ sprites?: import('./sprites.js').SpriteSheets, camera?: THREE.Camera }} [options]
+ * @param {{ sprites?: import('./sprites.js').SpriteSheets, camera?: THREE.Camera, reducedMotion?: boolean }} [options]
  */
-export function createHeroView(scene, animalId, classId, { sprites, camera } = {}) {
+export function createHeroView(scene, animalId, classId, { sprites, camera, reducedMotion = false } = {}) {
   const def = heroSpriteDef(sprites, animalId, classId);
-  const body = def ? createSpriteBody(scene, def, sprites, camera) : createFigureBody(scene, animalId, classId);
+  const body = def ? createSpriteBody(scene, def, sprites, camera, reducedMotion) : createFigureBody(scene, animalId, classId);
   const family = createFamily(scene);
 
   // Heller Bodenring unter dem Helden, damit er im Gewühl auffindbar bleibt.
@@ -169,10 +171,16 @@ export function lookYaw(facing, aim) {
   return Math.atan2(d.x, d.z);
 }
 
-/** Gemalter Held: eine Bildtafel mit Bodenschatten; Klone als dunkle Kopien derselben Tafel. */
-function createSpriteBody(scene, def, sprites, camera) {
+/**
+ * Gemalter Held: eine Bildtafel mit Bodenschatten; Klone als dunkle Kopien derselben Tafel. Mit Bildfolge (`def.frames`,
+ * alle Phasen gleich groß) tauscht die Tafel je Bild ihre Geometrie (UV-Ausschnitt) nach {@link duoFrameAt}.
+ */
+function createSpriteBody(scene, def, sprites, camera, reducedMotion) {
   const orient = billboardOrientation(camera);
-  const geometry = spriteGeometry(def, sprites.sizes[def.sheet]);
+  const geometries = (def.frames ?? [def]).map((f) => spriteGeometry(f, sprites.sizes[def.sheet]));
+  /** Bildposition zur Zeit `t`: ohne Bildfolge immer 0. */
+  const frameAt = (t) => (!def.frames ? 0 : reducedMotion ? DUO_FRAMES.reducedMotion : duoFrameAt(t));
+  let geometry = geometries[frameAt(0)];
   const material = spriteMaterial(sprites.textures[def.sheet]);
   const width = spriteWidth(def), height = def.heightM;
 
@@ -212,6 +220,8 @@ function createSpriteBody(scene, def, sprites, camera) {
       else if (facing.x < -BILLBOARD.flipHysteresis) face = -1;
       const m = spriteMotion(def.motion, { speed, time, attackT });
       m.tilt += dyingTilt * DYING_TILT;
+      geometry = geometries[frameAt(time)];
+      figure.geometry = geometry;
       // Nur bei Änderung schreiben: Aufblitzen, Gifttönung und Ausblenden betreffen allein diese Tafel (eigenes Material).
       const tint = flash ? 'flash' : poisoned ? 'poison' : 'plain';
       if (tint !== lookFlash) {
@@ -252,6 +262,7 @@ function createSpriteBody(scene, def, sprites, camera) {
         const k = 0.6 + 0.4 * fade;
         const m = spriteMotion(def.motion, { speed: 0, time: t * 1.3 + i });
         composeSprite(c.matrix, orient, s.x, 0, s.z, width * k, height * k, cloneFace.get(s), m, def.footOffset * k);
+        c.geometry = geometry;
         c.matrixWorldNeedsUpdate = true;
         c.visible = true;
         i++;
@@ -260,7 +271,7 @@ function createSpriteBody(scene, def, sprites, camera) {
     },
     dispose() {
       scene.remove(figure, blob, ...clones);
-      geometry.dispose();
+      for (const g of geometries) g.dispose();
       material.dispose();
       cloneMat.dispose();
       blobGeo.dispose();
