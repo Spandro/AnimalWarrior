@@ -20,7 +20,7 @@ import {
  *
  * Ereignisse eines Schritts stehen in `run.events`: alle Welt-Ereignisse und `levelUp`, `abilityUnlocked`,
  * `questAccepted`, `questAdvanced`, `questCompleted`, `questItem`, `loot`, `areaEnter`, `bossStart`, `bossDefeated`,
- * `arenaClosed`, `arenaOpened`, `dying`, `wake`, `rested`, `travel`, `mapChange`, `potion`, `abilityFail`.
+ * `arenaClosed`, `arenaOpened`, `dying`, `wake`, `rested`, `travel`, `mapChange`, `potion`, `abilityFail`, `chapterDone`.
  *
  * @typedef {import('../save/adventure.js').AdventureRecord} AdventureRecord
  * @typedef {import('../save/adventure.js').Ledger} Ledger
@@ -223,6 +223,7 @@ function handleWorldEvent(run, e) {
 }
 
 function grantXp(run, amount) {
+  if (amount > 0) run.dirty = true;
   const r = gainXp(run.record, amount * run.world.hero.stats.xpGain, run.hero.class);
   if (r.levels > 0) {
     applyHeroSetup(run, true);
@@ -287,6 +288,7 @@ function onBossDefeated(run, bossDef, e) {
 /** Ein Auftragsereignis: Fortschritt, Abschluss mit Belohnung genau einmal. */
 function quest(run, event) {
   const r = questEvent(run.record.quests, event);
+  if (r.changed) run.dirty = true;
   for (const id of r.advanced) { emit(run, { type: 'questAdvanced', questId: id }); run.dirty = true; }
   for (const id of r.completed) completeQuest(run, id);
 }
@@ -299,6 +301,10 @@ function completeQuest(run, id) {
   if (q.unlocks && !run.record.unlocked.includes(q.unlocks)) run.record.unlocked.push(q.unlocks);
   if (run.record.trackedQuest === id) run.record.trackedQuest = null;
   emit(run, { type: 'questCompleted', questId: id, reward });
+  if (q.endsChapter && !run.record.chapterDone.includes(q.endsChapter)) {
+    run.record.chapterDone.push(q.endsChapter);
+    emit(run, { type: 'chapterDone', chapter: q.endsChapter });
+  }
   run.dirty = true;
   grantXp(run, reward.xp / run.world.hero.stats.xpGain);
 }
@@ -457,6 +463,12 @@ export function acceptOffer(run, questId) {
   emit(run, { type: 'questAccepted', questId });
   run.dirty = true;
   return true;
+}
+
+/** Die Bildergeschichte zum Einstieg ist gezeigt (oder übersprungen). */
+export function markIntroSeen(run) {
+  run.record.introSeen = true;
+  run.dirty = true;
 }
 
 export function endTalk(run) {

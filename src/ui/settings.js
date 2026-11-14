@@ -45,6 +45,18 @@ export function renderSettings(c, props, app) {
       el('span', { class: 'option-title', text: q.label }),
       el('span', { class: 'option-text muted', text: q.text }))));
 
+  const sides = [
+    { id: 'right', label: 'Rechts', text: 'Knöpfe unten rechts, laufen mit dem linken Daumen.' },
+    { id: 'left', label: 'Links', text: 'Knöpfe unten links, laufen mit dem rechten Daumen.' },
+  ].map((o) => el('label', { class: 'option' },
+    el('input', {
+      type: 'radio', name: 'buttonSide', value: o.id, checked: o.id === app.save.settings.buttonSide,
+      onchange: () => { app.update((save) => { save.settings.buttonSide = o.id; }); app.applySettings(); },
+    }),
+    el('span', { class: 'option-body' },
+      el('span', { class: 'option-title', text: o.label }),
+      el('span', { class: 'option-text muted', text: o.text }))));
+
   c.append(
     screenHeader('Einstellungen'),
     el('div', { class: 'settings-list' },
@@ -56,7 +68,10 @@ export function renderSettings(c, props, app) {
         el('p', { class: 'hint', id: 'volume-hint', text: 'Ganz links ist der Ton aus.' })),
       el('fieldset', { class: 'panel setting' },
         el('legend', { class: 'setting-label', text: 'Grafikqualität' }),
-        ...options)),
+        ...options),
+      el('fieldset', { class: 'panel setting' },
+        el('legend', { class: 'setting-label', text: 'Knöpfe im Abenteuer' }),
+        ...sides)),
     screenFooter(() => app.screens.show('main')),
   );
 }

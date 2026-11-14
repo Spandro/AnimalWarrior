@@ -6,7 +6,8 @@
  *   `collect`: `from: 'spot'` = Fundorte dieser Art („Untersuchen“), sonst Gegnerarten, deren Besiegen mit Chance
  *   `QUEST_DROP` ein Stück gibt.
  * @typedef {{ id: string, kind: 'main'|'side', title: string, giver: string, requires: string[], steps: StepDef[],
- *   reward: { xp: number, gold: number, item?: string, potions?: number }, unlocks?: 'merchant'|'smith' }} QuestDef
+ *   reward: { xp: number, gold: number, item?: string, potions?: number }, unlocks?: 'merchant'|'smith', endsChapter?: number }} QuestDef
+ *   `endsChapter`: mit diesem Auftrag ist das Kapitel geschafft.
  */
 
 /** Chance, dass ein passender Gegner ein Auftragsstück (Flugblatt, Krebsschere) fallen lässt. */
@@ -55,7 +56,7 @@ export const QUESTS = {
       { type: 'boss', target: 'zwickzwack', map: 'kapitel1', text: 'Besiege Kommandant Zwickzwack' },
       { type: 'talk', target: 'panzerla', text: 'Bring Oma Panzerla die Flaschenpost' },
     ],
-    reward: { xp: 400, gold: 150 },
+    reward: { xp: 400, gold: 150 }, endsChapter: 1,
   },
   verbuddelt: {
     id: 'verbuddelt', kind: 'side', title: 'Verbuddelt und vergessen', giver: 'nussa', requires: [],

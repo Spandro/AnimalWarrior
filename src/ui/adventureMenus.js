@@ -16,6 +16,9 @@ import { trackedQuest } from '../core/quests.js';
  *   `change` ändert den gespeicherten Stand (Held als zweites Argument) und übernimmt ihn in den Lauf.
  */
 
+/** Offene Tafeln, die oberste zuletzt: nur sie bekommt Tasten. */
+const stack = [];
+
 /**
  * Tafel mit Titel, Inhalt und „Zurück“. `build(body)` füllt den Inhalt; `refresh()` baut ihn neu.
  * @returns {Promise<void>} erfüllt beim Schließen
@@ -38,10 +41,13 @@ export function panel(uiLayer, title, build, { backLabel = 'Zurück', wide = fal
     }
     function close() {
       window.removeEventListener('keydown', onKey, true);
+      stack.splice(stack.indexOf(api), 1);
       root.remove();
       resolve();
     }
     function onKey(e) {
+      // Nur die oberste Tafel, und keine, solange eine Rückfrage offen ist.
+      if (stack[stack.length - 1] !== api || document.querySelector('.dialog-backdrop')) return;
       if (e.code === 'Escape' || closeKeys.includes(e.code)) { e.preventDefault(); e.stopPropagation(); close(); return; }
       if (e.code === 'ArrowDown' || e.code === 'ArrowUp') {
         const list = [...box.querySelectorAll('button:not([disabled])')];
@@ -51,6 +57,7 @@ export function panel(uiLayer, title, build, { backLabel = 'Zurück', wide = fal
       }
     }
     back.addEventListener('click', close);
+    stack.push(api);
     window.addEventListener('keydown', onKey, true);
     build(body, api);
     focusFirst();

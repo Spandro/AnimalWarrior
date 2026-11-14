@@ -54,8 +54,11 @@ export function createAdventureHud(uiLayer, h) {
     controls);
   uiLayer.append(root);
 
-  let bannerUntil = 0, clock = 0, lastQuest = null, lastTalk = null;
-  function say(text) {
+  let bannerUntil = 0, clock = 0, lastQuest = null, lastTalk = null, bannerImportant = false;
+  /** Einblendung; Gebietsnamen (`minor`) verdrängen keine laufende wichtigere Meldung. */
+  function say(text, minor = false) {
+    if (minor && bannerImportant && !banner.hidden) return;
+    bannerImportant = !minor;
     banner.textContent = text;
     banner.hidden = false;
     bannerUntil = clock + BANNER_SECONDS;
@@ -67,7 +70,7 @@ export function createAdventureHud(uiLayer, h) {
     /** Einblendungen aus den Ereignissen eines Schritts. */
     handle(events) {
       for (const e of events) {
-        if (e.type === 'areaEnter') say(e.name);
+        if (e.type === 'areaEnter') say(e.name, true);
         else if (e.type === 'levelUp') say(`Level ${e.level}!`);
         else if (e.type === 'abilityUnlocked') say(`Neue Fähigkeit: ${ABILITIES[e.abilityId].name}`);
         else if (e.type === 'questAccepted') say(`Neuer Auftrag: ${QUESTS[e.questId].title}`);

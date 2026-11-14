@@ -204,3 +204,28 @@ test('adventure: Fähigkeit von Hand über den Knopf, ohne Ziel scheitert sie mi
   put(run, 54, 26); step(run);
   assertTrue(useAbility(run, 1));
 });
+
+test('adventure: Einstieg gesehen und Kapitel 1 geschafft stehen im Heldenstand', async () => {
+  const { markIntroSeen } = await import('../src/modes/adventure.js');
+  const run = setup({ map: 'dorf', campfire: 'dorf_platz', mutate: (a) => {
+    for (const id of ['nasse_pfoten', 'schmied_ohne_hammer', 'bruecke_zu', 'flugblaetter']) a.quests[id] = { state: 'done', step: 9, progress: 0 };
+    a.quests.zwickzwack = { state: 'active', step: 2, progress: 0 };
+    a.introSeen = false;
+  } });
+  markIntroSeen(run);
+  assertEqual(run.record.introSeen, true);
+  put(run, -6, -8.5); step(run);
+  interact(run);
+  assertEqual(run.record.quests.zwickzwack.state, 'done');
+  assertEqual(run.record.chapterDone, [1]);
+  assertTrue(run.events.some((e) => e.type === 'chapterDone' && e.chapter === 1));
+});
+
+test('adventure: Erfahrung und Zählfortschritt eines Auftrags markieren den Lauf zum Speichern', () => {
+  const run = setup({ mutate: (a) => { acceptQuest(a.quests, 'nasse_pfoten'); } });
+  put(run, 54, 26); step(run, 2);
+  run.dirty = false;
+  killAll(run, members(run, 'p_ufer_1').slice(0, 1)); step(run);
+  assertEqual(run.record.quests.nasse_pfoten.progress, 1);
+  assertTrue(run.dirty);
+});

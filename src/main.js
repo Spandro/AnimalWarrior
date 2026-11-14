@@ -9,6 +9,8 @@ import { initialQuality } from './render/quality.js';
 import { loadSpriteSheets, addSheet, deferredSheets } from './render/sprites.js';
 import { loadEnvironment } from './render/environment.js';
 import { startGame } from './game.js';
+import { startAdventure } from './adventureGame.js';
+import { newAdventure } from './save/adventure.js';
 import { createStore, addHero, deleteHero, settleRun, STORAGE_KEY } from './save/store.js';
 import { applyRunToStats, evaluateAchievements, evaluateStored, unlockStored, unlock } from './core/achievements.js';
 import { ACHIEVEMENTS } from './data/achievements.js';
@@ -241,6 +243,26 @@ function startApp() {
       });
     },
 
+    /** Zeigt den Spielbildschirm und startet das Abenteuer des Helden (beim ersten Mal ein neues). */
+    startAdventure(heroId) {
+      const hero = app.save.heroes.find((h) => h.id === heroId);
+      if (!hero) { app.screens.show('heroes'); return; }
+      if (!hero.adventure) app.update((save) => { const h = save.heroes.find((x) => x.id === heroId); if (h && !h.adventure) h.adventure = newAdventure(h); });
+      app.endRunSilently();
+      app.heroId = heroId;
+      app.screens.show('game');
+      const token = {};
+      app.pendingRun = token;
+      Promise.all([app.sprites.then((sprites) => addSheet(sprites, 'kapitel1')), app.environment]).then(([sprites, env]) => {
+        if (app.pendingRun !== token) return;
+        app.pendingRun = null;
+        app.run = startAdventure({
+          canvas, uiLayer, view: app.view, app, heroId, seed: Date.now(), quality: app.quality, timeScale, debug, sprites, env, sfx: app.sfx,
+          onExit: () => { app.endRunSilently(); app.screens.show('mode', { heroId }); },
+        });
+      });
+    },
+
     /**
      * Nach Sieg, Tod oder Aufgeben: Durchgang verbuchen (Gold, Statistik, beste Zeit) und Ergebnis zeigen.
      * @param {string} heroId
@@ -322,5 +344,11 @@ function startApp() {
 
   if (debug) window.__app = app;
   app.screens.show('main');
+  // ?mode=adventure (mit ?debug=1): sofort ins Abenteuer des ersten Helden, ohne Helden einen anlegen.
+  if (debug && params.get('mode') === 'adventure') {
+    const pick = autostartHero(params.get('animal'), params.get('class'));
+    const hero = app.save.heroes[0] ?? app.createHero({ name: 'Testheld', animal: pick.animalId, class: pick.classId });
+    if (hero) app.startAdventure(hero.id);
+  }
   for (const id of app.unlockStoredAchievements()) app.announceAchievement(id);
 }

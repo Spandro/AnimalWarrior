@@ -186,10 +186,11 @@ export function renderMode(c, props, app) {
       el('span', { class: 'card-title', text: 'Taverne' }),
       el('span', { class: 'card-text', text: 'Würfel, Rad und Karten. Das Haus gewinnt meistens.' }),
       el('span', { class: 'card-action', text: 'Zum Tresen →' })),
-      el('button', { class: 'card mode-card locked', type: 'button', disabled: true, 'aria-describedby': 'adventure-soon' },
+      el('button', { class: 'card mode-card', type: 'button', onclick: () => app.startAdventure(hero.id) },
         el('span', { class: 'card-title', text: 'Abenteuer-Modus' }),
-        el('span', { class: 'card-text', text: 'Eine Reise durch Wald und Dorf mit Aufgaben und Ausrüstung.' }),
-        el('span', { class: 'badge', id: 'adventure-soon', text: 'kommt später' }))),
+        el('span', { class: 'card-text', text: 'Ein Goldfisch will das Land fluten. Aufträge, Ausrüstung und Bosse.' }),
+        el('span', { class: 'card-text muted', text: hero.adventure ? `Kapitel ${Math.min(1, (hero.adventure.chapterDone.length || 0) + 1)} · Level ${hero.adventure.level}` : 'Neues Abenteuer' }),
+        el('span', { class: 'card-action', text: hero.adventure ? 'Weiter →' : 'Los geht’s →' }))),
     screenFooter(() => app.screens.show('heroes')),
   );
 }

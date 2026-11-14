@@ -82,20 +82,23 @@ function matches(step, e) {
  * Schreibt ein Ereignis in alle laufenden Aufträge fort.
  * @param {QuestLog} log
  * @param {QuestEvent} event
- * @returns {{ advanced: string[], completed: string[] }} weitergekommene (neuer Schritt) und abgeschlossene Aufträge
+ * @returns {{ advanced: string[], completed: string[], changed: boolean }} weitergekommene (neuer Schritt) und
+ *   abgeschlossene Aufträge; `changed`: irgendein Fortschritt (auch nur ein Zähler)
  */
 export function questEvent(log, event) {
   const advanced = [], completed = [];
+  let changed = false;
   for (const id of Object.keys(log)) {
     const s = currentStep(log, id);
     if (!s || !matches(s, event)) continue;
     const entry = log[id];
+    changed = true;
     entry.progress++;
     if (entry.progress < (s.count ?? 1)) continue;
     entry.step++; entry.progress = 0;
     if (entry.step >= QUESTS[id].steps.length) { entry.state = 'done'; completed.push(id); } else advanced.push(id);
   }
-  return { advanced, completed };
+  return { advanced, completed, changed };
 }
 
 /**
