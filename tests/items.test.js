@@ -1,10 +1,10 @@
 import { test, assertEqual, assertTrue } from './runner.js';
-import { ITEMS, RARITIES, SLOT_NAMES } from '../src/data/items.js';
+import { ITEMS, RARITIES, SLOT_NAMES, TAVERN_ITEMS, itemSheet } from '../src/data/items.js';
 import { BASE_STATS } from '../src/data/animals.js';
 import { rollItem } from '../src/core/tavern.js';
 import { createRng } from '../src/core/rng.js';
 
-const list = Object.values(ITEMS);
+const list = Object.values(ITEMS).filter((i) => i.source === 'taverne');
 
 test('items: 24 Gegenstände, 12/8/4 je Seltenheit, icon 0–23 je einmal, Kennungen eindeutig', () => {
   assertEqual(list.length, 24);
@@ -67,5 +67,28 @@ test('items: rollItem über 20.000 Würfe', () => {
   assertTrue(Math.abs(byRarity.gewoehnlich / N - 0.70) <= 0.015, 'gewoehnlich');
   assertTrue(Math.abs(byRarity.selten / N - 0.25) <= 0.015, 'selten');
   assertTrue(Math.abs(byRarity.legendaer / N - 0.05) <= 0.015, 'legendaer');
-  for (const id of Object.keys(ITEMS)) assertTrue(counts[id] > 0, `${id} nie gewürfelt`);
+  for (const id of Object.keys(TAVERN_ITEMS)) assertTrue(counts[id] > 0, `${id} nie gewürfelt`);
+});
+
+// ---------------------------------------------------------------- Abenteuer: Gegenstände aus Kapitel 1
+
+const k1 = Object.values(ITEMS).filter((i) => i.source === 'kapitel1');
+
+test('items: 30 Gegenstände aus Kapitel 1, 15/10/5, icon 0–29, jede Kennung hat eine Quelle', () => {
+  assertEqual(k1.length, 30);
+  assertEqual(Object.values(ITEMS).length, 54);
+  for (const item of Object.values(ITEMS)) assertTrue(['taverne', 'kapitel1'].includes(item.source), item.id);
+  assertEqual(k1.filter((i) => i.rarity === 'gewoehnlich').length, 15);
+  assertEqual(k1.filter((i) => i.rarity === 'selten').length, 10);
+  assertEqual(k1.filter((i) => i.rarity === 'legendaer').length, 5);
+  assertEqual(k1.map((i) => i.icon).sort((a, b) => a - b), Array.from({ length: 30 }, (_, n) => n));
+  for (const slot of Object.keys(SLOT_NAMES)) assertTrue(k1.some((i) => i.slot === slot), slot);
+  for (const kind of ['nahkampf', 'zauber', 'wurf']) assertTrue(k1.filter((i) => i.weaponKind === kind).length >= 2, kind);
+});
+
+test('items: itemSheet und TAVERN_ITEMS trennen die Bögen und die Truhe der Taverne', () => {
+  assertEqual(itemSheet(ITEMS.helm_zuversicht), 'beute');
+  assertEqual(itemSheet(k1[0]), 'beute1');
+  assertEqual(Object.keys(TAVERN_ITEMS).length, 24);
+  assertTrue(Object.values(TAVERN_ITEMS).every((i) => i.source === 'taverne'));
 });

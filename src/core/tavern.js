@@ -1,4 +1,4 @@
-import { ITEMS, RARITIES } from '../data/items.js';
+import { ITEMS, RARITIES, TAVERN_ITEMS } from '../data/items.js';
 import { TAVERN, DICE, WHEEL, HILO } from '../data/tavern.js';
 
 /**
@@ -19,7 +19,7 @@ export function rollItem(rng) {
     }
     roll -= r.weight;
   }
-  const pool = Object.values(ITEMS).filter((item) => item.rarity === rarity);
+  const pool = Object.values(TAVERN_ITEMS).filter((item) => item.rarity === rarity);
   return rng.pick(pool).id;
 }
 

@@ -5,13 +5,13 @@ import { screenHeader, screenFooter, confirmDialog } from './menus.js';
 import { describeModifier } from './heroCreate.js';
 import { chestSlots, foundCount, itemKindLabel } from './tavernText.js';
 import { TAVERN, HOSTS, TABLE_HOST, TAVERN_IMAGES } from '../data/tavern.js';
-import { ITEMS, RARITIES } from '../data/items.js';
+import { ITEMS, RARITIES, TAVERN_ITEMS } from '../data/items.js';
 import { unlockDuo, markItemsSeen } from '../save/tavern.js';
 import { HERO_SPRITES } from '../data/sprites.js';
 import { cropCanvas } from '../render/sprites.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const TOTAL_ITEMS = Object.keys(ITEMS).length;
+const TOTAL_ITEMS = Object.keys(TAVERN_ITEMS).length;
 
 // ---------------------------------------------------------------- Bilder mit Ersatz
 

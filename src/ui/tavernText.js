@@ -1,6 +1,6 @@
 // Reine Texte und Listen für Taverne und Truhe. Kein Zugriff auf `document`, damit sich alles testen lässt.
 import { TAVERN, HILO } from '../data/tavern.js';
-import { ITEMS, RARITIES, SLOT_NAMES } from '../data/items.js';
+import { ITEMS, RARITIES, SLOT_NAMES, TAVERN_ITEMS } from '../data/items.js';
 
 const factorFormat = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
@@ -29,7 +29,7 @@ export function formatFactor(f) {
  * @returns {{ id: string | null, icon: number, found: boolean, isNew: boolean }[]}
  */
 export function chestSlots(save) {
-  const byIcon = Object.values(ITEMS).sort((a, b) => a.icon - b.icon);
+  const byIcon = Object.values(TAVERN_ITEMS).sort((a, b) => a.icon - b.icon);
   return byIcon.map((def) => {
     const found = save.inventory.includes(def.id);
     return {
@@ -47,7 +47,7 @@ export function chestSlots(save) {
  * @returns {number}
  */
 export function foundCount(save) {
-  return Object.keys(ITEMS).filter((id) => save.inventory.includes(id)).length;
+  return Object.keys(TAVERN_ITEMS).filter((id) => save.inventory.includes(id)).length;
 }
 
 const WEAPON_KIND_NAMES = { nahkampf: 'Nahkampf', zauber: 'Zauber', wurf: 'Wurf' };
