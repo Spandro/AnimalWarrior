@@ -1,7 +1,7 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { ENEMIES } from '../data/enemies.js';
 import { ABILITIES } from '../data/abilities.js';
-import { ENEMY_SPRITES, CROW_FLIGHT_HEIGHT, BILLBOARD, CURL_ROLL, DUO_FX } from '../data/sprites.js';
+import { ENEMY_SPRITES, CROW_FLIGHT_HEIGHT, BILLBOARD, CURL_ROLL, DUO_FX, ADVENTURE_ENEMY_SPRITES, ADVENTURE_SPRITE_STANDIN, PICKUP_STANDIN } from '../data/sprites.js';
 import { isCurled } from '../core/world.js';
 import { SHADOW } from '../data/shadow.js';
 import { ENV_SPRITES } from '../data/environment.js';
@@ -209,6 +209,7 @@ const wingParts = (s) => [
 const FALLBACK_SHAPE = {
   fuchs: 'wolf', luchs: 'wolf', dachs: 'wildschwein', keiler: 'wildschwein', igel: 'ratte', kreuzotter: 'ratte',
   uhu: 'kraehe', hirsch: 'baer', wisent: 'baer',
+  helmfisch: 'ratte', krebs: 'ratte', frosch: 'giftkroete', hauptmann_graete: 'wolf', kommandant_zwickzwack: 'baer',
 };
 
 /**
@@ -331,8 +332,8 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
   /** @type {ReturnType<typeof createPool>[]} */
   let enemyExtras = [];
   let wingL = null, wingR = null, blobs;
-  /** Bildmaße je Gegnertyp (nur gemalt). */
-  const spriteSize = {};
+  /** Bildmaße und Ausschnitt je Gegnertyp (nur gemalt). */
+  const spriteSize = {}, spriteDefs = {};
   let orient = null;
   if (painted) {
     orient = billboardOrientation(camera);
@@ -342,6 +343,15 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
     for (const [type, def] of Object.entries(ENEMY_SPRITES)) {
       enemyPools[type] = createPool(root, geo(spriteGeometry(def, sprites.sizes[def.sheet])), sheetMat(def.sheet), capacity(type), { grow: false });
       spriteSize[type] = { width: spriteWidth(def), height: def.heightM };
+      spriteDefs[type] = def;
+    }
+    // Abenteuer-Gegner: eigenes Bild, sobald `kapitel1` geladen ist, sonst ein gemalter Stellvertreter in ihrer Größe.
+    for (const [type, own] of Object.entries(ADVENTURE_ENEMY_SPRITES)) {
+      if (!ENEMIES[type]) continue;
+      const def = sprites.textures[own.sheet] ? own : { ...ENEMY_SPRITES[ADVENTURE_SPRITE_STANDIN[type]], heightM: own.heightM };
+      enemyPools[type] = createPool(root, geo(spriteGeometry(def, sprites.sizes[def.sheet])), sheetMat(def.sheet), capacity(type), { grow: false });
+      spriteSize[type] = { width: spriteWidth(def), height: def.heightM };
+      spriteDefs[type] = def;
     }
     blobs = createPool(root, discGeo, mat(shadowMaterial()), ENEMY_CAPACITY, { grow: false });
   } else {
@@ -574,7 +584,7 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
       if (e.shadow) { drawShadow(world, e, alpha, t); continue; }
       const def = ENEMIES[e.type];
       const pool = enemyPools[e.type] || fallbackPool;
-      const sprite = ENEMY_SPRITES[e.type] || ENEMY_SPRITES.ratte;
+      const sprite = spriteDefs[e.type] || ENEMY_SPRITES.ratte;
       const size = spriteSize[e.type] || spriteSize.ratte;
       const p = tracker.pos(e.id, e.x, e.z, alpha);
       const k = def ? e.radius / def.radius : 1;
@@ -728,10 +738,11 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
     for (const pk of world.pickups) {
       const dx = pk.x - hero.x, dz = pk.z - hero.z;
       if (dx * dx + dz * dz > CULL_DISTANCE * CULL_DISTANCE) continue;
-      const size = pickupSize[pk.kind], pool = pools[pk.kind];
+      const kind = PICKUP_STANDIN[pk.kind] ?? pk.kind;
+      const size = pickupSize[kind], pool = pools[kind];
       if (!size || !pool) continue;
       // Größere Erfahrungssplitter wachsen leicht mit ihrem Wert, wie bei den 3D-Formen.
-      const k = pk.kind === 'xp' ? Math.min(1.5, 0.85 + 0.18 * Math.log2(Math.max(1, pk.value))) : 1;
+      const k = kind === 'xp' ? Math.min(1.5, 0.85 + 0.18 * Math.log2(Math.max(1, pk.value))) : 1;
       pickupMotion.offsetY = 0.05 * (Math.sin(t * 3 + phaseOf(pk)) + 1);
       pool.push(composeSprite(m, orient, pk.x, 0, pk.z, size.width * k, size.height * k, 1, pickupMotion, size.def.footOffset * k));
     }
@@ -745,14 +756,15 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
       if (dx * dx + dz * dz > CULL_DISTANCE * CULL_DISTANCE) continue;
       const ph = phaseOf(pk);
       const bob = Math.sin(t * 3 + ph);
-      if (pk.kind === 'xp') {
+      const kind = PICKUP_STANDIN[pk.kind] ?? pk.kind;
+      if (kind === 'xp') {
         const s = Math.min(0.38, 0.15 * (1 + 0.3 * Math.log2(Math.max(1, pk.value))));
         xpPool.push(place(pk.x, 0.32 + 0.07 * bob, pk.z, t * 2 + ph, s, s * 1.45, s));
-      } else if (pk.kind === 'gold') {
+      } else if (kind === 'gold') {
         goldPool.push(place(pk.x, 0.34 + 0.06 * bob, pk.z, t * 3 + ph, 0.2));
-      } else if (pk.kind === 'potion') {
+      } else if (kind === 'potion') {
         potionPool.push(place(pk.x, 0.04 + 0.05 * (bob + 1), pk.z, t * 1.2 + ph, 1.1));
-      } else if (pk.kind === 'chest') {
+      } else if (kind === 'chest') {
         chestPool.push(place(pk.x, 0, pk.z, 0.4 + 0.08 * bob, 1, 1 + 0.03 * bob, 1));
       }
     }

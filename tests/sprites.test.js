@@ -345,3 +345,12 @@ test('hero: die Figur dreht sich beim Zielen in die Zielrichtung, sonst in die L
   // Eine Zielrichtung der Länge null zählt nicht.
   assertClose(lookYaw(lauf, { x: 0, z: 0 }), Math.atan2(1, 0));
 });
+
+test('sprites: Abenteuer-Gegner liegen im Raster von kapitel1.webp, Stellvertreter und Aufsammelbares sind bekannt', async () => {
+  const { ADVENTURE_SPRITE_STANDIN, PICKUP_STANDIN } = await import('../src/data/sprites.js');
+  for (const [type, d] of Object.entries(ADVENTURE_ENEMY_SPRITES)) {
+    assertTrue(d.x >= 0 && d.y >= 0 && d.x + d.w <= 1254 && d.y + d.h <= 1254, type);
+    if (type !== 'flossian') assertTrue(Object.hasOwn(ENEMY_SPRITES, ADVENTURE_SPRITE_STANDIN[type]), type);
+  }
+  assertEqual(Object.values(PICKUP_STANDIN).sort(), ['chest', 'potion', 'xp']);
+});

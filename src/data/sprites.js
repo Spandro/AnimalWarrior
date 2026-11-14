@@ -160,6 +160,17 @@ export const ADVENTURE_ENEMY_SPRITES = {
   flossian: { sheet: 'kapitel1', x: 836, y: 627, w: 418, h: 627, heightM: 1.6, motion: 'lumber', footOffset: 0.05 },
 };
 
+/**
+ * Solange `kapitel1.webp` fehlt: gemalte Stellvertreter aus den vorhandenen Bögen (Bildhöhe aus
+ * `ADVENTURE_ENEMY_SPRITES`), in 3D die Form eines ähnlichen Tiers.
+ */
+export const ADVENTURE_SPRITE_STANDIN = {
+  helmfisch: 'ratte', krebs: 'igel', frosch: 'giftkroete', hauptmann_graete: 'wolf', kommandant_zwickzwack: 'dachs',
+};
+
+/** Aufsammelbares des Abenteuers, gezeichnet wie: Trank, Truhe (Gegenstand), Kristall (Flussperle). */
+export const PICKUP_STANDIN = { potion_item: 'potion', item: 'chest', material: 'xp' };
+
 /** Eingerollter Igel: Drehung um die Bildmitte (rad/s, in Laufrichtung) und Stauchung des Bildes. */
 export const CURL_ROLL = { spin: 10, scale: 0.85 };
 

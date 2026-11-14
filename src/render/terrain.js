@@ -130,10 +130,12 @@ function makeRockGeometry(variant) {
  * alles bei den 3D-Formen.
  * @param {THREE.Scene} scene
  * @param {number} seed Geländestartwert
+ * Optionen `obstacles` und `deco` ersetzen Hindernisse und Deko aus dem Seed (Abenteuer: Randbäume der Karte, Deko
+ * nur im Wald).
  * @param {{ env?: import('./environment.js').Environment, camera?: THREE.Camera }} [options]
  * @returns {{ update(x: number, z: number, dt?: number): void, dispose(): void }}
  */
-export function createTerrainView(scene, seed, { env, camera } = {}) {
+export function createTerrainView(scene, seed, { env, camera, obstacles = (x, z, r) => obstaclesNear(seed, x, z, r), deco = (cx, cz) => decoInCell(seed, cx, cz) } = {}) {
   const root = new THREE.Group();
   root.name = 'terrain';
   scene.add(root);
@@ -262,7 +264,7 @@ export function createTerrainView(scene, seed, { env, camera } = {}) {
 
   /** Alle Deko einer Zelle in einem einzigen Netz, damit die Bildrate nicht an Zeichenaufrufen hängt. */
   function paintedDeco(cx, cz) {
-    const list = decoInCell(seed, cx, cz);
+    const list = deco(cx, cz);
     if (list.length === 0) return null;
     const count = list.length;
     const positions = new Float32Array(count * 4 * 3);
@@ -354,7 +356,7 @@ export function createTerrainView(scene, seed, { env, camera } = {}) {
     group.add(ground);
     const geos = [ground.geometry];
     const half = TERRAIN_CELL / 2;
-    const near = obstaclesNear(seed, (cx + 0.5) * TERRAIN_CELL, (cz + 0.5) * TERRAIN_CELL, half * Math.SQRT2);
+    const near = obstacles((cx + 0.5) * TERRAIN_CELL, (cz + 0.5) * TERRAIN_CELL, half * Math.SQRT2);
     const trees = [];
     for (const o of near) {
       // Nur Hindernisse, deren Mittelpunkt in dieser Zelle liegt; Nachbarn baut deren Zelle.

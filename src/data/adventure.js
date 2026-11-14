@@ -99,3 +99,26 @@ export const EXPLORE_RADIUS = 20;
 
 /** Abstand vom Lagerfeuer, an dem der Held nach Rasten, Reisen oder Aufwachen steht (m). */
 export const CAMPFIRE_OFFSET = 1.6;
+
+/**
+ * Aussehen der Karten, solange die Bilder des Abenteuers fehlen: Radius der Randbäume und -felsen (m), Anteil der
+ * Wegbreite, der als Erdweg gezeichnet wird, Farben von Weg, Wasser und Brücke, Häuser (Breite, Höhe, Tiefe in m,
+ * Wand- und Dachfarbe) und eine Farbe je Person.
+ */
+export const MAP_LOOK = {
+  borderRadius: { tree: 0.75, rock: 1.0 },
+  pathWidthShare: 0.7,
+  path: 0x8a7150,
+  water: 0x4d86a6,
+  bridge: 0x7a5530,
+  props: {
+    haus_oma: { house: [6, 3, 5], wall: 0x9c8a6a, roof: 0x5f7a3a },
+    laden: { house: [5, 2.6, 4], wall: 0xb59a6a, roof: 0xb04a3a },
+    schmiede: { house: [5, 2.8, 5], wall: 0x7a6a5a, roof: 0x4a4a4a },
+    wohnhaus: { house: [4.5, 2.6, 4], wall: 0xa89070, roof: 0x7a5a3a },
+    wohnhaus2: { house: [4, 2.4, 4], wall: 0xa08868, roof: 0x6a7a4a },
+  },
+  npcs: {
+    panzerla: 0x6f8a4a, kruemel: 0xd29a5a, grabowski: 0x4a4048, nussa: 0xc0622e, pieps: 0x9a7a5a, amsel: 0x2a2a2a,
+  },
+};
