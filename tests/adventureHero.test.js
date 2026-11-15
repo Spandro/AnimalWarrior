@@ -156,6 +156,17 @@ test('adventureHero: Kapitel 2 bringt ohne Wiederholen von Level 10 etwa auf Lev
   assertTrue(a.level >= 15 && a.level <= 17, `Level ${a.level} bei ${Math.round(xp)} Erfahrung`);
 });
 
+test('adventureHero: Kapitel 3 bringt ohne Wiederholen von Level 16 etwa auf Level 21 bis 23', () => {
+  const a = newAdventure({ class: 'krieger' });
+  let need = 0;
+  for (let l = 1; l < 16; l++) need += xpToNextAdventure(l);
+  gainXp(a, need, 'krieger');
+  assertEqual(a.level, 16);
+  const xp = chapterXp('kapitel3');
+  gainXp(a, xp, 'krieger');
+  assertTrue(a.level >= 21 && a.level <= 23, `Level ${a.level} bei ${Math.round(xp)} Erfahrung`);
+});
+
 test('adventureHero: itemDelta vergleicht angelegtes und neues Stück mit Verbesserung', async () => {
   const { itemDelta, scaledModifiers } = await import('../src/core/adventureHero.js');
   assertEqual(scaledModifiers('helm_zuversicht', 5), [{ stat: 'armor', flat: 2 }]);

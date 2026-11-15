@@ -181,6 +181,9 @@ test('adventureSave: Händler – Tränke bis 4, Angebot, Verkauf nur ohne Träg
   assertEqual(buyItem(s, swamp, 'h1'), { ok: false, reason: 'unknown' });
   adv.chapterDone = [1];
   assertEqual(shopStock(adv), [...SHOP.stockByChapter[1], ...SHOP.stockByChapter[2]]);
+  adv.chapterDone = [1, 2];
+  assertEqual(shopStock(adv), [...SHOP.stockByChapter[1], ...SHOP.stockByChapter[2], ...SHOP.stockByChapter[3]]);
+  adv.chapterDone = [1];
   assertEqual(buyItem(s, id, 'h1'), { ok: true });
   assertEqual(buyItem(s, id, 'h1'), { ok: false, reason: 'owned' });
   assertEqual(buyItem(s, swamp, 'h1'), { ok: true });

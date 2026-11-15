@@ -193,6 +193,11 @@ export const ACHIEVEMENTS = [
     check: (c) => (c.save.heroes ?? []).some((h) => h.adventure?.chapterDone?.includes(2)),
   },
   {
+    id: 'dammbruch-verhindert', title: 'Dammbruch verhindert', condition: 'Schließe im Abenteuer Kapitel 3 ab',
+    line: 'Der Damm hält. Die Biber nagen jetzt nur noch an Brennholz.', gold: 100,
+    check: (c) => (c.save.heroes ?? []).some((h) => h.adventure?.chapterDone?.includes(3)),
+  },
+  {
     id: 'meisterstueck', title: 'Meisterstück', condition: 'Lass einen Gegenstand auf +5 verbessern',
     line: 'Grabowski hat geweint. Vor Stolz.', gold: 50,
     check: (c) => Object.values(c.save.itemLevels ?? {}).some((l) => l >= 5),

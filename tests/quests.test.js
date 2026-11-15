@@ -11,9 +11,11 @@ const MAIN = ['nasse_pfoten', 'schmied_ohne_hammer', 'bruecke_zu', 'flugblaetter
 const SIDE = ['verbuddelt', 'post_amsel', 'hamsterkauf'];
 const MAIN2 = ['ruf_aus_dem_sumpf', 'froesche_verbuendet', 'hofmarschall', 'nebel_im_moor', 'hecht_haudrauf'];
 const SIDE2 = ['egelplage', 'seerosen', 'libellenflug'];
+const MAIN3 = ['ruf_vom_damm', 'flossians_geschenk', 'bauleiter', 'dammwache', 'admiral'];
+const SIDE3 = ['bisamplage', 'treibholz', 'altarm'];
 
 test('quests: je Kapitel fünf Haupt- und drei Nebenaufträge mit bekannten Zielen', () => {
-  assertEqual(Object.keys(QUESTS), [...MAIN, ...SIDE, ...MAIN2, ...SIDE2]);
+  assertEqual(Object.keys(QUESTS), [...MAIN, ...SIDE, ...MAIN2, ...SIDE2, ...MAIN3, ...SIDE3]);
   const places = new Set(Object.values(MAPS).flatMap((m) => m.areas.map((a) => a.id)));
   const bosses = new Set(Object.values(MAPS).flatMap((m) => m.bosses.map((b) => b.id)));
   const spots = new Set(Object.values(MAPS).flatMap((m) => m.spots.map((s) => s.kind)));
@@ -30,7 +32,7 @@ test('quests: je Kapitel fünf Haupt- und drei Nebenaufträge mit bekannten Ziel
       assertTrue(s.text.length > 0, q.id);
     }
   }
-  for (const id of [...SIDE, ...SIDE2]) if (QUESTS[id].reward.item) assertEqual(ITEMS[QUESTS[id].reward.item].rarity, 'selten', id);
+  for (const id of [...SIDE, ...SIDE2, ...SIDE3]) if (QUESTS[id].reward.item) assertEqual(ITEMS[QUESTS[id].reward.item].rarity, 'selten', id);
 });
 
 test('quests: Kapitel 2 – Ziele liegen auf dem Sumpf, Oma gibt den ersten, genau einer beendet das Kapitel', () => {
@@ -194,4 +196,71 @@ test('quests: jeder Auftrag nennt sein Kapitel (fehlt = 1), passend zu den Karte
     for (const st of q.steps) if (st.map) assertEqual(MAPS[st.map].chapter, ch, `${q.id}: ${st.map}`);
   }
   for (const id of [...MAIN2, ...SIDE2]) assertEqual(QUESTS[id].chapter, 2, id);
+});
+
+test('quests: Kapitel 3 – Ziele liegen am Damm, Hebelschritte nennen eine Schleuse mit Hebel, genau einer beendet das Kapitel', () => {
+  const k3 = MAPS.kapitel3;
+  const places = new Set(k3.areas.map((a) => a.id)), bosses = new Set(k3.bosses.map((b) => b.id)), spots = new Set(k3.spots.map((x) => x.kind));
+  const kinds = new Set(k3.packs.flatMap((p) => Object.keys(p.enemies)));
+  const levers = new Set(k3.sluices.filter((s) => s.lever).map((s) => s.id));
+  for (const id of [...MAIN3, ...SIDE3]) {
+    const q = QUESTS[id];
+    assertEqual([q.kind, q.chapter], [MAIN3.includes(id) ? 'main' : 'side', 3], id);
+    for (const st of q.steps) {
+      if (st.type !== 'talk') assertEqual(st.map, 'kapitel3', `${id}: Karte`);
+      if (st.type === 'reach') assertTrue(places.has(st.target), `${id}: ${st.target}`);
+      if (st.type === 'boss') assertTrue(bosses.has(st.target), `${id}: ${st.target}`);
+      if (st.type === 'kill') assertTrue(kinds.has(st.target), `${id}: ${st.target}`);
+      if (st.type === 'lever') assertTrue(levers.has(st.target) && ['open', 'closed'].includes(st.state), `${id}: ${st.target}`);
+      if (st.type === 'collect' && st.from === 'spot') assertTrue(k3.spots.filter((x) => x.kind === st.target).length >= st.count, `${id}: Fundorte`);
+      if (st.type === 'collect' && st.from !== 'spot') for (const e of st.from) assertTrue(kinds.has(e), `${id}: ${e}`);
+      if (st.type === 'talk') assertTrue(['rinde', 'nagezahn', 'panzerla'].includes(st.target), `${id}: ${st.target}`);
+    }
+  }
+  assertEqual([QUESTS.ruf_vom_damm.giver, QUESTS.ruf_vom_damm.requires], ['panzerla', ['hecht_haudrauf']]);
+  const enders = Object.values(QUESTS).filter((q) => q.endsChapter === 3);
+  assertEqual(enders.map((q) => q.id), ['admiral']);
+  assertTrue(enders[0].steps.some((st) => st.type === 'boss' && st.target === 'flossenbart'));
+  // Die Biberschleuse öffnet mit dem Abschluss der Dammwache; die Wache verlangt Nord und Süd zu.
+  assertEqual(QUESTS.dammwache.steps.length, 3);
+  assertEqual(QUESTS.dammwache.steps.filter((s) => s.type === 'lever').map((s) => [s.target, s.state]), [['schleuse_nord', 'closed'], ['schleuse_sued', 'closed']]);
+  assertEqual(QUESTS.altarm.steps[0], { ...QUESTS.altarm.steps[0], type: 'lever', target: 'schleuse_altarm', state: 'closed' });
+  assertTrue(QUESTS.bauleiter.steps.some((s) => s.type === 'talk' && s.target === 'nagezahn'));
+});
+
+test('quests: ganzer Ablauf von Kapitel 3 bis Admiral Flossenbart', () => {
+  const log = Object.fromEntries([...MAIN, ...MAIN2].map((id) => [id, { state: 'done', step: QUESTS[id].steps.length, progress: 0 }]));
+  const ev = (e) => questEvent(log, e);
+  assertEqual(talkTo(log, 'panzerla').offer, 'ruf_vom_damm');
+  acceptQuest(log, 'ruf_vom_damm');
+  ev({ type: 'reach', place: 'dammufer' }); ev({ type: 'talk', npc: 'rinde' });
+  assertEqual(talkTo(log, 'rinde').offer, 'flossians_geschenk');
+  acceptQuest(log, 'flossians_geschenk');
+  for (const st of QUESTS.flossians_geschenk.steps) {
+    for (let i = 0; i < (st.count ?? 1); i++) {
+      if (st.type === 'kill') ev({ type: 'kill', enemyType: st.target });
+      else if (st.type === 'collect') ev({ type: 'collect', thing: st.target });
+      else if (st.type === 'talk') ev({ type: 'talk', npc: st.target });
+      else if (st.type === 'reach') ev({ type: 'reach', place: st.target });
+    }
+  }
+  assertEqual(log.flossians_geschenk.state, 'done');
+  acceptQuest(log, 'bauleiter');
+  ev({ type: 'reach', place: 'baustelle' }); ev({ type: 'boss', bossId: 'nagezahn' }); ev({ type: 'talk', npc: 'nagezahn' });
+  assertEqual(talkTo(log, 'nagezahn').offer, 'dammwache');
+  acceptQuest(log, 'dammwache');
+  ev({ type: 'lever', sluice: 'schleuse_nord', state: 'open' });
+  assertEqual(log.dammwache.step, 0, 'falsche Richtung zählt nicht');
+  ev({ type: 'lever', sluice: 'schleuse_nord', state: 'closed' }); ev({ type: 'lever', sluice: 'schleuse_sued', state: 'closed' });
+  ev({ type: 'talk', npc: 'nagezahn' });
+  acceptQuest(log, 'admiral');
+  ev({ type: 'reach', place: 'stausee' }); ev({ type: 'boss', bossId: 'flossenbart' });
+  assertEqual(ev({ type: 'talk', npc: 'panzerla' }).completed, ['admiral']);
+  for (const id of MAIN3) assertEqual(log[id].state, 'done', id);
+});
+
+test('quests: Kapitel 3 hat eine Einstiegsgeschichte, das Ende von Kapitel 2 zeigt den Weg zum Damm', () => {
+  assertTrue(STORY.chapterStart[3].length >= 2 && STORY.chapterStart[3].length <= 3);
+  assertTrue(STORY.chapterEnd[2].lines.some((l) => l.includes('Nordrand')), 'Weg zum Damm');
+  assertTrue(STORY.chapterEnd[3].lines.some((l) => l.includes('Fortsetzung folgt')));
 });

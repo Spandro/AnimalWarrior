@@ -28,6 +28,7 @@ export const DIALOGUES = {
       flugblaetter: ['Überall liegen Zettel herum. Die Fische verteilen sie.', 'Bring mir ein paar davon. Ich will wissen, wer dahintersteckt.'],
       zwickzwack: ['„Seine Durchlaucht Flossian der Erste“. Ein Goldfisch!', 'Sein General, ein Krebs namens Zwickzwack, sitzt am Quellteich.', 'Dort wird das Wasser umgeleitet. Hör auf damit, äh, hör ihn auf.'],
       ruf_aus_dem_sumpf: ['Hörst du das Quaken? Das kommt aus dem Sumpf im Westen.', 'Da stimmt was nicht. Frösche quaken nicht im Takt.', 'Geh hin. Frag nach der Unke Quappe. Die weiß immer alles. Leider.'],
+      ruf_vom_damm: ['Im Norden bauen die Biber einen riesigen Damm. Viel zu riesig.', 'Und wer hat ihnen das Holz geschenkt? Ein Goldfisch.', 'Geh nachsehen. Die Biberin Rinde ist vernünftig. Meistens.'],
     },
     remind: {
       nasse_pfoten: ['Die Fische sind am Bachufer. Gleich hinter dem Dorf.'],
@@ -35,6 +36,7 @@ export const DIALOGUES = {
       flugblaetter: ['Fische und Frösche tragen die Zettel. Nimm sie ihnen ab.'],
       zwickzwack: ['Der Quellteich liegt hinter dem Tiefen Wald.'],
       ruf_aus_dem_sumpf: ['Hörst du das Quaken? Das kommt aus dem Sumpf im Westen.', 'Frag dort nach der Unke Quappe. Die weiß immer alles. Leider.', 'Der Weg in den Sumpf beginnt am Westrand des Dorfs.'],
+      ruf_vom_damm: ['Der Weg zum Damm beginnt am Nordrand des Dorfs.', 'Frag nach Biberin Rinde am Biberbau. Sie nagt nicht nur, sie denkt auch.'],
     },
     progress: {},
     done: {
@@ -43,6 +45,7 @@ export const DIALOGUES = {
       flugblaetter: ['„Wasser für alle! Besonders für Fische!“ Wer schreibt so was?', 'Hier unten steht ein Name. Und ein Siegel mit einer Krone.'],
       zwickzwack: ['Eine Flaschenpost? Lies vor. Ich habe meine Brille verlegt.', 'Der Bach ist wieder ein Bach. Vorerst. Danke, Kindchen.'],
       hecht_haudrauf: ['Ein Hecht mit Narbe? Und du hast ihn besiegt? Donnerwetter.', 'Die Frösche sind wieder Frösche. Gut so. Kronen machen nur Ärger.', 'Ruh dich aus, Kindchen. Flossian gibt bestimmt nicht auf.'],
+      admiral: ['Ein Wels mit Admiralsmütze? Was es alles gibt.', 'Der Damm hält, und die Biber sind auf unserer Seite. Sehr gut.', 'Bleibt nur noch einer. Und der sitzt in einem Glas.'],
     },
     idle: ['Früher war hier alles trocken. Und langweilig. Schön war das.', 'Iss was. Du siehst dünn aus. Für ein Tier deiner Art.'],
   },
@@ -111,6 +114,47 @@ export const DIALOGUES = {
       libellenflug: ['Der Hecht ist jetzt blind und taub. Na ja, fast.'],
     },
     idle: ['Unken unken. Das ist unser Recht.', 'Schlamm ist gut für die Haut. Bremst aber.', 'Wenn es blubbert, geh zur Seite. Glaub mir.', 'Ich bin nicht schlecht gelaunt. Ich gucke immer so.'],
+  },
+  rinde: {
+    offer: {
+      flossians_geschenk: ['Ein Geschenk an alle, sagt Flossian. Der Damm sei für uns.', 'Ich glaube ihm kein Wort. Seine Aale schleichen nachts ums Holz.', 'Vertreib die Aale. Und nimm seinen Leuten die Baupläne ab.'],
+      bauleiter: ['Da steht es: „Damm brechen. Land fluten. Blubb.“', 'Unser Bauleiter Nagezahn glaubt trotzdem an Flossian.', 'Er ist stur. Vielleicht hört er auf dich, wenn du ihn besiegst.'],
+      bisamplage: ['Die Bisamratten graben unseren Damm von unten an.', 'Vertreib acht von ihnen. Pass auf, wo sie wieder auftauchen.'],
+      treibholz: ['Wir brauchen Holz, um die Löcher im Damm zu stopfen.', 'Sammelst du vier Stück Treibholz? Es liegt am Ufer herum.'],
+    },
+    remind: {
+      flossians_geschenk: ['Aale gibt es überall am Wasser. Die Pläne tragen Helmhechte und Bisame.'],
+      bauleiter: ['Die Baustelle liegt hinter dem Mühlgraben. Nagezahn ist laut, du findest ihn.'],
+      bisamplage: ['Bisamratten graben sich ein. Wo der Boden zittert, kommen sie hoch.'],
+      treibholz: ['Treibholz liegt hier am Bau, am Mühlgraben, im Auwald und weiter südlich.'],
+    },
+    progress: {},
+    done: {
+      ruf_vom_damm: ['Panzerla schickt dich? Gut. Hier stimmt nämlich gar nichts.', 'Hör zu, aber nag nicht dazwischen.'],
+      flossians_geschenk: ['Lies mal, was auf den Plänen steht. Na? Siehst du?'],
+      bisamplage: ['Endlich Ruhe unter dem Damm. Danke dir.', 'Nimm diesen Mantel. Den hat mal ein Aal hiergelassen. Unfreiwillig.'],
+      treibholz: ['Schönes Holz. Fast zu schade zum Stopfen.', 'Hier, eine Schleuder. Die Kiesel findest du am Ufer.'],
+    },
+    idle: ['Wir Biber bauen. Das ist unser Ding.', 'Ein Damm ist nur so gut wie sein schwächstes Stöckchen.', 'Strömung ist wie ein Kind: Sie zieht immer in eine Richtung.', 'Ich nage nur an Holz. Und manchmal an Ausreden.'],
+  },
+  nagezahn: {
+    offer: {
+      dammwache: ['Ich Holzkopf! Flossian hat uns alle reingelegt.', 'Seine Leute haben die Mühlgraben- und die Wiesen-Schleuse geöffnet.', 'Das Wasser frisst den Damm von unten. Mach beide Schleusen zu!'],
+      admiral: ['Hinter der Biberschleuse liegt der Stausee. Dort wartet sein Admiral.', 'Ein riesiger Wels namens Flossenbart. Er dreht die Strömung, wie er will.', 'Bleib am trockenen Ufer, wenn sich das Wasser dreht.'],
+      altarm: ['Im Altarm liegt eine Kiste, die Flossians Leute versteckt haben.', 'Der Hebel neben dem Weg lässt das Wasser dort ab. Probier es.'],
+    },
+    remind: {
+      dammwache: ['Die Hebel stehen am Weg neben den Schleusen. E drücken oder antippen.', 'Der Hebel ist unten? Dann ist die Schleuse zu. Das willst du.'],
+      admiral: ['Der Stausee liegt hinter der Biberschleuse im Osten.'],
+      altarm: ['Der Altarm-Hebel steht im Auwald, nördlich vom Weg.'],
+    },
+    progress: {},
+    done: {
+      bauleiter: ['Uff. Du schlägst fester zu als ein Biberschwanz.', 'Diese Pläne … „Damm brechen“? Das hat er mir nie gesagt!'],
+      dammwache: ['Beide Schleusen zu? Der Damm hält! Ich hör ihn aufatmen.', 'Wir Biber öffnen dir jetzt die Biberschleuse zum Stausee.'],
+      altarm: ['Eine Kiste voller Flossian-Kram? Typisch.', 'Du kannst den Hebel ruhig wieder umlegen. Schaden tut es nicht.'],
+    },
+    idle: ['Ich baue nur noch für Biber. Ehrenwort.', 'Jede Schleuse hat zwei Stellungen. Probieren schadet nie.', 'Wenn das Wasser kommt, geh ans Ufer. Das macht es von selbst.'],
   },
   flossian: {
     offer: {},

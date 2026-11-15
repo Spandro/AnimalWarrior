@@ -22,7 +22,7 @@ const byId = (id) => ACHIEVEMENTS.find((a) => a.id === id);
 // ------------------------------------------------------------------ Daten
 
 test('achievements: 37 eindeutige Ids mit Titel, Bedingung, Spruch und positivem Gold', () => {
-  assertEqual(ACHIEVEMENTS.length, 45);
+  assertEqual(ACHIEVEMENTS.length, 46);
   assertEqual(new Set(ACHIEVEMENTS.map((a) => a.id)).size, ACHIEVEMENTS.length);
   for (const a of ACHIEVEMENTS) {
     for (const key of ['id', 'title', 'condition', 'line']) assertTrue(typeof a[key] === 'string' && a[key].trim() !== '', `${a.id}.${key}`);
@@ -112,6 +112,7 @@ const CASES = [
     { run: { ended: true, won: true, animalId: 'giraffe' } }],
   ['trockene-pfoten', { save: { heroes: [{ adventure: { chapterDone: [] } }] } }, { save: { heroes: [{ adventure: { chapterDone: [1] } }] } }],
   ['sumpfdotter', { save: { heroes: [{ adventure: { chapterDone: [1] } }] } }, { save: { heroes: [{ adventure: null }, { adventure: { chapterDone: [1, 2] } }] } }],
+  ['dammbruch-verhindert', { save: { heroes: [{ adventure: { chapterDone: [1, 2] } }] } }, { save: { heroes: [{ adventure: { chapterDone: [1, 2, 3] } }] } }],
   ['meisterstueck', { save: { itemLevels: { paddel: 4 } } }, { save: { itemLevels: { paddel: 5 } } }],
   ['hilfsbereit', { save: { heroes: [{ adventure: { quests: { verbuddelt: { state: 'done' }, post_amsel: { state: 'done' } } } }] } },
     { save: { heroes: [{ adventure: { quests: { verbuddelt: { state: 'done' }, post_amsel: { state: 'done' }, hamsterkauf: { state: 'done' } } } }] } }],
@@ -462,7 +463,7 @@ test('achievements: evaluateStored löst Schatzsucher nie ohne Durchgang aus', (
 // ---------------------------------------------------------------- Abenteuer
 
 test('achievements: sieben Abenteuer-Erfolge aus dem gespeicherten Stand', () => {
-  assertEqual(ACHIEVEMENTS.length, 45);
+  assertEqual(ACHIEVEMENTS.length, 46);
   const hero = (adventure) => ({ id: 'h', name: 'H', animal: 'hase', class: 'krieger', createdAt: 1, survivor: { bestTime: 0, wins: 0, runs: 0 }, adventure });
   const ids = (save) => evaluateStored(saveWith({ ...save, stats: stats(save.stats) }));
   assertEqual(ids({}), []);

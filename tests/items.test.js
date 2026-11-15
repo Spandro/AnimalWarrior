@@ -76,8 +76,8 @@ const k1 = Object.values(ITEMS).filter((i) => i.source === 'kapitel1');
 
 test('items: 30 Gegenstände aus Kapitel 1, 15/10/5, icon 0–29, jede Kennung hat eine Quelle', () => {
   assertEqual(k1.length, 30);
-  assertEqual(Object.values(ITEMS).length, 62);
-  for (const item of Object.values(ITEMS)) assertTrue(['taverne', 'kapitel1', 'kapitel2'].includes(item.source), item.id);
+  assertEqual(Object.values(ITEMS).length, 70);
+  for (const item of Object.values(ITEMS)) assertTrue(['taverne', 'kapitel1', 'kapitel2', 'kapitel3'].includes(item.source), item.id);
   assertEqual(k1.filter((i) => i.rarity === 'gewoehnlich').length, 15);
   assertEqual(k1.filter((i) => i.rarity === 'selten').length, 10);
   assertEqual(k1.filter((i) => i.rarity === 'legendaer').length, 5);
@@ -104,6 +104,24 @@ test('items: Kapitel 2 – acht Gegenstände, stärker als die aus Kapitel 1, no
     for (const m of item.modifiers) {
       const kind = 'pct' in m ? 'pct' : 'flat';
       const same = k1.filter((i) => i.rarity === item.rarity).flatMap((i) => i.modifiers).filter((x) => x.stat === m.stat && kind in x);
+      const best = Math.max(0, ...same.map((x) => Math.abs(x[kind])));
+      assertTrue(Math.abs(m[kind]) >= best, `${item.id}: ${m.stat} ${m[kind]} < ${best}`);
+    }
+  }
+});
+
+test('items: Kapitel 3 – acht Gegenstände, mindestens so stark wie die aus Kapitel 2, noch ohne Bild', () => {
+  const k2 = Object.values(ITEMS).filter((i) => i.source === 'kapitel2');
+  const k3 = Object.values(ITEMS).filter((i) => i.source === 'kapitel3');
+  assertEqual(k3.length, 8);
+  assertEqual(k3.map((i) => i.icon).sort((a, b) => a - b), [0, 1, 2, 3, 4, 5, 6, 7]);
+  assertTrue(k3.some((i) => i.rarity === 'selten') && k3.some((i) => i.rarity === 'legendaer'));
+  for (const kind of ['nahkampf', 'zauber', 'wurf']) assertTrue(k3.some((i) => i.weaponKind === kind), kind);
+  for (const item of k3) {
+    assertEqual(itemSheet(item), null, item.id);
+    for (const m of item.modifiers) {
+      const kind = 'pct' in m ? 'pct' : 'flat';
+      const same = [...k1, ...k2].filter((i) => i.rarity === item.rarity).flatMap((i) => i.modifiers).filter((x) => x.stat === m.stat && kind in x);
       const best = Math.max(0, ...same.map((x) => Math.abs(x[kind])));
       assertTrue(Math.abs(m[kind]) >= best, `${item.id}: ${m.stat} ${m[kind]} < ${best}`);
     }

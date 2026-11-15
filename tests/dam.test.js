@@ -446,3 +446,37 @@ test('dam: ein Bewohner mit requires erscheint erst nach seiner Bedingung (Nagez
   stepAdventure(r, 1 / 60, still);
   assertEqual([r.interactable?.kind, r.interactable?.id], ['npc', 'nagezahn']);
 }));
+
+// ---------------------------------------------------------------- Karte und Aufträge zusammen (Task 6)
+
+test('dam: auf der echten Karte öffnet das Gespräch, das die Dammwache abschließt, die Biberschleuse', async () => {
+  const { defaultSave, addHero } = await import('../src/save/store.js');
+  const { newAdventure } = await import('../src/save/adventure.js');
+  const { createAdventureRun, stepAdventure, interact, sluiceState } = await import('../src/modes/adventure.js');
+  const save = defaultSave();
+  const h = addHero(save, { name: 'Damm', animal: 'hase', class: 'krieger' }, { now: 1, id: 'h1' });
+  const a = h.adventure = newAdventure(h);
+  Object.assign(a, { mapId: 'kapitel3', campfireId: 'k3_muehle', introSeen: true, chapterDone: [1, 2], bosses: ['nagezahn'] });
+  a.campfires.push('k3_muehle');
+  for (const id of ['ruf_vom_damm', 'flossians_geschenk', 'bauleiter']) a.quests[id] = { state: 'done', step: 9, progress: 0 };
+  a.quests.dammwache = { state: 'active', step: 0, progress: 0 };
+  const run = createAdventureRun({ seed: 3, save, heroId: 'h1' });
+  assertEqual(cellAt(run.grid, 1090, -22), CELL.water);
+  // Hebel Nord (am Mühlgraben) und Süd (vor der Baustelle) umlegen
+  for (const [x, z] of [[436, -24], [528, 12]]) {
+    run.world.hero.x = x + 1; run.world.hero.z = z;
+    stepAdventure(run, 1 / 60, still);
+    assertEqual(run.interactable?.kind, 'lever');
+    interact(run);
+  }
+  assertEqual([sluiceState(run, 'schleuse_nord'), sluiceState(run, 'schleuse_sued')], ['closed', 'closed']);
+  assertEqual(run.record.quests.dammwache.step, 2);
+  run.world.hero.x = 607.5; run.world.hero.z = 10;
+  stepAdventure(run, 1 / 60, still);
+  assertEqual([run.interactable?.kind, run.interactable?.id], ['npc', 'nagezahn']);
+  interact(run);
+  assertEqual(run.record.quests.dammwache.state, 'done');
+  assertEqual(sluiceState(run, 'biberschleuse'), 'open');
+  assertEqual(cellAt(run.grid, 1090, -22), CELL.walk);
+  assertEqual(run.record.quests.admiral?.state, undefined, 'Admiral bietet Nagezahn erst im nächsten Gespräch an');
+});

@@ -3,7 +3,7 @@
  * @typedef {'kopf'|'koerper'|'fuesse'|'waffe'|'schmuck'} Slot
  * @typedef {'nahkampf'|'zauber'|'wurf'} WeaponKind
  * @typedef {'gewoehnlich'|'selten'|'legendaer'} Rarity
- * @typedef {'taverne'|'kapitel1'|'kapitel2'} ItemSource
+ * @typedef {'taverne'|'kapitel1'|'kapitel2'|'kapitel3'} ItemSource
  * @typedef {{ id: string, name: string, slot: Slot, weaponKind?: WeaponKind, rarity: Rarity, modifiers: Modifier[], line: string, icon: number,
  *   source: ItemSource }} ItemDef
  *   `source`: woher der Gegenstand kommt (Taverne oder ein Kapitel des Abenteuers); `icon`: Zelle in seinem Bogen ({@link itemSheet}).
@@ -98,6 +98,15 @@ export const ITEMS = {
   libellenfluegel: { id: 'libellenfluegel', name: 'Umhang aus Libellenflügeln', slot: 'koerper', rarity: 'selten', modifiers: [{ stat: 'dodge', flat: 0.07 }, { stat: 'armor', flat: 2 }], line: 'Summt leise. Fliegen kann man damit nicht. Noch nicht.', icon: 5, source: 'kapitel2' },
   froschschleuder: { id: 'froschschleuder', name: 'Froschkönig-Schleuder', slot: 'waffe', weaponKind: 'wurf', rarity: 'selten', modifiers: [{ stat: 'critChance', flat: 0.07 }, { stat: 'critDamage', flat: 0.15 }], line: 'Für Frösche, die sich für Könige halten.', icon: 6, source: 'kapitel2' },
   quaks_krone: { id: 'quaks_krone', name: 'Quaks Krone', slot: 'kopf', rarity: 'legendaer', modifiers: [{ stat: 'armor', flat: 2 }, { stat: 'maxHp', pct: 0.12 }, { stat: 'xpGain', pct: 0.1 }], line: 'Etwas zu groß. Wie ihr Besitzer.', icon: 7, source: 'kapitel2' },
+  // Kapitel 3 „Der Biberdamm“ (noch ohne Bildbogen: Ersatzsymbol)
+  bauhelm: { id: 'bauhelm', name: 'Biber-Bauhelm', slot: 'kopf', rarity: 'gewoehnlich', modifiers: [{ stat: 'armor', flat: 3 }], line: 'Gelb, hart und leicht angenagt.', icon: 0, source: 'kapitel3' },
+  watstiefel: { id: 'watstiefel', name: 'Watstiefel', slot: 'fuesse', rarity: 'gewoehnlich', modifiers: [{ stat: 'moveSpeed', pct: 0.08 }], line: 'Bis zum Bauch wasserdicht. Danach nicht mehr.', icon: 1, source: 'kapitel3' },
+  schwimmweste: { id: 'schwimmweste', name: 'Schwimmweste aus Kork', slot: 'koerper', rarity: 'gewoehnlich', modifiers: [{ stat: 'maxHp', pct: 0.1 }], line: 'Quietscht beim Laufen. Schwimmt beim Schwimmen.', icon: 2, source: 'kapitel3' },
+  zollstock: { id: 'zollstock', name: 'Zollstock des Bauleiters', slot: 'waffe', weaponKind: 'zauber', rarity: 'gewoehnlich', modifiers: [{ stat: 'cooldown', pct: -0.07 }, { stat: 'damage', pct: 0.06 }], line: 'Misst alles. Auch Ärger.', icon: 3, source: 'kapitel3' },
+  nagezahnaxt: { id: 'nagezahnaxt', name: 'Nagezahn-Axt', slot: 'waffe', weaponKind: 'nahkampf', rarity: 'selten', modifiers: [{ stat: 'damage', pct: 0.12 }, { stat: 'critChance', flat: 0.07 }], line: 'Ein Biber hat sie geschliffen. Mit den Zähnen.', icon: 4, source: 'kapitel3' },
+  aalhaut: { id: 'aalhaut', name: 'Mantel aus Aalhaut', slot: 'koerper', rarity: 'selten', modifiers: [{ stat: 'dodge', flat: 0.08 }, { stat: 'armor', flat: 2 }], line: 'Glitschig. Wer dich packen will, rutscht ab.', icon: 5, source: 'kapitel3' },
+  kieselschleuder: { id: 'kieselschleuder', name: 'Flusskiesel-Schleuder', slot: 'waffe', weaponKind: 'wurf', rarity: 'selten', modifiers: [{ stat: 'critChance', flat: 0.08 }, { stat: 'critDamage', flat: 0.18 }], line: 'Die Kiesel sind rund. Die Treffer auch.', icon: 6, source: 'kapitel3' },
+  admiralsmuetze: { id: 'admiralsmuetze', name: 'Admiralsmütze', slot: 'kopf', rarity: 'legendaer', modifiers: [{ stat: 'armor', flat: 3 }, { stat: 'maxHp', pct: 0.14 }, { stat: 'goldGain', pct: 0.12 }], line: 'Riecht nach Wels. Sitzt aber wie angegossen.', icon: 7, source: 'kapitel3' },
 };
 
 /** Die 24 Gegenstände der Taverne (Würfelbecher, Rad, Höher oder tiefer und ihre Truhe). */

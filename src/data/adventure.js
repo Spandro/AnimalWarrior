@@ -54,7 +54,7 @@ export const LOOT = {
   bossMinRarity: 'selten',
   potionChance: 0.03,
   elitePearlChance: 0.05,
-  bossPearls: { graete: 2, zwickzwack: 3, quak: 3, haudrauf: 4 },
+  bossPearls: { graete: 2, zwickzwack: 3, quak: 3, haudrauf: 4, nagezahn: 4, flossenbart: 5 },
   goldChance: 0.25,
   gold: [1, 4],
 };
@@ -85,6 +85,7 @@ export const SHOP = {
   stockByChapter: {
     1: ['eimerhelm', 'regenponcho', 'gummistiefel', 'paddel', 'treibholzstab', 'angel'],
     2: ['schilfhelm', 'moorstiefel', 'unkenamulett', 'rohrkolbenstab'],
+    3: ['bauhelm', 'watstiefel', 'schwimmweste', 'zollstock'],
   },
 };
 
