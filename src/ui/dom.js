@@ -46,3 +46,13 @@ export function formatNumber(value, digits = 0) {
   if (!f) numberFormats.set(digits, f = new Intl.NumberFormat('de-DE', { minimumFractionDigits: digits, maximumFractionDigits: digits }));
   return f.format(value);
 }
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/** Baut ein SVG-Element mit Attributen und Kindern. */
+export function svg(tag, attrs = {}, ...children) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+  node.append(...children);
+  return node;
+}

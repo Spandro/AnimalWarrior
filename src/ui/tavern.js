@@ -1,6 +1,6 @@
 // Taverne: Übersicht mit den Spieltischen, Stall (Duo freischalten) und Truhe mit Detailansicht.
 // Alle Bilder sind optional: fehlt eine Datei, erscheint Ersatz aus Grundformen. Bildschirme scheitern nie an Bildern.
-import { el, formatNumber } from './dom.js';
+import { el, formatNumber, svg } from './dom.js';
 import { screenHeader, screenFooter, confirmDialog } from './menus.js';
 import { describeModifier } from './statText.js';
 import { chestSlots, foundCount, itemKindLabel } from './tavernText.js';
@@ -10,7 +10,6 @@ import { unlockDuo, markItemsSeen } from '../save/tavern.js';
 import { HERO_SPRITES } from '../data/sprites.js';
 import { cropCanvas } from '../render/sprites.js';
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
 const TOTAL_ITEMS = Object.keys(TAVERN_ITEMS).length;
 
 // ---------------------------------------------------------------- Bilder mit Ersatz
@@ -37,13 +36,6 @@ export function probeImage(url) {
   return probe;
 }
 
-/** Baut ein SVG-Element mit Attributen und Kindern. */
-function svg(tag, attrs = {}, ...children) {
-  const node = document.createElementNS(SVG_NS, tag);
-  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
-  node.append(...children);
-  return node;
-}
 
 /** Ersatzsymbole der Beute nach Art: Helm, Hemd, Stiefel, Schwert, Ring. In der Farbe der Seltenheit. */
 const SLOT_SHAPES = {
@@ -201,7 +193,7 @@ const UNLOCK_REASON = {
 };
 
 /** Esc führt zurück, solange kein Dialog darüber liegt (Dialoge fangen Esc selbst ab). Gibt die Aufräumfunktion zurück. */
-export function backOnEscape(onBack) {
+function backOnEscape(onBack) {
   const onKey = (e) => {
     if (e.key === 'Escape' && !document.querySelector('.dialog-backdrop')) { e.preventDefault(); onBack(); }
   };

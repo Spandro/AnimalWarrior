@@ -48,11 +48,13 @@ export function grantItem(save, id) {
  * Würfel und Rad: Einsatz ab, Gewinn dazu, Beute vergeben, Runde zählen. Bei `ok: false` bleibt `save` unverändert.
  * @param {Save} save
  * @param {{ stake: number, payout: number, loot: string | null }} round
- * @returns {{ ok: true, item: GrantResult | null } | { ok: false, reason: 'stake' | 'gold' }}
+ * @returns {{ ok: true, item: GrantResult | null } | { ok: false, reason: 'stake' | 'gold' | 'payout' | 'loot' }}
  */
 export function applyRound(save, { stake, payout, loot }) {
   const reason = stakeProblem(save, stake);
   if (reason) return { ok: false, reason };
+  if (!Number.isFinite(payout) || payout < 0) return { ok: false, reason: 'payout' };
+  if (loot && !Object.hasOwn(ITEMS, loot)) return { ok: false, reason: 'loot' };
   save.gold += Math.floor(payout) - stake;
   save.stats.tavernRounds += 1;
   return { ok: true, item: loot ? grantItem(save, loot) : null };
@@ -83,6 +85,8 @@ export function startHiLoRound(save, stake) {
  */
 export function settleHiLoRound(save, state, loot) {
   if (!state.done) throw new Error('Die Runde ist noch nicht beendet');
+  if (loot && !Object.hasOwn(ITEMS, loot)) throw new Error(`Unbekannter Gegenstand: ${loot}`);
+  if (state.result !== 'miss' && !(Number.isFinite(state.pot) && state.pot >= 0)) throw new Error('Ungültiger Topf');
   if (state.result !== 'miss') save.gold += Math.floor(state.pot);
   save.stats.hiLoBestStreak = Math.max(save.stats.hiLoBestStreak, state.hits);
   return { item: loot ? grantItem(save, loot) : null };

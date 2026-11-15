@@ -154,3 +154,14 @@ test('tavernSave: eine Runde, die das Gold über 1000 hebt, löst Sparschwein au
   assertEqual(s.achievements.sparschwein, 0);
   assertTrue(validate(s).ok);
 });
+
+test('tavernSave: Runde mit unbekannter Beute oder ungültiger Auszahlung ändert nichts (atomar)', () => {
+  for (const round of [{ stake: 10, payout: 20, loot: 'gibtsnicht' }, { stake: 10, payout: NaN, loot: null }, { stake: 10, payout: -5, loot: null }]) {
+    const s = defaultSave();
+    s.gold = 100;
+    const before = JSON.stringify(s);
+    const r = applyRound(s, round);
+    assertEqual(r.ok, false);
+    assertEqual(JSON.stringify(s), before);
+  }
+});

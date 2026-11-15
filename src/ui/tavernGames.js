@@ -1,7 +1,7 @@
 // Die drei Spieltische der Taverne: Würfelbecher, Glücksrad, Höher oder tiefer.
 // Jede Runde wird erst ausgewürfelt und gespeichert, danach läuft die Animation. Sie ist durch Tippen (oder eine Taste)
 // abkürzbar und entfällt bei „Bewegung reduzieren“. Würfel, Rad und Karten entstehen aus CSS und SVG, ohne Bilder.
-import { el, formatNumber } from './dom.js';
+import { el, formatNumber, svg } from './dom.js';
 import { confirmDialog } from './menus.js';
 import { lootIcon, hostPortrait } from './tavern.js';
 import { stakeOptions, formatFactor, cardLabel } from './tavernText.js';
@@ -10,8 +10,6 @@ import { playDice, spinWheel, hiLoStart, hiLoGuess, hiLoCashOut, hiLoFactor } fr
 import { applyRound, startHiLoRound, settleHiLoRound, canStake } from '../save/tavern.js';
 import { TAVERN, HOSTS, TABLE_HOST, WHEEL, HILO, TABLE_MOTION } from '../data/tavern.js';
 import { ITEMS, RARITIES } from '../data/items.js';
-
-const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /** Zuletzt gewählter Einsatz je Tisch, solange die Seite offen ist. */
 const lastStake = {};
@@ -266,7 +264,7 @@ function tableKeys(t, { onBack, onPlay, extra }) {
     if (document.querySelector('.dialog-backdrop')) return;
     if (e.key === 'Escape') { e.preventDefault(); onBack(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (t.busy && (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key.toLowerCase() === 'a')) {
+    if (t.busy && (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || (e.key ?? '').toLowerCase() === 'a')) {
       e.preventDefault();
       if (!e.repeat) t.skip();
       return;
@@ -287,6 +285,7 @@ function playButton(label, onPlay) {
 
 /** Nach der Pause den Fokus auf den Spielknopf zurück, falls er verloren ging, als der Knopf gesperrt war (für die Tastatur). */
 function keepFocus(c, button) {
+  if (document.querySelector('.dialog-backdrop')) return; // eine Rückfrage behält den Fokus
   if (!c.contains(document.activeElement) || document.activeElement === document.body) button?.focus({ preventScroll: true });
 }
 
@@ -394,12 +393,6 @@ function fieldLook(f) {
   return { label: `×${f.mul}`, cls: `f-x${f.mul}` };
 }
 
-function svg(tag, attrs = {}, ...children) {
-  const node = document.createElementNS(SVG_NS, tag);
-  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
-  node.append(...children);
-  return node;
-}
 
 /** Punkt auf dem Kreis, Winkel im Uhrzeigersinn ab oben. */
 function polar(r, deg) {
@@ -718,7 +711,7 @@ export function renderHiLo(c, props, app) {
       if (!round || round.state.done) return false;
       if (e.key === 'ArrowUp') { if (!e.repeat) guess('up'); return true; }
       if (e.key === 'ArrowDown') { if (!e.repeat) guess('down'); return true; }
-      if (e.key.toLowerCase() === 'a') { if (!e.repeat) cashOut(); return true; }
+      if ((e.key ?? '').toLowerCase() === 'a') { if (!e.repeat) cashOut(); return true; }
       return false;
     },
   });
