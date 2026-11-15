@@ -551,13 +551,16 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
 
   function bossTelegraph(e) {
     if (e.kind === 'dash') { dashTelegraph(e); return; }
+    if (e.kind === 'logs') { for (const l of e.lanes) dashTelegraph({ ...e, x: l.x, z: l.z, radius: 0 }); return; }
+    if (e.kind === 'flow') { flowTelegraph(e); return; }
     if (e.kind === 'bubbles') { for (const p of e.points) bossTelegraph({ ...e, kind: 'leap', x: p.x, z: p.z }); return; }
     const swipe = e.kind === 'swipe';
     const halfAngle = e.halfAngle ?? BOSS_MOVES.baer.near.halfAngle;
     const geoFill = swipe ? shapes.sector(2 * halfAngle / DEG) : shapes.disc;
     const geoEdge = swipe ? shapes.sector(2 * halfAngle / DEG, 0.93) : shapes.ring;
-    const o = { color: 0xd81c1c, life: e.delay, x: e.x, z: e.z, yaw: yawToward(e.dirX, e.dirZ), clock: 'world', start: world.time };
-    decals.add(geoEdge, { ...o, y: 0.07, color: 0xff3a2a }, (k, d) => {
+    const [edge, fill] = MAP_LOOK.telegraph[e.look] ?? [0xff3a2a, 0xd81c1c];
+    const o = { color: fill, life: e.delay, x: e.x, z: e.z, yaw: yawToward(e.dirX, e.dirZ), clock: 'world', start: world.time };
+    decals.add(geoEdge, { ...o, y: 0.07, color: edge }, (k, d) => {
       d.mesh.scale.setScalar(e.radius);
       d.material.opacity = 0.85;
     });
@@ -565,6 +568,19 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
       d.mesh.scale.setScalar(Math.max(0.01, e.radius * k));
       d.material.opacity = 0.3 + 0.25 * k;
     });
+  }
+
+  /** Flossenbart dreht gleich die Strömung: hellblauer Ring um die Arena, der pulsiert, bis es so weit ist. */
+  function flowTelegraph(e) {
+    decals.add(shapes.ring, { color: MAP_LOOK.telegraph.flow, life: e.delay, x: e.x, z: e.z, y: 0.08, clock: 'world', start: world.time }, (k, d) => {
+      d.mesh.scale.setScalar(e.radius * (0.97 + 0.03 * Math.sin(k * 30)));
+      d.material.opacity = 0.5 + 0.4 * k;
+    });
+  }
+
+  /** Wasser schießt in eine Fläche oder läuft ab (Hebel) bzw. der Held wird ans Ufer gespült: Spritzer. */
+  function splash(x, z) {
+    burst(dust, 16, x, 0.3, z, { speed: 3, up: 4, life: 0.6, size: 0.16, endSize: 0.3, color: 0x9fd0f0, gravity: 9 });
   }
 
   /** Moorblase: blubbernder Kreis, der sich bis zum Platzen füllt, dazu aufsteigende Bläschen. */
@@ -658,6 +674,8 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
         case 'bossTelegraph': bossTelegraph(e); break;
         case 'bubbleWarn': bubbleWarn(e); break;
         case 'bubblePop': bubblePop(e); break;
+        case 'sluiceSwitched': splash(e.x, e.z); break;
+        case 'heroWashed': splash(e.x, e.z); break;
         case 'heroSlowed': heroSlowed(e, hero); break;
         case 'levelup': levelup(hero); break;
         case 'revive': revive(hero); break;

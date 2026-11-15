@@ -149,6 +149,12 @@ export const MAP_LOOK = {
   bridge: 0x7a5530,
   /** Schlamm (Kapitel 2): Höhe über dem Boden (m) und Farbe braun-grün, wenn `schlamm.webp` fehlt. */
   mud: { color: 0x5b5a30, y: 0.035 },
+  // Kapitel 3: Strömung (Grundfarbe, helle Streifen, die mit `speed` m/s in Flussrichtung wandern), trockenes Flussbett
+  // einer Schleuse, Hebel (Pfosten, Griff; Griff zu = unten), Ankündigungen von Aal, Bisam und Flossenbart.
+  current: { color: 0x3f86b8, stripe: 'rgba(220,240,255,0.55)', tileM: 4, y: 0.04, speed: 2.5 },
+  dryBed: 0x9a8862,
+  lever: { post: 0x5a3e24, handle: 0xc0392b, open: -0.7, closed: 0.7 },
+  telegraph: { shock: [0xfff060, 0xffd400], burrow: [0xb08850, 0x7a5a30], flow: 0x6ac8ff },
   /** Ring an offenen Ausgängen: Farbe, Deckkraft. */
   exit: { color: 0xffe08a, opacity: 0.45 },
   /** Moorblasen: Farbe des blubbernden Kreises und der Spritzer. */
@@ -179,6 +185,7 @@ export const MAP_LOOK = {
 export const MINIMAP = {
   size: 112, radius: 45, block: EXPLORE_BLOCK,
   colors: { blocked: '#2e3b25', walk: '#b8a77a', water: '#4d86a6', bridge: '#8a6a45', mud: '#6e6a3c', current: '#5fa8d0' },
+  lever: '#e8503a',
 };
 
 /** Namen der Lagerfeuer für das Reisen. */

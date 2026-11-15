@@ -10,7 +10,7 @@ import { billboardOrientation, spriteUv, spriteWidth, spriteMaterial, shadowMate
 import { borderDecor, cellAt, CELL } from '../core/mapGrid.js';
 import { decoInCell, borderScenery } from '../core/environment.js';
 import { npcState } from '../core/quests.js';
-import { isGateClosed, exitOpen } from '../modes/adventure.js';
+import { isGateClosed, exitOpen, npcVisible } from '../modes/adventure.js';
 import { TERRAIN_CELL } from '../data/terrain.js';
 import { MAP_LOOK } from '../data/adventure.js';
 import { TRAIL_TILES } from '../data/environment.js';
@@ -50,6 +50,33 @@ function stripGeometry(points, width, y, tileM = 1) {
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geo.computeVertexNormals();
   return geo;
+}
+
+/** Viereck entlang der Strecke a → b: u läuft in Flussrichtung (je `tileM` Meter eine Kachel), v quer. */
+function segmentQuad(a, b, width, y, tileM) {
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  const nx = (-(b[1] - a[1]) / len) * width / 2, nz = ((b[0] - a[0]) / len) * width / 2;
+  const p = [[a[0] + nx, a[1] + nz], [b[0] + nx, b[1] + nz], [b[0] - nx, b[1] - nz], [a[0] - nx, a[1] - nz]];
+  const u = len / tileM;
+  const pos = [], uv = [];
+  for (const [i, uu, vv] of [[0, 0, 1], [1, u, 1], [3, 0, 0], [3, 0, 0], [1, u, 1], [2, u, 0]]) { pos.push(p[i][0], y, p[i][1]); uv.push(uu, vv); }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** Helle Querstreifen für die Strömung (wandern beim Verschieben der Kachel in u-Richtung). */
+function stripeTexture() {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 32;
+  const g = c.getContext('2d');
+  g.fillStyle = MAP_LOOK.current.stripe;
+  for (const [x, y, w] of [[6, 4, 10], [30, 14, 14], [48, 24, 9], [18, 26, 7]]) g.fillRect(x, y, w, 2);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
 }
 
 /**
@@ -185,6 +212,61 @@ export function createMapView(scene, map, grid, { env, sprites, tiles, camera, s
   const stegTileM = tiles?.steg ? TRAIL_TILES.tileM.steg : MAP_LOOK.planks.tileM;
   for (const b of map.boardwalks ?? []) flat(stripGeometry(b.points, b.width, 0.09, stegTileM), stegMat, 3);
 
+  // Strömung (Kapitel 3): blaue Fläche, darauf helle Streifen, die in Flussrichtung wandern (je Linienzug eine Kachel,
+  // damit eine gedrehte Strömung gegenläufig wandern kann). Schleusenflächen haben je Zustand ihre eigene Fläche.
+  const look = MAP_LOOK.current;
+  const currentMat = std(look.color, { ...layer, roughness: 0.3 });
+  const flows = [];
+  const addCurrent = (strip, parent, y) => {
+    const base = new THREE.Mesh(own(stripGeometry(strip.points, strip.width, y, look.tileM)), currentMat);
+    base.renderOrder = 2;
+    const tex = own(stripeTexture());
+    const mat = std(0xffffff, { ...layer, map: tex, transparent: true, depthWrite: false, roughness: 0.3 });
+    parent.add(base);
+    for (let i = 0; i + 1 < strip.points.length; i++) {
+      const m = new THREE.Mesh(own(segmentQuad(strip.points[i], strip.points[i + 1], strip.width, y + 0.005, look.tileM)), mat);
+      m.renderOrder = 3;
+      parent.add(m);
+    }
+    const mid = strip.points[Math.floor(strip.points.length / 2)];
+    flows.push({ tex, x: mid[0], z: mid[1] });
+  };
+  for (const c of map.currents ?? []) addCurrent(c, root, look.y);
+  const dryMat = std(MAP_LOOK.dryBed, layer);
+  const sluiceViews = (map.sluices ?? []).map((sl) => {
+    const view = { id: sl.id, open: new THREE.Group(), closed: new THREE.Group() };
+    for (const state of ['open', 'closed']) {
+      const kind = sl[state], group = view[state];
+      for (const st of sl.strips) {
+        if (kind === 'current') { addCurrent(st, group, look.y + 0.01); continue; }
+        const mat = kind === 'water' ? waterMat : kind === 'mud' ? mudMat : dryMat;
+        const m = new THREE.Mesh(own(stripGeometry(st.points, st.width, look.y + 0.01, kind === 'water' ? TRAIL_TILES.tileM.wasser : TRAIL_TILES.tileM.weg)), mat);
+        m.renderOrder = 2;
+        group.add(m);
+      }
+      root.add(group);
+    }
+    return view;
+  });
+  // Hebel: Pfosten mit Griff; der Griff steht schräg nach vorn (offen) oder hinten (zu).
+  const levers = (map.sluices ?? []).filter((sl) => sl.lever).map((sl) => {
+    const lv = MAP_LOOK.lever;
+    const g = new THREE.Group();
+    const base = new THREE.Mesh(own(new THREE.BoxGeometry(0.9, 0.3, 0.6)), std(lv.post));
+    base.position.y = 0.15; base.castShadow = true;
+    const pivot = new THREE.Group();
+    pivot.position.y = 0.3;
+    const handle = new THREE.Mesh(own(new THREE.CylinderGeometry(0.07, 0.07, 1.3, 8)), std(lv.handle));
+    handle.position.y = 0.65; handle.castShadow = true;
+    const knob = new THREE.Mesh(own(new THREE.SphereGeometry(0.14, 10, 8)), std(lv.handle));
+    knob.position.y = 1.3;
+    pivot.add(handle, knob);
+    g.add(base, pivot);
+    g.position.set(sl.lever.x, 0, sl.lever.z);
+    root.add(g);
+    return { id: sl.id, pivot };
+  });
+
   // Ausgänge: heller Ring am Boden, nur solange der Ausgang offen ist.
   const exitMat = std(MAP_LOOK.exit.color, { ...layer, transparent: true, opacity: MAP_LOOK.exit.opacity, emissive: MAP_LOOK.exit.color, emissiveIntensity: 0.4, depthWrite: false });
   const exitRings = map.exits.map((x) => {
@@ -279,11 +361,13 @@ export function createMapView(scene, map, grid, { env, sprites, tiles, camera, s
   owned.push(offerMarker.material, offerMarker.material.map, turnInMarker.material, turnInMarker.material.map);
   /** Gemalte Leute, die im Stand leicht atmen. */
   const breathing = [];
+  const gatedNpcs = [];
   for (const n of map.npcs) {
     const def = has(NPC_SPRITES[n.id]) ? NPC_SPRITES[n.id] : null;
     let top = 2.2;
     if (def) {
       const g = painted(def, n.x, n.z, n.faceX === -1);
+      if (n.requires) gatedNpcs.push({ npc: n, mesh: g });
       root.add(g);
       breathing.push({ mesh: g.userData.panel, phase: n.x * 0.37 + n.z * 0.11 });
       top = def.heightM + 0.6;
@@ -296,6 +380,7 @@ export function createMapView(scene, map, grid, { env, sprites, tiles, camera, s
       head.position.y = 1.35; head.castShadow = true;
       g.add(body, head);
       g.position.set(n.x, 0, n.z);
+      if (n.requires) gatedNpcs.push({ npc: n, mesh: g });
       root.add(g);
     }
     const offer = offerMarker.clone(), turn = turnInMarker.clone();
@@ -433,6 +518,24 @@ export function createMapView(scene, map, grid, { env, sprites, tiles, camera, s
       for (const gate of run.map.gates) gates[gate.id].visible = isGateClosed(run, gate.id);
       for (const { exit, ring } of exitRings) ring.visible = exitOpen(run, exit);
       for (const { prop: p, mesh } of gatedProps) mesh.visible = rec.chapterDone.includes(p.requires.chapterDone);
+      for (const { npc, mesh } of gatedNpcs) {
+        const shown = npcVisible(run, npc);
+        mesh.visible = shown;
+        if (!shown) markers[npc.id].offer.visible = markers[npc.id].turn.visible = false;
+      }
+      const turned = run.world.flowTurned;
+      for (const f of flows) {
+        const back = turned && Math.hypot(f.x - turned.x, f.z - turned.z) <= turned.r;
+        f.tex.offset.x -= (back ? -1 : 1) * MAP_LOOK.current.speed / MAP_LOOK.current.tileM * dt;
+      }
+      for (const v of sluiceViews) {
+        const open = run.sluices?.[v.id] === 'open';
+        v.open.visible = open; v.closed.visible = !open;
+      }
+      for (const l of levers) {
+        const want = run.sluices?.[l.id] === 'open' ? MAP_LOOK.lever.open : MAP_LOOK.lever.closed;
+        l.pivot.rotation.z += (want - l.pivot.rotation.z) * Math.min(1, dt * 8);
+      }
     },
     dispose() {
       terrain.dispose();

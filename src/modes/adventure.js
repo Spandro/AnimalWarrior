@@ -233,7 +233,7 @@ function syncSluices(run) {
   run.sluices = now;
   paintMapGrid(run.grid, run.map, now);
   run.gridVersion++;
-  for (const s of changed) emit(run, { type: 'sluiceSwitched', id: s.id, state: now[s.id], x: s.lever?.x ?? s.strips[0].points[0][0], z: s.lever?.z ?? s.strips[0].points[0][1] });
+  for (const s of changed) emit(run, { type: 'sluiceSwitched', id: s.id, name: s.name, state: now[s.id], x: s.lever?.x ?? s.strips[0].points[0][0], z: s.lever?.z ?? s.strips[0].points[0][1] });
   for (const [e, old] of before) {
     const c = cellAt(run.grid, e.x, e.z);
     if (!wet(c) || wet(old)) continue;

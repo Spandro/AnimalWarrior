@@ -6,6 +6,7 @@ import { CELL } from '../core/mapGrid.js';
 import { isExplored } from '../core/mapGrid.js';
 import { npcState, questTarget, trackedQuest } from '../core/quests.js';
 import { MAPS } from '../data/maps/index.js';
+import { npcVisible } from '../modes/adventure.js';
 import { MINIMAP } from '../data/adventure.js';
 
 const COLORS = Object.fromEntries(Object.entries(CELL).map(([name, value]) => [value, MINIMAP.colors[name]]));
@@ -48,9 +49,10 @@ function draw(g, run, base, { cx, cz, scale, w, h }, { names = false } = {}) {
   const seen = (o) => isExplored(run.explored, grid, o.x, o.z);
   const dot = (o, color, r) => { g.fillStyle = color; g.beginPath(); g.arc(toX(o.x), toY(o.z), r, 0, Math.PI * 2); g.fill(); };
   for (const c of map.campfires) if (seen(c)) dot(c, rec.campfires.includes(c.id) ? '#ff9a3a' : '#8a7a6a', 3);
+  for (const sl of map.sluices ?? []) if (sl.lever && seen(sl.lever)) dot(sl.lever, MINIMAP.lever, 2.5);
   g.font = 'bold 11px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
   for (const n of map.npcs) {
-    if (!seen(n)) continue;
+    if (!seen(n) || !npcVisible(run, n)) continue;
     dot(n, '#e8dcc0', 3);
     const state = npcState(rec.quests, n.id);
     if (state !== 'none') { g.fillStyle = state === 'offer' ? '#ffd34d' : '#9fe07a'; g.fillText(state === 'offer' ? '!' : '?', toX(n.x), toY(n.z) - 8); }
@@ -105,18 +107,18 @@ export function createMinimap(container, { onOpen }) {
   const button = el('button', { class: 'minimap', type: 'button', 'data-ui-control': true, 'aria-label': 'Karte öffnen (M)', title: 'Karte (M)', onclick: () => onOpen() }, canvas);
   container.append(button);
   const g = canvas.getContext('2d');
-  let base = null, baseMap = null;
+  let base = null, baseMap = null, baseVersion = null;
   return {
     root: button,
     /** @param {import('../modes/adventure.js').AdventureRun} run */
     update(run) {
-      if (baseMap !== run.map.id) { base = baseImage(run.grid); baseMap = run.map.id; }
+      if (baseMap !== run.map.id || baseVersion !== run.gridVersion) { base = baseImage(run.grid); baseMap = run.map.id; baseVersion = run.gridVersion; }
       const h = run.world.hero;
       draw(g, run, base, { cx: h.x, cz: h.z, scale: MINIMAP.size / (MINIMAP.radius * 2), w: MINIMAP.size, h: MINIMAP.size });
     },
     /** Große Karte in ein Canvas (ganze Karte eingepasst). */
     drawBig(canvas2, run) {
-      if (baseMap !== run.map.id) { base = baseImage(run.grid); baseMap = run.map.id; }
+      if (baseMap !== run.map.id || baseVersion !== run.gridVersion) { base = baseImage(run.grid); baseMap = run.map.id; baseVersion = run.gridVersion; }
       const grid = run.grid, w = canvas2.width, hh = canvas2.height;
       const scale = Math.min(w / (grid.cols * grid.cell), hh / (grid.rows * grid.cell)) * 0.95;
       draw(canvas2.getContext('2d'), run, base, {

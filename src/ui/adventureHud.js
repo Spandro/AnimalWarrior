@@ -12,7 +12,7 @@ import { ITEMS } from '../data/items.js';
 import { QUESTS, QUEST_THING_NAMES } from '../data/quests.js';
 import { MATERIALS } from '../data/adventure.js';
 
-const INTERACT_LABEL = { npc: 'Sprechen', campfire: 'Rasten', spot: 'Untersuchen', chest: 'Öffnen' };
+const INTERACT_LABEL = { npc: 'Sprechen', campfire: 'Rasten', spot: 'Untersuchen', chest: 'Öffnen', lever: 'Umlegen' };
 const BANNER_SECONDS = 2.6;
 
 /**
@@ -87,6 +87,9 @@ export function createAdventureHud(uiLayer, h) {
         else if (e.type === 'loot' && e.kind === 'chest') say(`Truhe: ${e.gold} Gold und ${ITEMS[e.itemId].name}`, false, e.itemId);
         else if (e.type === 'loot' && e.kind === 'material') say(`${MATERIALS[e.id].name}${e.count > 1 ? ` × ${e.count}` : ''}`);
         else if (e.type === 'loot' && e.kind === 'potion') say('Heiltrank gefunden');
+        else if (e.type === 'sluiceSwitched') say(`${e.name}: ${e.state === 'open' ? 'offen' : 'zu'}`);
+        else if (e.type === 'heroWashed') say('Ans Ufer gespült!');
+        else if (e.type === 'flowTurned') say(e.on ? 'Die Strömung dreht sich!' : 'Die Strömung fließt wieder normal.');
         else if (e.type === 'questItem') say(`Gefunden: ${QUEST_THING_NAMES[e.thing] ?? e.thing}`);
         else if (e.type === 'wake') say(e.goldLost > 0 ? `Du wachst am Lagerfeuer auf … (−${e.goldLost} Gold)` : 'Du wachst am Lagerfeuer auf …');
         else if (e.type === 'abilityFail' && slots[e.slot]) {

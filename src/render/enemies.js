@@ -603,7 +603,7 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
     const hero = world.hero;
     for (const e of world.enemies) {
       const dx = e.x - hero.x, dz = e.z - hero.z;
-      if (dx * dx + dz * dz > CULL_DISTANCE * CULL_DISTANCE) continue;
+      if (dx * dx + dz * dz > CULL_DISTANCE * CULL_DISTANCE || e.hidden) continue;
       if (e.shadow) { drawShadow(world, e, alpha, t); continue; }
       const def = ENEMIES[e.type];
       const pool = enemyPools[e.type] || fallbackPool;
@@ -643,7 +643,7 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
     const hero = world.hero;
     for (const e of world.enemies) {
       const dx = e.x - hero.x, dz = e.z - hero.z;
-      if (dx * dx + dz * dz > CULL_DISTANCE * CULL_DISTANCE) continue;
+      if (dx * dx + dz * dz > CULL_DISTANCE * CULL_DISTANCE || e.hidden) continue;
       if (e.shadow) { drawShadow(world, e, alpha, t); continue; }
       const def = ENEMIES[e.type];
       const pool = enemyPools[e.type] || fallbackPool;
@@ -709,7 +709,11 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
     for (const pr of world.enemyProjectiles) {
       const p = tracker.pos(pr, pr.x, pr.z, alpha);
       const r = pr.radius * (1 + 0.1 * Math.sin(t * 20));
-      if (pr.shadow) {
+      if (pr.kind === 'log') {
+        // Holzstamm (Nagezahn): rollende Nuss-Form in Stammgröße.
+        const s = pr.radius * 1.6;
+        nuts.push(place(p.x, pr.radius * 0.7, p.z, Math.atan2(pr.dirX, pr.dirZ), s, s, s, t * 6));
+      } else if (pr.shadow) {
         shadowShotCore.push(place(p.x, 0.8, p.z, 0, r * 0.6));
         shadowShotHalo.push(place(p.x, 0.8, p.z, Math.atan2(pr.dirX, pr.dirZ), r * 0.95, r * 0.95, r * 1.6));
       } else {

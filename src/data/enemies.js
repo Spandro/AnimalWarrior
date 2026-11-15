@@ -215,7 +215,7 @@ export const BOSS_MOVES = {
   bauleiter_nagezahn: {
     chaseTime: 2.5, recover: 0.8, triggerRange: 3.5,
     near: { kind: 'swipe', reach: 3, halfAngle: Math.PI / 2.5, windup: 0.7, damageMul: 1.2 },
-    far: { kind: 'logs', count: 3, lane: 3, length: 18, radius: 1.1, speed: 9, windup: 1.1, damageMul: 1.2 },
+    far: { kind: 'logs', count: 3, lane: 4.5, length: 18, radius: 1.1, speed: 9, windup: 1.1, damageMul: 1.2 },
   },
   admiral_flossenbart: {
     chaseTime: 2.5, recover: 0.8, triggerRange: 4,
