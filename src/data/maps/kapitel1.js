@@ -97,6 +97,9 @@ export const KAPITEL1 = {
     { kind: 'wegweiser', x: 14, z: -6 },
     { kind: 'wegweiser', x: 262, z: 4 },
     { kind: 'zaun', x: 420, z: 6 },
+    { kind: 'flugblatt', x: 14, z: 4 },
+    { kind: 'flugblatt', x: 340, z: -9.5 },
+    { kind: 'flugblatt', x: 445, z: 2 },
   ],
   start: { campfire: 'k1_ufer' },
 };

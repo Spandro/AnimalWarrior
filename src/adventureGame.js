@@ -38,10 +38,10 @@ const DEBUG_KILL_RANGE = 20;
 /**
  * @param {{ canvas: HTMLCanvasElement, uiLayer: HTMLElement, view?: ReturnType<typeof createRenderer>, app: any, heroId: string,
  *   seed: number, quality?: 'high'|'low', timeScale?: number, debug?: boolean, sprites?: any, env?: any, sfx?: any,
- *   onExit(): void }} options
+ *   tiles?: import('./render/environment.js').TrailTiles, onExit(): void }} options
  * @returns {{ stop(): void, setQuality(q: 'high'|'low'): void }}
  */
-export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quality = 'high', timeScale = 1, debug = false, sprites, env, sfx, onExit }) {
+export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quality = 'high', timeScale = 1, debug = false, sprites, env, tiles, sfx, onExit }) {
   if (!view) view = createRenderer(canvas, { quality });
   else view.setQuality(quality);
   const run = createAdventureRun({ seed, save: app.save, heroId });
@@ -51,7 +51,7 @@ export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quali
   function ensureMapView() {
     if (mapId === run.map.id) return;
     mapView?.dispose();
-    mapView = createMapView(view.scene, run.map, run.grid, { env, camera: view.camera, seed: run.seed });
+    mapView = createMapView(view.scene, run.map, run.grid, { env, sprites, tiles, camera: view.camera, seed: run.seed });
     mapId = run.map.id;
   }
   ensureMapView();

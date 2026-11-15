@@ -5,7 +5,7 @@ import { screenHeader, screenFooter, confirmDialog } from './menus.js';
 import { describeModifier } from './statText.js';
 import { chestSlots, foundCount, itemKindLabel } from './tavernText.js';
 import { TAVERN, HOSTS, TABLE_HOST, TAVERN_IMAGES } from '../data/tavern.js';
-import { ITEMS, RARITIES, TAVERN_ITEMS } from '../data/items.js';
+import { ITEMS, RARITIES, TAVERN_ITEMS, itemIconRect } from '../data/items.js';
 import { unlockDuo, markItemsSeen } from '../save/tavern.js';
 import { HERO_SPRITES } from '../data/sprites.js';
 import { cropCanvas } from '../render/sprites.js';
@@ -85,7 +85,7 @@ function chestSvg() {
 }
 
 /**
- * Symbol eines Gegenstands: Ausschnitt aus dem Bogen per Hintergrundposition, bis dahin (oder dauerhaft, wenn das Bild
+ * Symbol eines Gegenstands: Ausschnitt aus seinem Bogen ({@link itemIconRect}: Taverne oder Kapitel), bis dahin (oder dauerhaft, wenn das Bild
  * fehlt) ein Ersatzsymbol der Art. Ohne Gegenstand (nicht gefunden) erscheint ein „?“.
  * @param {import('../data/items.js').ItemDef | null} def
  * @param {string} [sizeClass]
@@ -99,16 +99,20 @@ export function lootIcon(def, sizeClass = '') {
   }
   box.style.color = RARITIES[def.rarity].color;
   box.append(slotSvg(def.slot));
-  const { sheet, cols, rows } = TAVERN_IMAGES.loot;
-  probeImage(sheet).then((img) => {
+  const r = itemIconRect(def);
+  probeImage(r.url).then((img) => {
     if (!img || !box.isConnected) return;
-    const col = def.icon % cols;
-    const row = Math.floor(def.icon / cols);
-    box.style.backgroundImage = `url('${sheet}')`;
-    box.style.backgroundSize = `${cols * 100}% ${rows * 100}%`;
-    box.style.backgroundPosition = `${cols > 1 ? (col / (cols - 1)) * 100 : 0}% ${rows > 1 ? (row / (rows - 1)) * 100 : 0}%`;
-    box.classList.add('loot-image');
+    // Nur die Zelle zeigen: ein Kind im Seitenverhältnis der Zelle, der Bogen per Hintergrund darauf zugeschnitten.
+    const W = img.naturalWidth, H = img.naturalHeight, kx = W / r.width, ky = H / r.height;
+    const x = r.x * kx, y = r.y * ky, w = r.w * kx, h = r.h * ky;
+    const art = el('span', { class: 'loot-art' });
+    art.style.aspectRatio = `${w} / ${h}`;
+    art.style.backgroundImage = `url('${r.url}')`;
+    art.style.backgroundSize = `${(W / w) * 100}% ${(H / h) * 100}%`;
+    art.style.backgroundPosition = `${W > w ? (x / (W - w)) * 100 : 0}% ${H > h ? (y / (H - h)) * 100 : 0}%`;
     box.querySelector('.loot-fallback')?.remove();
+    box.append(art);
+    box.classList.add('loot-image');
   });
   return box;
 }

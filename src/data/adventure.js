@@ -101,16 +101,22 @@ export const EXPLORE_RADIUS = 20;
 export const CAMPFIRE_OFFSET = 1.6;
 
 /**
- * Aussehen der Karten, solange die Bilder des Abenteuers fehlen: Radius der Randbäume und -felsen (m), Anteil der
- * Wegbreite, der als Erdweg gezeichnet wird, Farben von Weg, Wasser und Brücke, Häuser (Breite, Höhe, Tiefe in m,
- * Wand- und Dachfarbe) und eine Farbe je Person.
+ * Aussehen der Karten: Radius der Randbäume und -felsen (m), Abstand (m) um Häuser und Kleinkram (`propClear`) sowie um
+ * Leute, Lagerfeuer, Kisten und Fundorte (`thingClear`), in dem keine Randbäume und -felsen stehen (sonst verdecken sie
+ * diese), Anteil der Wegbreite, der als Erdweg gezeichnet wird; wenn die
+ * Bilder des Abenteuers fehlen: Farben von Weg, Wasser und Brücke, Häuser (Breite, Höhe, Tiefe in m, Wand- und
+ * Dachfarbe) und eine Farbe je Person.
  */
 export const MAP_LOOK = {
   borderRadius: { tree: 0.75, rock: 1.0 },
+  propClear: { haus_oma: 6, laden: 5, schmiede: 6, wohnhaus: 5.5, wohnhaus2: 5.5, brunnen: 2.5, wegweiser: 2, zaun: 2.5, flugblatt: 1.5 },
+  thingClear: 3,
   pathWidthShare: 0.7,
   path: 0x8a7150,
   water: 0x4d86a6,
   bridge: 0x7a5530,
+  /** Bretter der Brücke, wenn Weg und Bach gemalt sind: Bretter je Kachel, Kachel in m, Fugenfarbe, Helligkeitsstreuung. */
+  planks: { count: 8, tileM: 2.4, gap: 0x3a2614, spread: 0.18 },
   props: {
     haus_oma: { house: [6, 3, 5], wall: 0x9c8a6a, roof: 0x5f7a3a },
     laden: { house: [5, 2.6, 4], wall: 0xb59a6a, roof: 0xb04a3a },

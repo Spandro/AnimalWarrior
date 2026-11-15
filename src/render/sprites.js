@@ -1,7 +1,7 @@
 // Gemalte Figuren: Bildbögen laden, weißen Hintergrund entfernen, Texturen anlegen, Bewegung berechnen.
 import * as THREE from '../../vendor/three.module.min.js';
 import {
-  SHEETS, SHEET_HOLES, SHEET_FRAMES, HERO_SPRITES, ENEMY_SPRITES, BACKGROUND, BILLBOARD, MOTION, IDLE, ATTACK, MOTION_FULL_SPEED,
+  SHEETS, SHEET_HOLES, SHEET_FRAMES, SHEET_CUTS, CUT_LAYOUTS, HERO_SPRITES, ENEMY_SPRITES, BACKGROUND, BILLBOARD, MOTION, IDLE, ATTACK, MOTION_FULL_SPEED,
   HOP_BACK_LEAN, DUO_FRAMES,
 } from '../data/sprites.js';
 import { animalUnlocked } from '../core/roster.js';
@@ -216,6 +216,93 @@ export function cutFrames(img, { x: lefts, y: top, w, h }) {
   return { width: outW, height: h, data: out };
 }
 
+/**
+ * Schneidet die Stücke eines Bogens einzeln aus und legt sie in einen neuen Bogen (`layout`, siehe `cutLayout` in
+ * `src/data/sprites.js`). Jedes Stück bekommt nur seine eigenen Pixel, auch wo sich die Rechtecke im gelieferten Bild
+ * überschneiden: Jede zusammenhängende sichtbare Fläche (Deckkraft > 0, Nachbarn auch über Eck) gehört dem Stück, dessen
+ * Rechteck sie ganz enthält. Enthalten sie mehrere (kleine Flächen im Überschneidungsbereich), gehört sie dem Stück, dessen
+ * größte eigene Fläche ihr am nächsten liegt. Flächen, die in keinem Rechteck ganz liegen, fallen weg.
+ * Erwartet ein Bild nach {@link removeBackground}. Ohne DOM, daher testbar.
+ * @param {ImageDataLike} img
+ * @param {Record<string, { x: number, y: number, w: number, h: number }>} pieces Rechtecke im gelieferten Bild
+ * @param {{ width: number, height: number, cells: Record<string, { x: number, y: number, w: number, h: number }> }} layout
+ * @returns {{ width: number, height: number, data: Uint8ClampedArray }}
+ */
+export function cutPieces(img, pieces, layout) {
+  const { width: W, height: H, data } = img;
+  const n = W * H;
+  const names = Object.keys(pieces);
+  const rects = names.map((k) => pieces[k]);
+  const label = new Int32Array(n);
+  const stack = new Int32Array(n);
+  /** @type {Array<{ x0: number, y0: number, x1: number, y1: number, count: number }>} Umriss je Fläche, Index = Marke − 1 */
+  const boxes = [];
+  for (let s = 0; s < n; s++) {
+    if (label[s] || data[s * 4 + 3] === 0) continue;
+    const id = boxes.length + 1;
+    const box = { x0: W, y0: H, x1: -1, y1: -1, count: 0 };
+    let sp = 0;
+    stack[sp++] = s; label[s] = id;
+    while (sp > 0) {
+      const i = stack[--sp];
+      const x = i % W, y = (i - x) / W;
+      box.count++;
+      if (x < box.x0) box.x0 = x;
+      if (x > box.x1) box.x1 = x;
+      if (y < box.y0) box.y0 = y;
+      if (y > box.y1) box.y1 = y;
+      for (let dy = -1; dy <= 1; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= H) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= W) continue;
+          const j = yy * W + xx;
+          if (!label[j] && data[j * 4 + 3]) { label[j] = id; stack[sp++] = j; }
+        }
+      }
+    }
+    boxes.push(box);
+  }
+  const inside = (b, r) => b.x0 >= r.x && b.y0 >= r.y && b.x1 < r.x + r.w && b.y1 < r.y + r.h;
+  const gap = (a, b) => Math.hypot(Math.max(0, a.x0 - b.x1, b.x0 - a.x1), Math.max(0, a.y0 - b.y1, b.y0 - a.y1));
+  // Größte eigene Fläche je Stück.
+  const main = rects.map((r) => {
+    let best = null;
+    for (const b of boxes) if (inside(b, r) && (!best || b.count > best.count)) best = b;
+    return best;
+  });
+  const owner = new Int32Array(boxes.length + 1).fill(-1);
+  boxes.forEach((b, k) => {
+    const candidates = [];
+    rects.forEach((r, p) => { if (inside(b, r)) candidates.push(p); });
+    if (candidates.length === 0) return;
+    let pick = candidates[0];
+    for (const p of candidates) {
+      if (main[p] === b) { pick = p; break; }
+      const d = main[p] ? gap(b, main[p]) : Infinity, dPick = main[pick] ? gap(b, main[pick]) : Infinity;
+      if (d < dPick) pick = p;
+    }
+    owner[k + 1] = pick;
+  });
+  const out = new Uint8ClampedArray(layout.width * layout.height * 4);
+  names.forEach((name, p) => {
+    const r = rects[p], cell = layout.cells[name];
+    for (let y = 0; y < r.h; y++) {
+      const sy = r.y + y;
+      if (sy < 0 || sy >= H || y >= cell.h) continue;
+      for (let x = 0; x < r.w; x++) {
+        const sx = r.x + x;
+        if (sx < 0 || sx >= W || x >= cell.w) continue;
+        const i = sy * W + sx;
+        if (owner[label[i]] !== p) continue;
+        out.set(data.subarray(i * 4, i * 4 + 4), ((cell.y + y) * layout.width + cell.x + x) * 4);
+      }
+    }
+  });
+  return { width: layout.width, height: layout.height, data: out };
+}
+
 /** @param {string} url @returns {Promise<HTMLImageElement>} */
 export function loadImage(url) {
   return new Promise((resolve, reject) => {
@@ -282,13 +369,16 @@ function canvasOf(img) {
  * @param {HTMLImageElement} image
  * @param {Array<[number, number]>} [holes] Startpunkte für eingeschlossenes Papierweiß
  * @param {{ x: number[], y: number, w: number, h: number }} [frames] Phasen einer Bildfolge (`SHEET_FRAMES`)
+ * @param {{ pieces: Record<string, { x: number, y: number, w: number, h: number }>, layout: ReturnType<typeof import('../data/sprites.js').cutLayout> }} [cut]
+ *   einzeln ausgeschnittene Stücke ({@link cutPieces}, `SHEET_CUTS`)
  * @returns {{ texture: THREE.DataTexture, canvas: HTMLCanvasElement, size: { width: number, height: number } }}
  */
-export function prepareSheet(image, holes = [], frames) {
+export function prepareSheet(image, holes = [], frames, cut) {
   let imageData = imageDataOf(image);
   removeBackground(imageData, BACKGROUND, holes);
   removeSpecks(imageData, BACKGROUND.minSpeck);
   if (frames) imageData = cutFrames(imageData, frames);
+  if (cut) imageData = cutPieces(imageData, cut.pieces, cut.layout);
   bleedColors(imageData, BACKGROUND.bleed);
   return { texture: dataTexture(imageData), canvas: canvasOf(imageData), size: { width: imageData.width, height: imageData.height } };
 }
@@ -350,7 +440,8 @@ export function heroSpriteDef(sprites, animalId, classId) {
 
 /** Bereitet einen geladenen Bogen auf und trägt ihn in `result` ein. */
 function storeSheet(result, id, image, prepare) {
-  const sheet = prepare(image, SHEET_HOLES[id] || [], SHEET_FRAMES[id]);
+  const cut = SHEET_CUTS[id] ? { pieces: SHEET_CUTS[id].pieces, layout: CUT_LAYOUTS[id] } : undefined;
+  const sheet = prepare(image, SHEET_HOLES[id] || [], SHEET_FRAMES[id], cut);
   result.textures[id] = sheet.texture;
   result.sizes[id] = sheet.size;
   result.canvases[id] = sheet.canvas;

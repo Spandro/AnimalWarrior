@@ -58,6 +58,19 @@ export const DECO = {
 /** Boden: Kantenlänge einer Kachel in Metern und wie breit die Ränder für die nahtlose Kachel gemischt werden. */
 export const GROUND = { tileM: 8, seamBlendPx: 48 };
 
+/**
+ * Kacheln für Erdweg und Bach der Abenteuer-Karten (von oben gemalt, 1254 × 1254), geladen beim Betreten des Abenteuers:
+ * Datei, Kantenlänge einer Kachel in Metern, wie breit die Ränder für die nahtlose Kachel gemischt werden (wie beim Boden)
+ * und Deckkraft des Wassers.
+ */
+export const TRAIL_TILES = {
+  weg: 'assets/abenteuer/weg.webp',
+  wasser: 'assets/abenteuer/wasser.webp',
+  tileM: { weg: 5, wasser: 6 },
+  seamBlendPx: 48,
+  waterOpacity: 0.94,
+};
+
 /** Spalte und Zeile jedes Motivs im 3 × 2-Raster von `szenen.webp`. */
 export const SCENE_CELLS = {
   waldweg: { col: 0, row: 0 },

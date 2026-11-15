@@ -1,6 +1,7 @@
 // Anzeige im Abenteuer (Spec §5.1): Leben, Erfahrung, Level, verfolgter Auftrag, Minikarte, Pause, Knopfviereck mit drei
 // Fähigkeiten und Heiltrank (links oder rechts), Sprechen-Knopf, Bossanzeige, kurze Einblendungen.
 import { el } from './dom.js';
+import { lootIcon } from './tavern.js';
 import { bar, abilityInitials, abilityColor } from './hud.js';
 import { createMinimap } from './minimap.js';
 import { xpToNextAdventure } from '../core/adventureHero.js';
@@ -55,11 +56,15 @@ export function createAdventureHud(uiLayer, h) {
   uiLayer.append(root);
 
   let bannerUntil = 0, clock = 0, lastQuest = null, lastTalk = null, bannerImportant = false;
-  /** Einblendung; Gebietsnamen (`minor`) verdrängen keine laufende wichtigere Meldung. */
-  function say(text, minor = false) {
+  /**
+   * Einblendung; Gebietsnamen (`minor`) verdrängen keine laufende wichtigere Meldung. `itemId`: Symbol des Gegenstands davor.
+   */
+  function say(text, minor = false, itemId = null) {
     if (minor && bannerImportant && !banner.hidden) return;
     bannerImportant = !minor;
-    banner.textContent = text;
+    if (itemId && ITEMS[itemId]) banner.replaceChildren(lootIcon(ITEMS[itemId], 'loot-banner'), el('span', { text }));
+    else banner.textContent = text;
+    banner.classList.toggle('adv-banner-item', !!itemId);
     banner.hidden = false;
     bannerUntil = clock + BANNER_SECONDS;
   }
@@ -78,8 +83,8 @@ export function createAdventureHud(uiLayer, h) {
         else if (e.type === 'questCompleted') say(`Auftrag erledigt: ${QUESTS[e.questId].title}`);
         else if (e.type === 'bossStart') say(e.name);
         else if (e.type === 'bossDefeated') say(`${e.name} besiegt!`);
-        else if (e.type === 'loot' && e.kind === 'item') say(`Gefunden: ${ITEMS[e.itemId].name}`);
-        else if (e.type === 'loot' && e.kind === 'chest') say(`Truhe: ${e.gold} Gold und ${ITEMS[e.itemId].name}`);
+        else if (e.type === 'loot' && e.kind === 'item') say(`Gefunden: ${ITEMS[e.itemId].name}`, false, e.itemId);
+        else if (e.type === 'loot' && e.kind === 'chest') say(`Truhe: ${e.gold} Gold und ${ITEMS[e.itemId].name}`, false, e.itemId);
         else if (e.type === 'loot' && e.kind === 'material') say(`${MATERIALS[e.id].name}${e.count > 1 ? ` × ${e.count}` : ''}`);
         else if (e.type === 'loot' && e.kind === 'potion') say('Heiltrank gefunden');
         else if (e.type === 'questItem') say(`Gefunden: ${THINGS[e.thing] ?? e.thing}`);

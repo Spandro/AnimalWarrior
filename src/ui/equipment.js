@@ -6,6 +6,19 @@ import { ITEMS, RARITIES, SLOT_NAMES } from '../data/items.js';
 import { CLASS_WEAPON } from '../data/adventure.js';
 import { itemDelta } from '../core/adventureHero.js';
 import { equipItem } from '../save/adventure.js';
+import { lootIcon } from './tavern.js';
+
+/**
+ * Zeile eines Gegenstands in Ausrüstung, Laden und Schmiede: Symbol links (Bild aus seinem Bogen, sonst Ersatzsymbol im
+ * Seltenheitsrahmen), daneben die Texte.
+ * @param {Record<string, any>} attrs Eigenschaften der Schaltfläche
+ * @param {string} id Gegenstand
+ * @param {...(Node|null)} children
+ */
+export function itemRow(attrs, id, ...children) {
+  return el('button', { ...attrs, class: `${attrs.class ?? 'adv-quest-row'} adv-item-row` },
+    lootIcon(ITEMS[id], 'loot-row'), el('span', { class: 'adv-item-text' }, ...children));
+}
 
 /** Name mit Verbesserungsstufe, z. B. „Paddel der Tapferkeit +2“. */
 export function itemTitle(id, levels) {
@@ -31,9 +44,10 @@ export function openEquipment(ctx) {
       body.append(el('p', { class: 'adv-note', text: `Leben ${Math.round(stats.maxHp)} · Rüstung ${Math.round(stats.armor)} · Schaden ${Math.round(stats.damage * 100)} % · Tempo ${stats.moveSpeed.toFixed(1)}` }));
       for (const [key, label] of Object.entries(SLOT_NAMES)) {
         const id = rec.equipment[key];
-        body.append(el('button', { class: 'adv-quest-row', type: 'button', 'data-key': key, onclick: () => { slot = key; api.refresh(); } },
-          el('strong', { text: label }),
-          el('span', { text: id ? itemTitle(id, levels) : '– leer –', style: id ? `color:${RARITIES[ITEMS[id].rarity].color}` : null })));
+        const parts = [el('strong', { text: label }),
+          el('span', { text: id ? itemTitle(id, levels) : '– leer –', style: id ? `color:${RARITIES[ITEMS[id].rarity].color}` : null })];
+        const attrs = { class: 'adv-quest-row', type: 'button', 'data-key': key, onclick: () => { slot = key; api.refresh(); } };
+        body.append(id ? itemRow(attrs, id, ...parts) : el('button', attrs, ...parts));
       }
       return;
     }
@@ -47,11 +61,11 @@ export function openEquipment(ctx) {
     if (options.length === 0) body.append(el('p', { class: 'adv-note', text: 'Noch nichts Passendes in der Truhe. Gegner, Kisten, Krümel und die Taverne haben Nachschub.' }));
     for (const id of options) {
       const worn = id === current;
-      body.append(el('button', {
+      body.append(itemRow({
         class: `adv-quest-row${worn ? ' on' : ''}`, type: 'button', 'data-key': id, disabled: worn,
         style: `border-color:${RARITIES[ITEMS[id].rarity].color}`,
         onclick: () => { ctx.change((s) => equipItem(s, ctx.heroId, slot, id)); slot = null; api.refresh(); },
-      },
+      }, id,
       el('strong', { text: `${itemTitle(id, levels)}${worn ? ' (angelegt)' : ''}` }),
       ...itemDelta(current, id, levels).map((d) => el('span', { class: 'adv-muted', text: deltaText(d) })),
       el('span', { class: 'adv-desc', text: `„${ITEMS[id].line}“` })));
