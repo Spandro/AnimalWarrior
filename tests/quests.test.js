@@ -181,3 +181,9 @@ test('quests: verfolgter Auftrag und Ziel auf der Karte', () => {
   assertEqual(nut.map, 'kapitel1');
   assertTrue(!(nut.x === 95 && nut.z === -1));
 });
+
+test('quests: jedes Auftragsstück hat einen Anzeigenamen für die Meldung „Gefunden: …“', async () => {
+  const { QUEST_THING_NAMES } = await import('../src/data/quests.js');
+  const things = new Set(Object.values(QUESTS).flatMap((q) => q.steps.filter((s) => s.type === 'collect').map((s) => s.target)));
+  for (const t of things) assertTrue(typeof QUEST_THING_NAMES?.[t] === 'string' && QUEST_THING_NAMES[t].length > 0, t);
+});

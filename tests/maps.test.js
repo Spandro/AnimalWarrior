@@ -156,3 +156,15 @@ test('maps: Kapitel 2 – ohne Sieg über Quak kommt man nicht ins Nebelmoor', (
   assertTrue(!blocked(fire('k2_nebel')));
   assertTrue(!blocked(fire('k2_hecht')));
 });
+
+test('maps: jede Bossarena ist mit geschlossenem Tor dicht – kein Lagerfeuer von innen erreichbar', () => {
+  for (const map of Object.values(MAPS)) {
+    for (const b of map.bosses) {
+      // Im Kampf: sein Tor zu, Sperren ebenfalls (sie öffnen erst nach dem Sieg bzw. dem Auftrag).
+      const barriers = new Set(map.gates.filter((g) => g.kind === 'barrier').map((g) => g.id));
+      const inside = reachable(map, b.arena, (id) => id === b.gate || barriers.has(id));
+      for (const fire of map.campfires) assertTrue(!inside(fire), `${map.id}: Arena ${b.id} erreicht ${fire.id}`);
+      for (const x of map.exits) assertTrue(!inside(x), `${map.id}: Arena ${b.id} erreicht ${x.id}`);
+    }
+  }
+});

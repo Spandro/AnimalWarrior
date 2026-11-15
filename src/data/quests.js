@@ -10,6 +10,12 @@
  *   `endsChapter`: mit diesem Auftrag ist das Kapitel geschafft.
  */
 
+/** Anzeigenamen der Auftragsstücke (Meldung „Gefunden: …“). */
+export const QUEST_THING_NAMES = {
+  hammer: 'Grabowskis Hammer', nuss: 'Nussversteck', flugblatt: 'Flugblatt', krebsschere: 'Krebsschere',
+  einladung: 'Einladung zur Krönung', irrlicht: 'Irrlicht', seerose: 'Seerose',
+};
+
 /** Chance, dass ein passender Gegner ein Auftragsstück (Flugblatt, Krebsschere) fallen lässt. */
 export const QUEST_DROP = 0.5;
 

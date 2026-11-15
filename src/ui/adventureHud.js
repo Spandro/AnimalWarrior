@@ -9,7 +9,7 @@ import { trackedQuest } from '../core/quests.js';
 import { ABILITIES } from '../data/abilities.js';
 import { ENEMIES } from '../data/enemies.js';
 import { ITEMS } from '../data/items.js';
-import { QUESTS } from '../data/quests.js';
+import { QUESTS, QUEST_THING_NAMES } from '../data/quests.js';
 import { MATERIALS } from '../data/adventure.js';
 
 const INTERACT_LABEL = { npc: 'Sprechen', campfire: 'Rasten', spot: 'Untersuchen', chest: 'Öffnen' };
@@ -87,7 +87,7 @@ export function createAdventureHud(uiLayer, h) {
         else if (e.type === 'loot' && e.kind === 'chest') say(`Truhe: ${e.gold} Gold und ${ITEMS[e.itemId].name}`, false, e.itemId);
         else if (e.type === 'loot' && e.kind === 'material') say(`${MATERIALS[e.id].name}${e.count > 1 ? ` × ${e.count}` : ''}`);
         else if (e.type === 'loot' && e.kind === 'potion') say('Heiltrank gefunden');
-        else if (e.type === 'questItem') say(`Gefunden: ${THINGS[e.thing] ?? e.thing}`);
+        else if (e.type === 'questItem') say(`Gefunden: ${QUEST_THING_NAMES[e.thing] ?? e.thing}`);
         else if (e.type === 'wake') say(e.goldLost > 0 ? `Du wachst am Lagerfeuer auf … (−${e.goldLost} Gold)` : 'Du wachst am Lagerfeuer auf …');
         else if (e.type === 'abilityFail' && slots[e.slot]) {
           const b = slots[e.slot].btn;
@@ -143,7 +143,6 @@ export function createAdventureHud(uiLayer, h) {
 }
 
 /** Auftragsgegenstände für Einblendungen. */
-const THINGS = { hammer: 'Grabowskis Hammer', nuss: 'Nussversteck', flugblatt: 'Flugblatt', krebsschere: 'Krebsschere' };
 
 /** Zeile „Titel: Schritt (2/5)“ des verfolgten Auftrags. */
 function questLine(id, rec) {

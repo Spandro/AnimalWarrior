@@ -444,3 +444,32 @@ test('adventure: Einstiegsgeschichte von Kapitel 2 einmal – solange der erste 
   const k1 = setup();
   assertTrue(!chapterStartDue(k1));
 });
+
+test('adventure: wer Kapitel 1 bei Oma abschließt, hat sofort den ersten Sumpf-Auftrag (Geschichte beim ersten Betreten)', async () => {
+  const { chapterStartDue } = await import('../src/modes/adventure.js');
+  const MAIN1 = ['nasse_pfoten', 'schmied_ohne_hammer', 'bruecke_zu', 'flugblaetter'];
+  const run = setup({ map: 'dorf', campfire: 'dorf_platz', mutate: (a) => {
+    for (const id of MAIN1) a.quests[id] = { state: 'done', step: 9, progress: 0 };
+    a.quests.zwickzwack = { state: 'active', step: 2, progress: 0 };
+    a.bosses.push('graete', 'zwickzwack');
+  } });
+  put(run, -6, -8.4); step(run);
+  interact(run);
+  assertEqual(run.record.chapterDone, [1]);
+  assertEqual(run.record.quests.ruf_aus_dem_sumpf, { state: 'active', step: 0, progress: 0 });
+  assertTrue(run.events.some((e) => e.type === 'questAccepted' && e.questId === 'ruf_aus_dem_sumpf'));
+  endTalk(run);
+  const exit = run.map.exits.find((x) => x.id === 'nach_kapitel2');
+  put(run, exit.x, exit.z); step(run);
+  assertEqual(run.map.id, 'kapitel2');
+  assertTrue(chapterStartDue(run));
+});
+
+test('adventure: alter Stand mit Kapitel 1, aber ohne Sumpf-Auftrag, bekommt ihn beim Start', () => {
+  const run = setup({ map: 'dorf', campfire: 'dorf_platz', mutate: (a) => {
+    for (const id of ['nasse_pfoten', 'schmied_ohne_hammer', 'bruecke_zu', 'flugblaetter', 'zwickzwack']) a.quests[id] = { state: 'done', step: 9, progress: 0 };
+    a.chapterDone = [1];
+  } });
+  assertEqual(run.record.quests.ruf_aus_dem_sumpf, { state: 'active', step: 0, progress: 0 });
+  assertTrue(run.dirty);
+});

@@ -337,8 +337,8 @@ test('world: Wellen-Modus unverändert – fester Durchlauf über 60 s', async (
     stepRun(run, 1 / 60, { moveX: Math.cos(i / 300), moveZ: Math.sin(i / 300) });
   }
   const w = run.world;
-  assertClose(w.hero.x, -16.105953975668406, 1e-9);
-  assertClose(w.hero.z, 4.4388851207797675, 1e-9);
+  // Exakt (Bit für Bit): schon die Reihenfolge einer Multiplikation ändert sonst nach Minuten den Verlauf.
+  assertEqual([w.hero.x, w.hero.z], [-16.105953975668406, 4.4388851207797675]);
   assertEqual(w.run.kills, 12);
   assertEqual(w.enemies.length, 78);
 });

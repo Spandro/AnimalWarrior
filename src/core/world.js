@@ -906,10 +906,10 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
   if (len > 0) {
     const dx = input.moveX / len, dz = input.moveZ / len;
     hero.facing = { x: dx, z: dz };
-    const slowed = hero.slowUntil > world.time ? 1 - hero.slowFactor : 1;
-    const step = hero.stats.moveSpeed * slowed * terrainFactor(world, hero.x, hero.z, 'walk') * dt;
-    hero.x += dx * step;
-    hero.z += dz * step;
+    // Reihenfolge wie vor dem Gelände (dx × Tempo × dt), sonst weicht der Wellen-Modus in den letzten Stellen ab.
+    const f = (hero.slowUntil > world.time ? 1 - hero.slowFactor : 1) * terrainFactor(world, hero.x, hero.z, 'walk');
+    hero.x += dx * hero.stats.moveSpeed * f * dt;
+    hero.z += dz * hero.stats.moveSpeed * f * dt;
     pushOutOfObstacles(world, hero);
   }
 

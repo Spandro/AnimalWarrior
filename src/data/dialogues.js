@@ -32,7 +32,7 @@ export const DIALOGUES = {
       bruecke_zu: ['Hauptmann Gräte wartet an der Alten Brücke. Sei vorsichtig.'],
       flugblaetter: ['Fische und Frösche tragen die Zettel. Nimm sie ihnen ab.'],
       zwickzwack: ['Der Quellteich liegt hinter dem Tiefen Wald.'],
-      ruf_aus_dem_sumpf: ['Der Weg in den Sumpf beginnt am Westrand des Dorfs.'],
+      ruf_aus_dem_sumpf: ['Hörst du das Quaken? Das kommt aus dem Sumpf im Westen.', 'Frag dort nach der Unke Quappe. Die weiß immer alles. Leider.', 'Der Weg in den Sumpf beginnt am Westrand des Dorfs.'],
     },
     progress: {},
     done: {

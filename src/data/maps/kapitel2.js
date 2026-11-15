@@ -35,7 +35,7 @@ export const KAPITEL2 = {
     { points: [[200, -128], [208, -112]], width: 8 },
     { points: [[560, -14], [700, 24]], width: 40 },
     { points: [[820, -36], [900, 36]], width: 34 },
-    { points: [[1222, -10], [1258, -10]], width: 30 },
+    { points: [[1234, -10], [1246, -10]], width: 24 }, // ganz im Arenakreis (r 18), sonst läuft man ums Tor herum
   ],
   bridges: [],
   boardwalks: [

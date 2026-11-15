@@ -74,6 +74,7 @@ export function createAdventureRun({ seed, save, heroId }) {
     world: null, map: null, grid: null, explored: null, queued: [], stepping: false, worldSeen: 0,
   };
   enterMap(run, run.record.mapId, run.record.campfireId);
+  startNextChapter(run);
   // Helden aus Etappe 1, die schon Level 10 haben, erfahren so von der Wahl.
   if (!run.record.subclass && run.record.level >= SUBCLASS_RULES.chooseLevel) emit(run, { type: 'subclassAvailable' });
   return run;
@@ -354,6 +355,17 @@ function onBossDefeated(run, bossDef, e) {
   run.dirty = true;
 }
 
+/**
+ * Ist ein Kapitel abgeschlossen, gibt Oma gleich den ersten Auftrag des nächsten mit (sofern es gebaut ist). So läuft beim
+ * ersten Betreten die Einstiegsgeschichte, und der Auftrag zeigt den Weg; auch alte Stände bekommen ihn beim Start.
+ */
+function startNextChapter(run) {
+  for (const [ch, id] of Object.entries(CHAPTER_START_QUEST)) {
+    if (!run.record.chapterDone.includes(Number(ch) - 1) || run.record.quests[id]) continue;
+    acceptOffer(run, id);
+  }
+}
+
 /** Ein Auftragsereignis: Fortschritt, Abschluss mit Belohnung genau einmal. */
 function quest(run, event) {
   const r = questEvent(run.record.quests, event);
@@ -382,6 +394,7 @@ function completeQuest(run, id) {
   if (q.endsChapter && !run.record.chapterDone.includes(q.endsChapter)) {
     run.record.chapterDone.push(q.endsChapter);
     emit(run, { type: 'chapterDone', chapter: q.endsChapter });
+    startNextChapter(run);
   }
   run.dirty = true;
   grantXp(run, reward.xp / run.world.hero.stats.xpGain);
