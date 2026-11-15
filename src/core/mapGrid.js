@@ -7,14 +7,15 @@ import { MAP_CELL, GATE_HALF_WIDTH, EXPLORE_BLOCK, BORDER_DECOR, TERRAIN } from 
  * @typedef {{ points: [number, number][], width: number }} Strip Linienzug mit Breite
  * @typedef {{ id: string, bounds: { minX: number, maxX: number, minZ: number, maxZ: number }, paths: Strip[],
  *   clearings: { x: number, z: number, r: number }[], water: Strip[], bridges: Strip[], obstacles: Obstacle[],
- *   mud?: Strip[], boardwalks?: Strip[],
+ *   mud?: Strip[], boardwalks?: Strip[], currents?: Strip[],
  *   gates: { id: string, points: [number, number][] }[] }} MapShape  (Ausschnitt von MapDef, src/data/maps)
- * @typedef {{ cell: number, minX: number, minZ: number, cols: number, rows: number, cells: Uint8Array }} MapGrid
+ * @typedef {{ cell: number, minX: number, minZ: number, cols: number, rows: number, cells: Uint8Array,
+ *   flow: Float32Array | null }} MapGrid  `flow`: Einheitsrichtung der Strömung je Zelle (x, z), nur bei Karten mit Strömung
  * @typedef {'walk'|'fly'|'shot'} MoveMode  laufen; fliegen (nur innerhalb der Karte); Geschoss (über Wasser, nicht durch den Rand)
  */
 
-/** Zellwerte. `mud`: begehbar, bremst Laufende (Kapitel 2). */
-export const CELL = { blocked: 0, walk: 1, water: 2, bridge: 3, mud: 4 };
+/** Zellwerte. `mud`: begehbar, bremst Laufende (Kapitel 2); `current`: begehbar, schiebt in Flussrichtung (Kapitel 3). */
+export const CELL = { blocked: 0, walk: 1, water: 2, bridge: 3, mud: 4, current: 5 };
 
 /** Abstand von (x,z) zur Strecke a–b. */
 function segmentDistance(x, z, ax, az, bx, bz) {
@@ -58,16 +59,38 @@ function paintStrip(grid, strip, value) {
 }
 
 /**
- * Raster aus der Kartenbeschreibung: erst Wege und Lichtungen, dann Wasser darüber, dann Schlamm, dann Brücken,
- * zuletzt Stege (wie Brücken, über Schlamm und Wasser).
- * @param {MapShape} map
- * @returns {MapGrid}
+ * Strömung: wie ein Streifen, dazu die Richtung des nächsten Abschnitts a → b je Zelle.
+ * @param {MapGrid} grid
+ * @param {Strip} strip
  */
-export function buildMapGrid(map) {
-  const { minX, maxX, minZ, maxZ } = map.bounds;
-  const cell = MAP_CELL;
-  const cols = Math.ceil((maxX - minX) / cell), rows = Math.ceil((maxZ - minZ) / cell);
-  const grid = { cell, minX, minZ, cols, rows, cells: new Uint8Array(cols * rows) };
+function paintCurrent(grid, strip) {
+  const pts = strip.points;
+  paint(grid, stripBox(strip), CELL.current, (x, z) => {
+    let best = Infinity, seg = 0;
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const d = segmentDistance(x, z, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
+      if (d < best) { best = d; seg = i; }
+    }
+    if (best > strip.width / 2) return false;
+    const [ax, az] = pts[seg], [bx, bz] = pts[seg + 1];
+    const len = Math.hypot(bx - ax, bz - az) || 1;
+    const c = Math.floor((x - grid.minX) / grid.cell), r = Math.floor((z - grid.minZ) / grid.cell);
+    grid.flow[(r * grid.cols + c) * 2] = (bx - ax) / len;
+    grid.flow[(r * grid.cols + c) * 2 + 1] = (bz - az) / len;
+    return true;
+  });
+}
+
+/**
+ * Malt das Raster (neu) aus der Kartenbeschreibung: erst Wege und Lichtungen, dann Wasser darüber, dann Schlamm, dann
+ * Strömung, dann Brücken, zuletzt Stege (wie Brücken, über Schlamm, Wasser und Strömung).
+ * @param {MapGrid} grid
+ * @param {MapShape} map
+ * @param {Record<string, 'open'|'closed'>} [switches] Zustände der Schleusen (Kapitel 3)
+ */
+export function paintMapGrid(grid, map, switches = {}) {
+  grid.cells.fill(CELL.blocked);
+  if (grid.flow) grid.flow.fill(0);
   for (const p of map.paths || []) paintStrip(grid, p, CELL.walk);
   for (const c of map.clearings || []) {
     paint(grid, { minX: c.x - c.r, maxX: c.x + c.r, minZ: c.z - c.r, maxZ: c.z + c.r }, CELL.walk,
@@ -75,9 +98,25 @@ export function buildMapGrid(map) {
   }
   for (const w of map.water || []) paintStrip(grid, w, CELL.water);
   for (const m of map.mud || []) paintStrip(grid, m, CELL.mud);
+  for (const c of map.currents || []) paintCurrent(grid, c);
   for (const b of map.bridges || []) paintStrip(grid, b, CELL.bridge);
   for (const b of map.boardwalks || []) paintStrip(grid, b, CELL.bridge);
   return grid;
+}
+
+/**
+ * Raster aus der Kartenbeschreibung (siehe {@link paintMapGrid}).
+ * @param {MapShape} map
+ * @param {Record<string, 'open'|'closed'>} [switches]
+ * @returns {MapGrid}
+ */
+export function buildMapGrid(map, switches = {}) {
+  const { minX, maxX, minZ, maxZ } = map.bounds;
+  const cell = MAP_CELL;
+  const cols = Math.ceil((maxX - minX) / cell), rows = Math.ceil((maxZ - minZ) / cell);
+  const flowing = (map.currents?.length ?? 0) > 0 || (map.sluices?.length ?? 0) > 0;
+  const grid = { cell, minX, minZ, cols, rows, cells: new Uint8Array(cols * rows), flow: flowing ? new Float32Array(cols * rows * 2) : null };
+  return paintMapGrid(grid, map, switches);
 }
 
 /**
@@ -121,6 +160,12 @@ export function mapTerrain(map, grid, isGateClosed) {
     /** Tempo-Faktor an (x,z): Schlamm bremst nur Laufende (`TERRAIN.mudSpeed`), sonst 1. */
     speedFactor(x, z, mode = 'walk') {
       return mode === 'walk' && cellAt(grid, x, z) === CELL.mud ? TERRAIN.mudSpeed : 1;
+    },
+    /** Schub der Strömung an (x,z) in m/s (`TERRAIN.currentSpeed` in Flussrichtung), sonst null. */
+    flowAt(x, z) {
+      if (cellAt(grid, x, z) !== CELL.current) return null;
+      const i = (Math.floor((z - grid.minZ) / grid.cell) * grid.cols + Math.floor((x - grid.minX) / grid.cell)) * 2;
+      return { x: grid.flow[i] * TERRAIN.currentSpeed, z: grid.flow[i + 1] * TERRAIN.currentSpeed };
     },
   };
 }

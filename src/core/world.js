@@ -9,6 +9,7 @@ import { bonusModifiers } from '../data/bonuses.js';
 import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, CONTACT_TOLERANCE, HERO_RADIUS, SEPARATION_CELL, MAX_ENEMIES,
   CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS_MOVES, CURL, SLITHER, VENOM, POUNCE } from '../data/enemies.js';
 import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
+import { TERRAIN } from '../data/adventure.js';
 
 /**
  * @typedef {import('./stats.js').Stats} Stats
@@ -444,7 +445,9 @@ export function enemyTarget(world, enemy) {
  * @param {Enemy} enemy
  */
 export function enemySpeed(world, enemy) {
-  const base = world.time < enemy.slowUntil ? enemy.speed * (1 - enemy.slowFactor) : enemy.speed;
+  let base = world.time < enemy.slowUntil ? enemy.speed * (1 - enemy.slowFactor) : enemy.speed;
+  const swim = ENEMIES[enemy.type]?.swimmer;
+  if (swim && flowAt(world, enemy.x, enemy.z)) base *= swim.speedMul;
   if (enemy.flying || ENEMIES[enemy.type]?.mudproof) return base;
   return base * terrainFactor(world, enemy.x, enemy.z, 'walk');
 }
@@ -458,6 +461,47 @@ export function enemySpeed(world, enemy) {
  */
 export function terrainFactor(world, x, z, mode) {
   return world.terrain.speedFactor ? world.terrain.speedFactor(x, z, mode) : 1;
+}
+
+/**
+ * Schub der Strömung an (x,z) in m/s, im Kreis `world.flowTurned` (Admiral Flossenbart) gegenläufig; null ohne Strömung
+ * oder wenn die Geländequelle keine meldet (Wellen-Modus).
+ * @param {World} world
+ * @param {number} x
+ * @param {number} z
+ * @returns {{ x: number, z: number } | null}
+ */
+export function flowAt(world, x, z) {
+  const f = world.terrain.flowAt ? world.terrain.flowAt(x, z) : null;
+  if (!f) return null;
+  const t = world.flowTurned;
+  if (t && (x - t.x) ** 2 + (z - t.z) ** 2 <= t.r * t.r) return { x: -f.x, z: -f.z };
+  return f;
+}
+
+/**
+ * Strömung schiebt den Helden: eigener Schub zum Laufen dazu, aber höchstens so stark, dass er gegen sie mit mindestens
+ * `TERRAIN.heroHeadway` m/s vorankommt (wirksames Tempo − heroHeadway, nie negativ; Spec §14.1).
+ */
+function pushHeroByFlow(world, dt) {
+  const hero = world.hero;
+  const flow = flowAt(world, hero.x, hero.z);
+  if (!flow) return;
+  const own = hero.stats.moveSpeed * (hero.slowUntil > world.time ? 1 - hero.slowFactor : 1) * terrainFactor(world, hero.x, hero.z, 'walk');
+  const v = Math.hypot(flow.x, flow.z);
+  const k = Math.min(v, Math.max(0, own - TERRAIN.heroHeadway)) / v;
+  hero.x += flow.x * k * dt;
+  hero.z += flow.z * k * dt;
+  pushOutOfObstacles(world, hero);
+}
+
+/** Strömung schiebt Gegner am Boden (nicht Flieger, nicht Schwimmer, nicht den Schatten) mit vollem Schub. */
+function pushEnemiesByFlow(world, dt) {
+  for (const e of world.enemies) {
+    if (e.flying || e.shadow || ENEMIES[e.type]?.swimmer) continue;
+    const f = flowAt(world, e.x, e.z);
+    if (f) { e.x += f.x * dt; e.z += f.z * dt; }
+  }
 }
 
 /**
@@ -915,6 +959,7 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
     hero.z += dz * hero.stats.moveSpeed * f * dt;
     pushOutOfObstacles(world, hero);
   }
+  if (!inert && world.terrain.flowAt) pushHeroByFlow(world, dt);
 
   // Stärkungen ablaufen lassen
   const before = hero.buffs.length;
@@ -939,6 +984,7 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
     if (world.time < e.confusedUntil) wander(world, e, dt);
     else (BEHAVIORS[e.behavior] || BEHAVIORS.chase)(world, e, dt);
   }
+  if (world.terrain.flowAt) pushEnemiesByFlow(world, dt);
   separateEnemies(world);
   for (const e of world.enemies) if (!e.flying) pushOutOfObstacles(world, e);
   pushEnemiesOutOfHero(world);

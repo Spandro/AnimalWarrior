@@ -8,7 +8,7 @@ import { KAPITEL2 } from './kapitel2.js';
  * @typedef {{ points: Pt[], width: number }} Strip
  * @typedef {{ id: string, name: string, chapter: number, bounds: { minX: number, maxX: number, minZ: number, maxZ: number },
  *   paths: Strip[], clearings: { x: number, z: number, r: number }[], water: Strip[], bridges: Strip[],
- *   mud?: Strip[], boardwalks?: Strip[],
+ *   mud?: Strip[], boardwalks?: Strip[], currents?: Strip[],
  *   obstacles: import('../../core/terrain.js').Obstacle[],
  *   gates: { id: string, kind: 'arena'|'barrier', points: Pt[], opensOn?: { boss: string } | { quest: string, step: number } }[],
  *   areas: { id: string, name: string, x: number, z: number, r: number }[],
@@ -24,6 +24,7 @@ import { KAPITEL2 } from './kapitel2.js';
  *   Der erste Eintrag in `paths` ist der Hauptweg. Tore: `arena` schließt sich im Bosskampf, `barrier` ist zu, bis
  *   `opensOn` erfüllt ist. Ein Ausgang mit `requires` ist erst offen (sichtbar und benutzbar), wenn das Kapitel abgeschlossen ist. Ein Gebiet ist das kleinste, dessen Kreis den Helden enthält. `hazards.bubbles`: Moorblasen auf
  *   dem Schlamm dieser Karte, Gegner-Schaden nach Stufe `level`; `bubbleArena`: Moorblasen auch in dieser Bossarena.
+ *   `currents`: Strömung (begehbar, schiebt in Richtung des Linienzugs, Kapitel 3).
  */
 
 /** @type {Record<'dorf'|'kapitel1'|'kapitel2', MapDef>} */

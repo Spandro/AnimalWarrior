@@ -4,8 +4,12 @@
 /** Kantenlänge einer Rasterzelle der Karte in Metern. */
 export const MAP_CELL = 1;
 
-/** Gelände (Etappe 3, Spec §4.1): Tempo-Faktor auf Schlamm für Laufende (nicht fliegend, nicht `mudproof`). */
-export const TERRAIN = { mudSpeed: 0.65 };
+/**
+ * Gelände (Etappe 3, Spec §4.1, §4.2, §14.1): Tempo-Faktor auf Schlamm für Laufende (nicht fliegend, nicht `mudproof`);
+ * Strömung schiebt Laufende mit `currentSpeed` m/s in Flussrichtung (nicht Flieger, nicht `swimmer`); gegen die Strömung
+ * kommt der Held immer mit mindestens `heroHeadway` m/s voran (sein Schub ist höchstens wirksames Tempo − `heroHeadway`).
+ */
+export const TERRAIN = { mudSpeed: 0.65, currentSpeed: 2.5, heroHeadway: 1 };
 
 /**
  * Moorblasen (Spec §4.1, §14.1): nächste Blase nach `minInterval`–`maxInterval` s, Ort im Umkreis `range` (m) um den
@@ -164,7 +168,7 @@ export const MAP_LOOK = {
  */
 export const MINIMAP = {
   size: 112, radius: 45, block: EXPLORE_BLOCK,
-  colors: { blocked: '#2e3b25', walk: '#b8a77a', water: '#4d86a6', bridge: '#8a6a45', mud: '#6e6a3c' },
+  colors: { blocked: '#2e3b25', walk: '#b8a77a', water: '#4d86a6', bridge: '#8a6a45', mud: '#6e6a3c', current: '#5fa8d0' },
 };
 
 /** Namen der Lagerfeuer für das Reisen. */

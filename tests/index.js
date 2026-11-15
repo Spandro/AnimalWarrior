@@ -40,3 +40,4 @@ import './tavernGames.test.js';
 import './adventureImages.test.js';
 import './hazards.test.js';
 import './swamp.test.js';
+import './dam.test.js';
