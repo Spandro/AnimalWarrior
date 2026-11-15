@@ -2,7 +2,7 @@
 
 Diese Datei ist für die nächste Sitzung gedacht, falls die laufende abbricht. Sie wird an jedem Pausenpunkt aktualisiert.
 
-Zuletzt aktualisiert: 2026-11-15. **Abenteuer-Modus Etappe 2 (Unterklassen mit Fähigkeitenbaum) ist gebaut, getestet und auf `main`** (Spielversion 0.6.0, Spielstand Version 5). Spec `docs/superpowers/specs/2026-11-14-abenteuer-etappe2-design.md`, Plan `docs/superpowers/plans/2026-11-14-abenteuer-etappe2.md`, gebaut „sparsam“ (inline, am Ende ein frischer Prüfer). Was drin ist und welche Entscheidungen beim Bau fielen, steht in Abschnitt 1 („Abenteuer-Modus Etappe 2“). Etappe 1 (0.5.0) steht darüber. **Bilder des Abenteuers sind eingebaut** (2026-11-15, `docs/abenteuer-bilder.md`). Offen: Etappe 3 (Kapitel 2–4), Rückmeldung zum Spielgefühl der Unterklassen.
+Zuletzt aktualisiert: 2026-11-15 (Aufräumrunde der Kleinigkeiten erledigt, Abschnitt 8). **Abenteuer-Modus Etappe 2 (Unterklassen mit Fähigkeitenbaum) ist gebaut, getestet und auf `main`** (Spielversion 0.6.0, Spielstand Version 5). Spec `docs/superpowers/specs/2026-11-14-abenteuer-etappe2-design.md`, Plan `docs/superpowers/plans/2026-11-14-abenteuer-etappe2.md`, gebaut „sparsam“ (inline, am Ende ein frischer Prüfer). Was drin ist und welche Entscheidungen beim Bau fielen, steht in Abschnitt 1 („Abenteuer-Modus Etappe 2“). Etappe 1 (0.5.0) steht darüber. **Bilder des Abenteuers sind eingebaut** (2026-11-15, `docs/abenteuer-bilder.md`). Offen: Etappe 3 (Kapitel 2–4), Rückmeldung zum Spielgefühl der Unterklassen.
 
 ## 1. Was fertig ist
 
@@ -153,7 +153,7 @@ Reihenfolge wie vereinbart; jedes Paket bekommt eigenen Entwurf, Spec und Plan.
 
 **Weitere offene Wünsche und Ideen**
 
-- Getroffene Gegner blitzen nicht auf (Trefferereignisse tragen keine Gegnerkennung)
+- ~~Getroffene Gegner blitzen nicht auf~~ – erledigt 2026-11-15 (Treffer tragen die Gegnerkennung, Gegner leuchten 0,1 s hell auf; `ENEMY_FLASH` in `src/data/sprites.js`)
 - Balancing ist ungespielt: Wer still steht, stirbt sehr schnell; 15 Minuten hat noch niemand am Stück gespielt
 - Ton hat noch niemand gehört
 
@@ -222,71 +222,24 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/serve.ps1 -Port 8080
 
 ## 8. Zurückgestellte Kleinigkeiten (bekannt, nicht dringend)
 
-Aus der Gesamtprüfung des Abenteuers Etappe 2 (bewusst zurückgestellt):
+**Aufräumrunde 2026-11-15** (Wunsch des Auftraggebers: „erst die Kleinigkeiten“). Behoben, jeweils mit Test, wo die Logik betroffen ist (Commits `107ec1e` bis `83f4b1b`):
 
-- Lebensraub rechnet mit dem ganzen Treffer, auch über das restliche Leben des Gegners hinaus (bei höchstens 6 % Lebensraub wenig)
-- Umlernen räumt laufende Besonderheiten (Erdmännchen, Wolke, Fallen, Schild, Heiltopf) nicht weg; sie wirken bis zu ihrem Ende weiter
-- In der Sterbephase (1,2 s) wirken Fallen, Begleiter und Zonen weiter; Gold und Tötungen daraus zählen nicht (danach neue Welt)
-- Ein ganz vom Schild geschluckter Otterbiss vergiftet trotzdem (die Gift-Ticks schluckt dann meist auch der Schild)
-- „Familientreffen“ und „Ablenkungsmanöver“ erscheinen als dunkle Heldenkopien statt als Erdmännchen bzw. Lockvogel; Beschwörungen und Erdmännchen prüfen nicht, ob die Stelle begehbar ist
-- Omas Umlernen-Satz steht in der Oberfläche statt in `src/data/dialogues.js`; nach dem Umlernen bleibt nur „Nein danke“
-- „kritischer Schaden +0,10 je Stufe“ liest sich holprig (wie bisher bei `describeModifier`)
-- Helden aus Etappe 1, die schon Level 10 oder mehr haben, bekommen die Meldung „Wähle deine Unterklasse!“ nicht (nur Kopfzeile im Baum und Erinnerung am Lagerfeuer)
-- Erdmännchen, Wolke und Fähigkeiten mit großer Reichweite können einen ruhenden Boss von außerhalb seiner Arena treffen (gab es mit Fernfähigkeiten schon vorher)
-- Unsichtbarkeit endet oft schon durch die automatische Grundattacke, sobald ein umherlaufender Gegner nah kommt (laut Spec so: erster eigener Treffer); sie ist damit eher Fluchthilfe als Hinterhalt
+- Etappe 2: Lebensraub zählt nur den Schaden bis zum restlichen Leben; ein ganz vom Schild geschluckter Otterbiss vergiftet nicht mehr (und stößt nicht weg); das Erdmännchen läuft nicht durch gesperrte Fläche, Verwandte von „Familientreffen“ erscheinen nur auf begehbaren Stellen und als Erdmännchen; Umlernen und Tod räumen laufende Besonderheiten weg; unsichtbar wartet die Grundattacke (die Unsichtbarkeit ist wieder ein Hinterhalt); Omas Sätze stehen in `RESPEC_LINES` (`src/data/dialogues.js`), nach dem Umlernen sagt sie, wo man neu wählt; „kritischer Schaden +10 %“ statt „+0,10“; Helden aus Etappe 1 ab Level 10 bekommen beim Start einmal die Meldung „Wähle deine Unterklasse!“.
+- Etappe 1: neue Erkundung der Minikarte wird mitgespeichert; schlägt ein Speichern fehl (Speicher voll), baut das nächste auf dem ungespeicherten Stand auf, nichts geht verloren (`createStore`); `busy` wird nach Gespräch und Lagerfeuer immer zurückgesetzt (`try/finally`); der Goldverlust beim Tod rechnet mit dem Gold nach Erfolgsbelohnungen; Reisen zählt als Rasten („Lagerfeuerromantik“); nach einem Kartenwechsel blenden Gegner nicht mehr von alten Positionen über. Geprüft und in Ordnung: die Leertaste löst in Gesprächen nicht doppelt aus (Browser verwirft das Loslassen, weil das Drücken schon behandelt ist).
+- Neue Gegner: Ein betäubter oder verwirrter Luchs bricht seinen Sprung ab (vorher landete er nach der Betäubung sofort und traf); Verwirrung bricht auch das Ducken ab; ausgewichene Gift-Ticks zeigen kein „Ausgewichen“ und zählen nicht für „Glückspilz“; JSDoc in `src/audio/sfx.js` und der Kommentar „Fassungsvermögen“ stehen richtig; Gift-Leuchtfarbe der 3D-Figur in `HERO_POISON_EMISSIVE`; ein betäubter, eingerollter Igel dreht sich nicht mehr.
+- Taverne: eine Runde mit unbekannter Beute oder ungültiger Auszahlung (NaN, negativ) ändert nichts mehr; `svg()` gibt es nur noch einmal (`src/ui/dom.js`); Tastenprüfung abgesichert; der Fokus springt nicht hinter eine offene Rückfrage; nach einer abgelehnten Runde sagt der Wirt, dass Gold fehlt; `backOnEscape` nicht mehr exportiert.
+- Paket 1 und älter: die Bodentextur der App bleibt unverändert (der Boden nutzt eine Kopie); durchscheinende Baum-Materialien werden freigegeben, sobald der Baum wieder deckend ist; Export nach einem beschädigten Stand gibt die gesicherte Kopie aus, solange noch nichts Neues gespielt wurde; Erfolgs-Einblendungen liegen auf dem Ergebnisbildschirm unten; die Großfamilie blendet beim Tod mit aus. Die Anzeige der Bildrate fing schon vorher keine Zeiger ab (`pointer-events: none`).
 
-Aus der Gesamtprüfung des Abenteuers Etappe 1 (bewusst zurückgestellt):
+**Bewusst gelassen** (mit Grund):
 
-- Neue Erkundung der Minikarte wird erst mit dem nächsten anderen Speichern gesichert
-- `busy` in `src/adventureGame.js` wird nicht in `try/finally` zurückgesetzt, falls ein Gespräch oder das Lagerfeuer-Fenster einen Fehler wirft
-- Kann der Browser nicht speichern, geht die Beute im geleerten Ledger verloren (bisheriges Verhalten von `app.update`)
-- Der Goldverlust beim Tod rechnet mit dem Gold vor einer gerade gutgeschriebenen Erfolgsbelohnung (etwas zu niedrig)
-- Reisen zählt nicht für „Lagerfeuerromantik“
-- Ungeprüft: ob die Leertaste in Gespräch oder Geschichte doppelt auslöst (keydown weiter, keyup klickt den neuen Knopf); kurzer Bildsprung von Gegnern nach einem Kartenwechsel (Kennungen beginnen neu); Rasten mitten im Kampf entfernt die angreifende Gruppe (Fluchtweg; die Spec sagt nichts dazu)
-
-Aus dem Bau der Taverne (bewusst zurückgestellt, für die Gesamtprüfung):
-
-- Höher oder tiefer: Die Erfolge werden nach dem Aufdecken einer Karte geprüft, nicht erst nach dem Auszahlen (bewusst so entschieden). Neuladen mitten in einer Runde kostet den Einsatz; der laufende Topf wird nicht gespeichert (wie in der Spec)
-- Verrechnen einer Runde ist nicht ganz atomar, wenn eine unbekannte Beute-Kennung übergeben wird; kein Schutz gegen einen ungültigen Auszahlungswert (NaN). Im Spiel kommt beides nicht vor
-- Bei abgelehnter Runde gibt es keine Rückmeldung (der Satz „Ohne Gold kein Spiel …“ steht seit der Gesamtprüfung in `src/data`)
-- Bei „Bewegung reduzieren“ kann ein Animationsgriff übrig bleiben (nur Darstellung); `backOnEscape` wird exportiert, aber nicht genutzt; die Hilfsfunktion `svg()` gibt es doppelt; die Tastenprüfung `e.key` ohne Absicherung
-- Die Truhen-Detailansicht hängt nicht am Aufräumen des Bildschirms
-- Aussehen der Duo-Figur: einige Zahlen stehen im Darstellungscode statt in den Daten; der Titel des gesperrten Duos hat wenig Kontrast; die Großfamilie ignoriert das Ausblenden beim Tod (Beschreibung bei `createHeroView` und der Test für den Teilausfall beim Laden sind seit der Gesamtprüfung erledigt)
-- Zwischen den ausgeschnittenen Phasen des Duos ist kein Abstand; die Zuordnung der Figurenstücke ist bei einem neuen Bild fragil (Stall, `frameCanvas` und der Ausfall aller Bögen bei einem kaputten Duo-Bild sind seit der Gesamtprüfung behoben)
-- Tests fehlen für die Wahl der Duo-Phase und für „Bewegung reduzieren“; ein Test trägt einen veralteten Titel („stride“)
-- Höher oder tiefer: Drückt man innerhalb von 0,4 s nach dem Aufdecken „Zurück“, kann der Tastatur-Fokus hinter den Dialog „Runde aufgeben?“ springen (nur Tastatur, Esc wirkt weiter; Abhilfe: `keepFocus` überspringen, solange ein Dialog offen ist)
-- Bei einer offenen Taverne in einem zweiten Tab zeigen die Tavernen-Bildschirme das Gold erst nach der nächsten Aktion neu an (kein Gold in Gefahr, jede Buchung prüft den Speicher neu)
-- Auf dem Entwicklungsrechner meldete der Testserver beim Neuladen einmal `ERR_CONNECTION_RESET`; ein zweites Laden ging sofort (Server, nicht Spiel)
-
-Aus der Gesamtprüfung von „Neue Gegner und wechselnde Bosse“ (bewusst zurückgestellt):
-
-- Wird ein Luchs mitten im Sprung betäubt oder verwirrt, landet er nach Ende der Betäubung sofort am Ziel und trifft;
-  Verwirrung bricht das Ducken nicht ab (nur Betäubung)
-- Ein ausgewichener Gift-Tick zeigt „Ausgewichen“ und zählt für „Glückspilz“
-- `src/audio/sfx.js`: JSDoc von `shouldPlay` und `eventSound` vertauscht; `src/render/enemies.js`: Kommentar
-  „Fassungsvermögen“ steht über `FALLBACK_SHAPE` statt über den Kapazitäten
-- Gift-Leuchtfarbe der 3D-Ersatzfigur steht im Code (`src/render/hero.js`) statt in `src/data`
-- Ein eingerollter Igel dreht sich auch betäubt weiter (nur Darstellung)
-- Nebenbefund aus `docs/neue-gegner-bilder.md`: `helden.webp` hat kleine eingeschlossene weiße Stellen (bis ~80 Pixel
-  deckendes Weiß, z. B. um 98/691, 764/887); ob sie im Spiel auffallen, ist ungeprüft
-
-Aus der Gesamtprüfung von Paket 1 (bewusst zurückgestellt):
-
-- Die Ausblend-Materialien verdeckender Bäume werden beim Entfernen einer Zelle nicht freigegeben und wachsen innerhalb eines Durchgangs (wenige Dutzend, je wenige KB)
-- Bäume und Felsen sind je zwei eigene Meshes; Bodenschatten und Felstafeln einer Zelle ließen sich wie die Deko zusammenfassen (~66 Zeichenaufrufe weniger). Auf dem Entwicklungsrechner 60 Bilder/s, auf einem echten Handy ungemessen
-- In der Sterbephase laufen Welt und Effekte mit verschiedenen Uhren (nur Darstellung)
-- `src/render/terrain.js` schreibt die Kachelung in die der App gehörende Bodentextur; heute harmlos, aber eine Falle für später
-
-Ältere Punkte:
-
-- Die Bodenkachel (8 m) wiederholt sich im Bild etwa dreimal und ist als Muster erkennbar; harte Nähte gibt es keine
-- Der Bodenschatten unter Truhen und Felsen ist sehr dezent, die Deko eher sparsam gesät
-- Der Pause-Knopf liegt unter den Überlagerungen; im Pausenfenster führt nur „Weiter" oder Esc zurück
-- Auf dem Ergebnisbildschirm kann eine Erfolgs-Einblendung die Überschrift verdecken (schon vor Paket 1 so)
-- Anzeige der Bildrate im Stresstest fängt Zeigerereignisse ab
-- Gehen sowohl „Finger hoch" als auch „Erfassung verloren" verloren, läuft der Held bis zur nächsten Pause weiter (sehr selten)
-- Kein automatischer Test für die Anbindung der Zeigerereignisse
-- Aus dem ersten Bauabschnitt: Export nach beschädigtem Stand schreibt den Standardstand; Klang-Stimmen werden nicht getrennt; Schatten-Wolke und -Geschosse nie im Bild geprüft; Hasenohren ragen in der 3D-Ersatzfigur durch Hut und Kapuze
+- Entscheidungen, nicht Fehler: Rasten mitten im Kampf entfernt die angreifende Gruppe (Fluchtweg; Spec sagt nichts); Höher oder tiefer prüft Erfolge schon nach dem Aufdecken; Neuladen mitten in einer Runde kostet den Einsatz (wie in der Spec); im Pausenfenster führen nur „Weiter“ oder Esc zurück; Ausweichen gilt für Gift-Ticks.
+- Braucht ein echtes Handy oder Messungen: Bäume und Felsen zu weniger Zeichenaufrufen zusammenfassen; Bildrate auf dem Handy; ganz seltener Fall „Finger hoch“ und „Erfassung verloren“ gehen beide verloren.
+- Braucht das Auge des Auftraggebers oder neue Bilder: Bodenkachel als Muster erkennbar, Schatten unter Truhen dezent, Deko sparsam; kleine weiße Stellen in `helden.webp`; Hasenohren der 3D-Ersatzfigur ragen durch Hut und Kapuze; Schatten-Wolke und -Geschosse nie im Bild geprüft; Klang-Stimmen werden nicht getrennt (Ton hat noch niemand gehört).
+- Kleine Darstellungsdinge ohne sichtbare Folge: in der Sterbephase laufen Welt und Effekte mit verschiedenen Uhren; Animationsgriff bei „Bewegung reduzieren“; die Truhen-Detailansicht hängt nicht am Aufräumen des Bildschirms; Duo: einige Zahlen im Darstellungscode, kein Abstand zwischen den Phasen, Titel des gesperrten Duos mit wenig Kontrast (Stelle nicht eindeutig gefunden).
+- Tests fehlen noch für die Wahl der Duo-Phase, „Bewegung reduzieren“ und die Anbindung der Zeigerereignisse (nur im Browser prüfbar); ein Test heißt noch „stride“ (die Gangart gibt es weiterhin, der Titel stimmt also).
+- Zweiter Tab mit offener Taverne zeigt das Gold erst nach der nächsten Aktion neu (kein Gold in Gefahr).
+- Erdmännchen, Wolke und Fähigkeiten mit großer Reichweite können einen ruhenden Boss von außerhalb seiner Arena treffen (Arena-Regeln: Thema für Etappe 3).
+- Testserver meldet beim Neuladen manchmal `ERR_CONNECTION_RESET` (Server, nicht Spiel; Wechsel zwischen `localhost` und `127.0.0.1` hilft).
 
 ## 9. Was nur der Auftraggeber prüfen kann
 
