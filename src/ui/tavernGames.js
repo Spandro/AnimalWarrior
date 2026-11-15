@@ -231,6 +231,7 @@ function createTable(c, app, { table, title, onBack }) {
     refresh() {
       setGold(app.save.gold);
       renderStakes();
+      if (broke()) speak(); // z. B. nach einer abgelehnten Runde, weil ein anderer Tab das Gold ausgegeben hat
     },
     broke,
     /** Abkürzen der laufenden Animation (Tippen oder Taste). */
