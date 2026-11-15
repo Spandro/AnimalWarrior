@@ -257,9 +257,15 @@ export function upgradeItem(save, itemId) {
   return { ok: true };
 }
 
-/** Feste Auswahl des Händlers. */
-export function shopStock() {
-  return [...SHOP.stock];
+/**
+ * Auswahl des Händlers für einen Abenteuer-Stand: Kapitel 1 immer, jedes weitere nach Abschluss des Kapitels davor.
+ * @param {AdventureRecord | null | undefined} adventure
+ */
+export function shopStock(adventure) {
+  const done = adventure?.chapterDone ?? [];
+  return Object.entries(SHOP.stockByChapter)
+    .filter(([ch]) => Number(ch) === 1 || done.includes(Number(ch) - 1))
+    .flatMap(([, ids]) => ids);
 }
 
 /** Preis eines Gegenstands beim Händler. */
@@ -285,10 +291,12 @@ export function buyPotion(save, heroId) {
 /**
  * @param {Save} save
  * @param {string} itemId
+ * @param {string} heroId  wessen Abenteuer die Auswahl bestimmt
  * @returns {{ ok: boolean, reason?: 'unknown'|'owned'|'gold' }}
  */
-export function buyItem(save, itemId) {
-  if (!SHOP.stock.includes(itemId)) return { ok: false, reason: 'unknown' };
+export function buyItem(save, itemId, heroId) {
+  const adventure = save.heroes.find((h) => h.id === heroId)?.adventure;
+  if (!shopStock(adventure).includes(itemId)) return { ok: false, reason: 'unknown' };
   if (save.inventory.includes(itemId)) return { ok: false, reason: 'owned' };
   const price = shopPrice(itemId);
   if (save.gold < price) return { ok: false, reason: 'gold' };

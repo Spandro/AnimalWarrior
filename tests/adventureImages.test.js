@@ -106,6 +106,7 @@ test('abenteuer-bilder: cutPieces gibt jedem Stück nur seine eigenen Pixel, auc
 test('abenteuer-bilder: Symbole der Gegenstände liegen in ihrer Zelle, ohne Rasterlinien und ohne Überlappung', () => {
   const bySheet = {};
   for (const item of Object.values(ITEMS)) {
+    if (!itemSheet(item)) { assertEqual(itemIconRect(item), null, item.id); continue; } // noch ohne Bild (Kapitel 2)
     const r = itemIconRect(item), sheet = ITEM_SHEETS[itemSheet(item)];
     assertTrue(insideBox(r, sheet.width, sheet.height), item.id);
     assertEqual(r.url, sheet.url);

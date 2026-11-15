@@ -126,17 +126,35 @@ test('adventureHero: nicht unter 20 s in einer Gruppe aus 6 Helmfischen seiner S
   assertTrue(world.hero.hp > 0, `Leben ${world.hero.hp}`);
 });
 
-test('adventureHero: Kapitel 1 bringt ohne Wiederholen etwa Level 9 bis 11', () => {
+/** Erfahrung eines Kapitels ohne Wiederholen: alle Gruppen, Bosse und Aufträge mit einem Schritt auf seiner Karte. */
+function chapterXp(mapId) {
   let xp = 0;
-  for (const p of MAPS.kapitel1.packs) {
+  for (const p of MAPS[mapId].packs) {
     for (const [type, n] of Object.entries(p.enemies)) xp += ENEMIES[type].xp * n * enemyMultipliers(p.level).xpMul;
     if (p.elite) xp += ENEMIES[p.elite].xp * (ELITE.xpMul - 1) * enemyMultipliers(p.level).xpMul;
   }
-  for (const b of MAPS.kapitel1.bosses) xp += ENEMIES[b.type].xp * enemyMultipliers(b.level).xpMul;
-  for (const q of Object.values(QUESTS)) xp += q.reward.xp;
+  for (const b of MAPS[mapId].bosses) xp += ENEMIES[b.type].xp * enemyMultipliers(b.level).xpMul;
+  const inChapter2 = (q) => q.steps.some((st) => st.map === 'kapitel2');
+  for (const q of Object.values(QUESTS)) if (inChapter2(q) === (mapId === 'kapitel2')) xp += q.reward.xp;
+  return xp;
+}
+
+test('adventureHero: Kapitel 1 bringt ohne Wiederholen etwa Level 9 bis 11', () => {
+  const xp = chapterXp('kapitel1');
   const a = newAdventure({ class: 'krieger' });
   gainXp(a, xp, 'krieger');
   assertTrue(a.level >= 9 && a.level <= 11, `Level ${a.level} bei ${Math.round(xp)} Erfahrung`);
+});
+
+test('adventureHero: Kapitel 2 bringt ohne Wiederholen von Level 10 etwa auf Level 15 bis 17', () => {
+  const a = newAdventure({ class: 'krieger' });
+  let need = 0;
+  for (let l = 1; l < 10; l++) need += xpToNextAdventure(l);
+  gainXp(a, need, 'krieger');
+  assertEqual(a.level, 10);
+  const xp = chapterXp('kapitel2');
+  gainXp(a, xp, 'krieger');
+  assertTrue(a.level >= 15 && a.level <= 17, `Level ${a.level} bei ${Math.round(xp)} Erfahrung`);
 });
 
 test('adventureHero: itemDelta vergleicht angelegtes und neues Stück mit Verbesserung', async () => {

@@ -8,7 +8,7 @@ import { createEffects } from './render/effects.js';
 import { createSignatureView } from './render/signatures.js';
 import {
   createAdventureRun, stepAdventure, useAbility, drinkPotion, interact, endTalk, acceptOffer, setPaused, closeMenu, travel,
-  snapshot, clearLedger, refreshFromSave, markIntroSeen,
+  snapshot, clearLedger, refreshFromSave, markIntroSeen, chapterStartDue,
 } from './modes/adventure.js';
 import { commitAdventure } from './save/adventure.js';
 import { damageEnemy } from './core/world.js';
@@ -208,6 +208,8 @@ export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quali
 
   /** Geschichten, die nach einem Ereignis drankommen (Flaschenpost, Kapitelende). */
   const storyQueue = [];
+  /** Welt, für die die Einstiegsgeschichte des Kapitels schon eingereiht ist. */
+  let startStoryWorld = null;
   function handleEvents() {
     heroView.handle(run.events, run.world);
     effects.handle(run.events, run.world);
@@ -221,6 +223,11 @@ export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quali
       else if (e.type === 'questAdvanced' && e.questId === 'zwickzwack' && run.record.quests.zwickzwack?.step === 2) {
         storyQueue.push(() => showDialogue(uiLayer, { npc: 'flossian', speaker: NPCS.flossian.name, lines: DIALOGUES.flossian.progress.zwickzwack }));
       } else if (e.type === 'chapterDone') storyQueue.push(() => playStory(uiLayer, [STORY.chapterEnd[e.chapter]]));
+      else if ((e.type === 'mapChange' || e.type === 'travel') && startStoryWorld !== run.world && chapterStartDue(run) && STORY.chapterStart?.[run.map.chapter]) {
+        // Ereignisse aus Aktionen (Reisen) kommen mit dem nächsten Schritt noch einmal: je Betreten (neue Welt) nur einmal.
+        startStoryWorld = run.world;
+        storyQueue.push(() => playStory(uiLayer, STORY.chapterStart[run.map.chapter]));
+      }
     }
     if (important) commit(true);
   }

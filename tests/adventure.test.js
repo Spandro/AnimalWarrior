@@ -431,3 +431,16 @@ test('adventure: alter Stand mit abgeschlossenem Kapitel 1 sieht den Ausgang sof
   assertEqual(run.map.id, 'dorf');
   assertTrue(exitOpen(run, run.map.exits.find((x) => x.id === 'nach_kapitel2')));
 });
+
+test('adventure: Einstiegsgeschichte von Kapitel 2 einmal – solange der erste Auftrag des Kapitels noch am Anfang steht', async () => {
+  const { chapterStartDue } = await import('../src/modes/adventure.js');
+  const run = setup({ map: 'kapitel2', campfire: 'k2_rand', mutate: (a) => { a.chapterDone = [1]; } });
+  assertTrue(!chapterStartDue(run), 'ohne Auftrag nicht');
+  run.record.quests.ruf_aus_dem_sumpf = { state: 'active', step: 0, progress: 0 };
+  assertTrue(chapterStartDue(run));
+  step(run, 2);
+  assertEqual(run.record.quests.ruf_aus_dem_sumpf.step, 1, 'Schilfrand erreicht');
+  assertTrue(!chapterStartDue(run));
+  const k1 = setup();
+  assertTrue(!chapterStartDue(k1));
+});

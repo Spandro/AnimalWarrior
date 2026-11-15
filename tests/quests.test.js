@@ -9,9 +9,11 @@ import { npcState, talkTo, acceptQuest, questEvent, trackedQuest, questTarget } 
 
 const MAIN = ['nasse_pfoten', 'schmied_ohne_hammer', 'bruecke_zu', 'flugblaetter', 'zwickzwack'];
 const SIDE = ['verbuddelt', 'post_amsel', 'hamsterkauf'];
+const MAIN2 = ['ruf_aus_dem_sumpf', 'froesche_verbuendet', 'hofmarschall', 'nebel_im_moor', 'hecht_haudrauf'];
+const SIDE2 = ['egelplage', 'seerosen', 'libellenflug'];
 
-test('quests: fünf Haupt- und drei Nebenaufträge mit bekannten Zielen', () => {
-  assertEqual(Object.keys(QUESTS), [...MAIN, ...SIDE]);
+test('quests: je Kapitel fünf Haupt- und drei Nebenaufträge mit bekannten Zielen', () => {
+  assertEqual(Object.keys(QUESTS), [...MAIN, ...SIDE, ...MAIN2, ...SIDE2]);
   const places = new Set(Object.values(MAPS).flatMap((m) => m.areas.map((a) => a.id)));
   const bosses = new Set(Object.values(MAPS).flatMap((m) => m.bosses.map((b) => b.id)));
   const spots = new Set(Object.values(MAPS).flatMap((m) => m.spots.map((s) => s.kind)));
@@ -28,7 +30,69 @@ test('quests: fünf Haupt- und drei Nebenaufträge mit bekannten Zielen', () => 
       assertTrue(s.text.length > 0, q.id);
     }
   }
-  for (const id of SIDE) assertEqual(ITEMS[QUESTS[id].reward.item].rarity, 'selten');
+  for (const id of [...SIDE, ...SIDE2]) if (QUESTS[id].reward.item) assertEqual(ITEMS[QUESTS[id].reward.item].rarity, 'selten', id);
+});
+
+test('quests: Kapitel 2 – Ziele liegen auf dem Sumpf, Oma gibt den ersten, genau einer beendet das Kapitel', () => {
+  const k2 = MAPS.kapitel2;
+  const places = new Set(k2.areas.map((a) => a.id)), bosses = new Set(k2.bosses.map((b) => b.id)), spots = new Set(k2.spots.map((x) => x.kind));
+  const kinds = new Set(k2.packs.flatMap((p) => Object.keys(p.enemies)));
+  for (const id of [...MAIN2, ...SIDE2]) {
+    const q = QUESTS[id];
+    assertEqual(q.kind, MAIN2.includes(id) ? 'main' : 'side', id);
+    for (const st of q.steps) {
+      if (st.type !== 'talk') assertEqual(st.map, 'kapitel2', `${id}: Karte`);
+      if (st.type === 'reach') assertTrue(places.has(st.target), `${id}: ${st.target}`);
+      if (st.type === 'boss') assertTrue(bosses.has(st.target), `${id}: ${st.target}`);
+      if (st.type === 'kill') assertTrue(kinds.has(st.target), `${id}: ${st.target}`);
+      if (st.type === 'collect' && st.from === 'spot') {
+        assertTrue(spots.has(st.target), `${id}: ${st.target}`);
+        assertTrue(k2.spots.filter((x) => x.kind === st.target).length >= st.count, `${id}: genug Fundorte`);
+      }
+      if (st.type === 'collect' && st.from !== 'spot') for (const e of st.from) assertTrue(kinds.has(e), `${id}: ${e}`);
+      if (st.type === 'talk') assertTrue(st.target === 'quappe' || st.target === 'panzerla', `${id}: ${st.target}`);
+    }
+  }
+  assertEqual(QUESTS.ruf_aus_dem_sumpf.giver, 'panzerla');
+  assertEqual(QUESTS.ruf_aus_dem_sumpf.requires, ['zwickzwack']);
+  for (const id of [...MAIN2.slice(1), ...SIDE2]) assertEqual(QUESTS[id].giver, 'quappe', id);
+  const enders = Object.values(QUESTS).filter((q) => q.endsChapter === 2);
+  assertEqual(enders.map((q) => q.id), ['hecht_haudrauf']);
+  assertTrue(enders[0].steps.some((st) => st.type === 'boss' && st.target === 'haudrauf'));
+});
+
+test('quests: Gespräche – jeder Auftrag hat Angebot und Erinnerung beim Geber, Abschluss bei der letzten Person', () => {
+  for (const q of Object.values(QUESTS)) {
+    const d = DIALOGUES[q.giver];
+    assertTrue(d.offer[q.id]?.length > 0, `${q.id}: Angebot`);
+    assertTrue(d.remind[q.id]?.length > 0, `${q.id}: Erinnerung`);
+    const last = q.steps[q.steps.length - 1];
+    if (last.type === 'talk') assertTrue(DIALOGUES[last.target].done[q.id]?.length > 0, `${q.id}: Abschluss`);
+  }
+  assertTrue(DIALOGUES.quappe.idle.length >= 3);
+});
+
+test('quests: ganzer Ablauf von Kapitel 2 bis Hecht Haudrauf', () => {
+  const log = Object.fromEntries(MAIN.map((id) => [id, { state: 'done', step: QUESTS[id].steps.length, progress: 0 }]));
+  const ev = (e) => questEvent(log, e);
+  assertEqual(talkTo(log, 'panzerla').offer, 'ruf_aus_dem_sumpf');
+  acceptQuest(log, 'ruf_aus_dem_sumpf');
+  ev({ type: 'reach', place: 'schilfrand' }); ev({ type: 'talk', npc: 'quappe' });
+  assertEqual(talkTo(log, 'quappe').offer, 'froesche_verbuendet');
+  acceptQuest(log, 'froesche_verbuendet');
+  for (let i = 0; i < 6; i++) ev({ type: 'kill', enemyType: 'ochsenfrosch' });
+  for (let i = 0; i < 4; i++) ev({ type: 'collect', thing: 'einladung' });
+  ev({ type: 'talk', npc: 'quappe' });
+  acceptQuest(log, 'hofmarschall');
+  ev({ type: 'reach', place: 'froschhof' }); ev({ type: 'boss', bossId: 'quak' }); ev({ type: 'talk', npc: 'quappe' });
+  acceptQuest(log, 'nebel_im_moor');
+  ev({ type: 'reach', place: 'nebelmoor' });
+  for (let i = 0; i < 3; i++) ev({ type: 'collect', thing: 'irrlicht' });
+  ev({ type: 'talk', npc: 'quappe' });
+  acceptQuest(log, 'hecht_haudrauf');
+  ev({ type: 'reach', place: 'hechtloch' }); ev({ type: 'boss', bossId: 'haudrauf' });
+  assertEqual(ev({ type: 'talk', npc: 'panzerla' }).completed, ['hecht_haudrauf']);
+  for (const id of MAIN2) assertEqual(log[id].state, 'done', id);
 });
 
 test('quests: jeder Satz in Gesprächen und Geschichte höchstens 90 Zeichen', () => {
@@ -36,7 +100,7 @@ test('quests: jeder Satz in Gesprächen und Geschichte höchstens 90 Zeichen', (
   for (const d of Object.values(DIALOGUES)) for (const group of Object.values(d)) {
     if (Array.isArray(group)) all.push(...group); else for (const lines of Object.values(group)) all.push(...lines);
   }
-  for (const panel of [...STORY.intro, ...Object.values(STORY.chapterEnd)]) all.push(...panel.lines);
+  for (const panel of [...STORY.intro, ...Object.values(STORY.chapterEnd), ...Object.values(STORY.chapterStart).flat()]) all.push(...panel.lines);
   assertTrue(all.length > 40);
   for (const line of all) assertTrue(typeof line === 'string' && line.length > 0 && line.length <= 90, line);
 });

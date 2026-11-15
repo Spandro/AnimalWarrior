@@ -22,9 +22,9 @@ export function openShop(ctx) {
     if (tab === 'buy') {
       body.append(el('button', { class: 'adv-quest-row', type: 'button', 'data-key': 'potion', onclick: () => act((s) => buyPotion(s, ctx.heroId)) },
         el('strong', { text: `Heiltrank – ${POTION.price} Gold` }), el('span', { class: 'adv-muted', text: `In der Tasche: ${rec.potions} von ${POTION.max}` })));
-      for (const id of shopStock()) {
+      for (const id of shopStock(rec)) {
         const owned = save.inventory.includes(id);
-        body.append(itemRow({ class: 'adv-quest-row', type: 'button', 'data-key': id, disabled: owned, style: `border-color:${RARITIES[ITEMS[id].rarity].color}`, onclick: () => act((s) => buyItem(s, id)) }, id,
+        body.append(itemRow({ class: 'adv-quest-row', type: 'button', 'data-key': id, disabled: owned, style: `border-color:${RARITIES[ITEMS[id].rarity].color}`, onclick: () => act((s) => buyItem(s, id, ctx.heroId)) }, id,
           el('strong', { text: `${ITEMS[id].name} – ${shopPrice(id)} Gold` }),
           el('span', { class: 'adv-muted', text: owned ? 'Schon in deiner Truhe' : `„${ITEMS[id].line}“` })));
       }

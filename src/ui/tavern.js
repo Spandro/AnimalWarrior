@@ -92,6 +92,7 @@ export function lootIcon(def, sizeClass = '') {
   box.style.color = RARITIES[def.rarity].color;
   box.append(slotSvg(def.slot));
   const r = itemIconRect(def);
+  if (!r) return box; // noch kein Bild (Kapitel 2): Ersatzsymbol bleibt
   probeImage(r.url).then((img) => {
     if (!img || !box.isConnected) return;
     // Nur die Zelle zeigen: ein Kind im Seitenverhältnis der Zelle, der Bogen per Hintergrund darauf zugeschnitten.

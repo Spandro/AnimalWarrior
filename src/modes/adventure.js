@@ -7,7 +7,7 @@ import { gainXp, adventureModifiers, enemyMultipliers, abilitySpecials, specialB
 import { talkTo, acceptQuest, questEvent } from '../core/quests.js';
 import { rollAdventureItem } from '../core/loot.js';
 import { MAPS } from '../data/maps/index.js';
-import { QUESTS, QUEST_DROP } from '../data/quests.js';
+import { QUESTS, QUEST_DROP, CHAPTER_START_QUEST } from '../data/quests.js';
 import { CLASSES } from '../data/classes.js';
 import { ENEMIES, ELITE } from '../data/enemies.js';
 import {
@@ -544,6 +544,17 @@ export function acceptOffer(run, questId) {
   run.dirty = true;
   skipBeatenBosses(run);
   return true;
+}
+
+/**
+ * Soll beim Betreten dieser Karte die Einstiegsgeschichte ihres Kapitels laufen? Ja, solange der erste Auftrag des
+ * Kapitels angenommen ist und noch beim ersten Schritt steht (Spec §5.4; kein eigenes Feld).
+ * @param {AdventureRun} run
+ */
+export function chapterStartDue(run) {
+  const id = CHAPTER_START_QUEST[run.map.chapter];
+  const q = id ? run.record.quests[id] : null;
+  return !!q && q.state === 'active' && q.step === 0;
 }
 
 /** Die Bildergeschichte zum Einstieg ist gezeigt (oder übersprungen). */

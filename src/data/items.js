@@ -3,7 +3,7 @@
  * @typedef {'kopf'|'koerper'|'fuesse'|'waffe'|'schmuck'} Slot
  * @typedef {'nahkampf'|'zauber'|'wurf'} WeaponKind
  * @typedef {'gewoehnlich'|'selten'|'legendaer'} Rarity
- * @typedef {'taverne'|'kapitel1'} ItemSource
+ * @typedef {'taverne'|'kapitel1'|'kapitel2'} ItemSource
  * @typedef {{ id: string, name: string, slot: Slot, weaponKind?: WeaponKind, rarity: Rarity, modifiers: Modifier[], line: string, icon: number,
  *   source: ItemSource }} ItemDef
  *   `source`: woher der Gegenstand kommt (Taverne oder ein Kapitel des Abenteuers); `icon`: Zelle in seinem Bogen ({@link itemSheet}).
@@ -89,18 +89,28 @@ export const ITEMS = {
   schneckenhaus: { id: 'schneckenhaus', name: 'Schneckenhaus-Amulett', slot: 'schmuck', rarity: 'selten', modifiers: [{ stat: 'armor', flat: 2 }], line: 'Die Schnecke ist ausgezogen. Freiwillig.', icon: 27, source: 'kapitel1' },
   flussperlenohrring: { id: 'flussperlenohrring', name: 'Flussperlen-Ohrring', slot: 'schmuck', rarity: 'selten', modifiers: [{ stat: 'xpGain', pct: 0.08 }], line: 'Klüger durch Glanz.', icon: 28, source: 'kapitel1' },
   flossians_schuppe: { id: 'flossians_schuppe', name: 'Flossians verlorene Schuppe', slot: 'schmuck', rarity: 'legendaer', modifiers: [{ stat: 'critChance', flat: 0.08 }, { stat: 'goldGain', pct: 0.1 }, { stat: 'damage', pct: 0.05 }], line: 'Er sucht sie bestimmt schon.', icon: 29, source: 'kapitel1' },
+  // Kapitel 2 „Der Sumpf“: noch ohne Bild (Ersatzsymbol mit Seltenheitsrahmen); `icon` ist die Zelle im künftigen Bogen.
+  schilfhelm: { id: 'schilfhelm', name: 'Helm aus Schilf', slot: 'kopf', rarity: 'gewoehnlich', modifiers: [{ stat: 'armor', flat: 2 }], line: 'Raschelt bei jedem Schritt. Tarnung: mäßig.', icon: 0, source: 'kapitel2' },
+  moorstiefel: { id: 'moorstiefel', name: 'Moorstiefel', slot: 'fuesse', rarity: 'gewoehnlich', modifiers: [{ stat: 'moveSpeed', pct: 0.06 }], line: 'Schlamm? Welcher Schlamm?', icon: 1, source: 'kapitel2' },
+  unkenamulett: { id: 'unkenamulett', name: 'Unken-Amulett', slot: 'schmuck', rarity: 'gewoehnlich', modifiers: [{ stat: 'maxHp', pct: 0.08 }], line: 'Riecht nach Teich. Hilft trotzdem.', icon: 2, source: 'kapitel2' },
+  rohrkolbenstab: { id: 'rohrkolbenstab', name: 'Rohrkolbenstab', slot: 'waffe', weaponKind: 'zauber', rarity: 'gewoehnlich', modifiers: [{ stat: 'cooldown', pct: -0.06 }, { stat: 'damage', pct: 0.05 }], line: 'Sieht aus wie eine Wurst am Stiel. Zaubert aber.', icon: 3, source: 'kapitel2' },
+  stegbrett: { id: 'stegbrett', name: 'Brett vom Steg', slot: 'waffe', weaponKind: 'nahkampf', rarity: 'selten', modifiers: [{ stat: 'damage', pct: 0.1 }, { stat: 'critChance', flat: 0.06 }], line: 'Der Steg vermisst es. Ein bisschen.', icon: 4, source: 'kapitel2' },
+  libellenfluegel: { id: 'libellenfluegel', name: 'Umhang aus Libellenflügeln', slot: 'koerper', rarity: 'selten', modifiers: [{ stat: 'dodge', flat: 0.07 }, { stat: 'armor', flat: 2 }], line: 'Summt leise. Fliegen kann man damit nicht. Noch nicht.', icon: 5, source: 'kapitel2' },
+  froschschleuder: { id: 'froschschleuder', name: 'Froschkönig-Schleuder', slot: 'waffe', weaponKind: 'wurf', rarity: 'selten', modifiers: [{ stat: 'critChance', flat: 0.07 }, { stat: 'critDamage', flat: 0.15 }], line: 'Für Frösche, die sich für Könige halten.', icon: 6, source: 'kapitel2' },
+  quaks_krone: { id: 'quaks_krone', name: 'Quaks Krone', slot: 'kopf', rarity: 'legendaer', modifiers: [{ stat: 'armor', flat: 2 }, { stat: 'maxHp', pct: 0.12 }, { stat: 'xpGain', pct: 0.1 }], line: 'Etwas zu groß. Wie ihr Besitzer.', icon: 7, source: 'kapitel2' },
 };
 
 /** Die 24 Gegenstände der Taverne (Würfelbecher, Rad, Höher oder tiefer und ihre Truhe). */
 export const TAVERN_ITEMS = Object.fromEntries(Object.entries(ITEMS).filter(([, item]) => item.source === 'taverne'));
 
 /**
- * Bildbogen des Symbols: Taverne `beute` (6 × 4), Kapitel 1 `beute1` (6 × 5).
+ * Bildbogen des Symbols: Taverne `beute` (6 × 4), Kapitel 1 `beute1` (6 × 5); Kapitel 2 hat noch keinen (null).
  * @param {ItemDef} item
- * @returns {'beute'|'beute1'}
+ * @returns {'beute'|'beute1'|null}
  */
 export function itemSheet(item) {
-  return item.source === 'taverne' ? 'beute' : 'beute1';
+  if (item.source === 'taverne') return 'beute';
+  return item.source === 'kapitel1' ? 'beute1' : null;
 }
 
 /**
@@ -116,12 +126,13 @@ export const ITEM_SHEETS = {
 };
 
 /**
- * Ausschnitt des Symbols eines Gegenstands in seinem Bogen (x, y von links oben, in Pixeln).
+ * Ausschnitt des Symbols eines Gegenstands in seinem Bogen (x, y von links oben, in Pixeln); null ohne Bogen.
  * @param {ItemDef} item
- * @returns {{ url: string, width: number, height: number, x: number, y: number, w: number, h: number }}
+ * @returns {{ url: string, width: number, height: number, x: number, y: number, w: number, h: number } | null}
  */
 export function itemIconRect(item) {
   const sheet = ITEM_SHEETS[itemSheet(item)];
+  if (!sheet) return null;
   const perRow = sheet.cols.length - 1;
   const c = item.icon % perRow, r = Math.floor(item.icon / perRow);
   const x = sheet.cols[c] + sheet.inset, y = sheet.rows[r] + sheet.inset;

@@ -170,11 +170,19 @@ test('adventureSave: Händler – Tränke bis 4, Angebot, Verkauf nur ohne Träg
   assertEqual(buyPotion(s, 'h1'), { ok: true });
   assertEqual(buyPotion(s, 'h1'), { ok: false, reason: 'full' });
   assertEqual(s.gold, 1000 - POTION.price);
-  assertEqual(shopStock(), SHOP.stock);
-  assertTrue(SHOP.stock.every((id) => ITEMS[id].rarity === 'gewoehnlich' && ITEMS[id].source === 'kapitel1'));
-  const id = SHOP.stock[0];
-  assertEqual(buyItem(s, id), { ok: true });
-  assertEqual(buyItem(s, id), { ok: false, reason: 'owned' });
+  const adv = s.heroes[0].adventure;
+  adv.chapterDone = [];
+  assertEqual(shopStock(adv), SHOP.stockByChapter[1]);
+  for (const [ch, list] of Object.entries(SHOP.stockByChapter)) {
+    assertTrue(list.every((id) => ITEMS[id].rarity === 'gewoehnlich' && ITEMS[id].source === `kapitel${ch}`), ch);
+  }
+  const id = SHOP.stockByChapter[1][0], swamp = SHOP.stockByChapter[2][0];
+  assertEqual(buyItem(s, swamp, 'h1'), { ok: false, reason: 'unknown' });
+  adv.chapterDone = [1];
+  assertEqual(shopStock(adv), [...SHOP.stockByChapter[1], ...SHOP.stockByChapter[2]]);
+  assertEqual(buyItem(s, id, 'h1'), { ok: true });
+  assertEqual(buyItem(s, id, 'h1'), { ok: false, reason: 'owned' });
+  assertEqual(buyItem(s, swamp, 'h1'), { ok: true });
   s.heroes[1].adventure = newAdventure(s.heroes[1]);
   s.heroes[1].adventure.equipment.kopf = 'helm_zuversicht';
   assertEqual(sellItem(s, 'helm_zuversicht'), { ok: false, reason: 'equipped', by: 'Quak' });

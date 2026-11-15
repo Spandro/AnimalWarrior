@@ -65,10 +65,16 @@ export const SMITH = {
   maxLevel: 5,
 };
 
-/** Händler Krümel (Spec §11.4): Preis = Gegenwert × `priceFactor`; feste Auswahl gewöhnlicher Stücke aus Kapitel 1. */
+/**
+ * Händler Krümel (Spec §11.4, Etappe 3 §8): Preis = Gegenwert × `priceFactor`; Auswahl gewöhnlicher Stücke je Kapitel.
+ * Die von Kapitel 1 gibt es immer, die eines späteren Kapitels, sobald das Kapitel davor abgeschlossen ist.
+ */
 export const SHOP = {
   priceFactor: 5,
-  stock: ['eimerhelm', 'regenponcho', 'gummistiefel', 'paddel', 'treibholzstab', 'angel'],
+  stockByChapter: {
+    1: ['eimerhelm', 'regenponcho', 'gummistiefel', 'paddel', 'treibholzstab', 'angel'],
+    2: ['schilfhelm', 'moorstiefel', 'unkenamulett', 'rohrkolbenstab'],
+  },
 };
 
 /** Höchstes Abenteuer-Level (Etappe 1). */

@@ -22,7 +22,8 @@ import { QUESTS } from './quests.js';
  */
 
 /** Nebenaufträge von Kapitel 1 (für „Hilfsbereit“). */
-const SIDE_QUESTS = Object.values(QUESTS).filter((q) => q.kind === 'side').map((q) => q.id);
+/** Nebenaufträge von Kapitel 1 (ohne Schritt auf einer späteren Karte). */
+const SIDE_QUESTS = Object.values(QUESTS).filter((q) => q.kind === 'side' && !q.steps.some((s) => s.map && s.map !== 'kapitel1')).map((q) => q.id);
 
 const killed = (type, n) => (ctx) => (ctx.stats.kills[type] || 0) >= n;
 
@@ -185,6 +186,11 @@ export const ACHIEVEMENTS = [
     id: 'trockene-pfoten', title: 'Trockene Pfoten', condition: 'Schließe im Abenteuer Kapitel 1 ab',
     line: 'Der Bach ist wieder ein Bach. Vorerst.', gold: 100,
     check: (c) => (c.save.heroes ?? []).some((h) => h.adventure?.chapterDone?.includes(1)),
+  },
+  {
+    id: 'sumpfdotter', title: 'Sumpfdotter', condition: 'Schließe im Abenteuer Kapitel 2 ab',
+    line: 'Im Sumpf quakt es wieder normal. Also laut.', gold: 100,
+    check: (c) => (c.save.heroes ?? []).some((h) => h.adventure?.chapterDone?.includes(2)),
   },
   {
     id: 'meisterstueck', title: 'Meisterstück', condition: 'Lass einen Gegenstand auf +5 verbessern',
