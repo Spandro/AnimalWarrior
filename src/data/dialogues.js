@@ -9,6 +9,7 @@ export const NPCS = {
   nussa: { name: 'Nussa', animal: 'Eichhörnchen' },
   pieps: { name: 'Pieps', animal: 'Spatz' },
   amsel: { name: 'Tante Amsel', animal: 'Amsel' },
+  quappe: { name: 'Frau Quappe', animal: 'Unke' },
   flossian: { name: 'Flossian der Erste', animal: 'Goldfisch' },
 };
 

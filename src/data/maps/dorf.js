@@ -1,4 +1,5 @@
-// Dorf Bachwinkel: kleiner Platz mit Brunnen, Häuser drumherum, Bach im Norden, Ausgang nach Osten zu Kapitel 1.
+// Dorf Bachwinkel: kleiner Platz mit Brunnen, Häuser drumherum, Bach im Norden, Ausgang nach Osten zu Kapitel 1 und
+// (nach Kapitel 1) nach Westen in den Sumpf, Kapitel 2.
 // Koordinaten in Metern; x nach Osten, z nach Süden (wie in der Welt).
 
 /** @type {import('./index.js').MapDef} */
@@ -29,7 +30,10 @@ export const DORF = {
   chests: [],
   packs: [],
   bosses: [],
-  exits: [{ id: 'nach_kapitel1', x: 57, z: 0, r: 3, to: { map: 'kapitel1', campfire: 'k1_ufer' } }],
+  exits: [
+    { id: 'nach_kapitel1', x: 57, z: 0, r: 3, to: { map: 'kapitel1', campfire: 'k1_ufer' } },
+    { id: 'nach_kapitel2', x: -27, z: 0, r: 3, to: { map: 'kapitel2', campfire: 'k2_rand' }, requires: { chapterDone: 1 } },
+  ],
   props: [
     { kind: 'haus_oma', x: -7, z: -21 },
     { kind: 'laden', x: 18, z: -18 },
@@ -41,6 +45,7 @@ export const DORF = {
     { kind: 'zaun', x: 34, z: -7 },
     { kind: 'zaun', x: 34, z: 7 },
     { kind: 'flugblatt', x: 40, z: -6.5 },
+    { kind: 'wegweiser', x: -20, z: -6 },
   ],
   start: { campfire: 'dorf_platz' },
 };

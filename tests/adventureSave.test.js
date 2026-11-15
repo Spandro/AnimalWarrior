@@ -226,3 +226,20 @@ test('adventureSave: Ausbessern – fremde Unterklasse, Astfähigkeit ohne Unter
   const kept = repaired((a) => { Object.assign(a, { level: 12, skillPoints: 0, subclass: 'tuersteher', abilities: { schwerthieb: 1, breiteskreuz: 5 }, buttons: ['breiteskreuz', null, null], passives: { dickehaut: 3 } }); });
   assertEqual([kept.buttons[0], kept.passives.dickehaut], ['breiteskreuz', 3]);
 });
+
+test('adventureSave: Ausbessern behält Lagerfeuer, Bosse, Kisten, Fundorte und Abschluss von Kapitel 2', () => {
+  const s = defaultSave();
+  const h = addHero(s, { name: 'Sumpf', animal: 'ente', class: 'magier' }, { now: 1, id: 'h1' });
+  h.adventure = newAdventure(h);
+  Object.assign(h.adventure, {
+    mapId: 'kapitel2', campfireId: 'k2_nebel', campfires: ['dorf_platz', 'k2_rand', 'k2_nebel'],
+    bosses: ['quak', 'haudrauf'], chests: ['k2_kiste_teich'], found: ['k2_seerose_1'], chapterDone: [1, 2],
+  });
+  const a = repairSave(s).heroes[0].adventure;
+  assertEqual([a.mapId, a.campfireId], ['kapitel2', 'k2_nebel']);
+  assertEqual(a.campfires, ['dorf_platz', 'k2_rand', 'k2_nebel']);
+  assertEqual(a.bosses, ['quak', 'haudrauf']);
+  assertEqual(a.chests, ['k2_kiste_teich']);
+  assertEqual(a.found, ['k2_seerose_1']);
+  assertEqual(a.chapterDone, [1, 2]);
+});

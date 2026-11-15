@@ -8,6 +8,7 @@ import {
 } from '../src/data/sprites.js';
 import { ITEMS, ITEM_SHEETS, itemIconRect, itemSheet } from '../src/data/items.js';
 import { MAPS } from '../src/data/maps/index.js';
+import { MAP_LOOK } from '../src/data/adventure.js';
 import { NPCS } from '../src/data/dialogues.js';
 import { cutPieces, prepareSheet, loadImage, addSheet } from '../src/render/sprites.js';
 import { loadTrailTiles } from '../src/render/environment.js';
@@ -63,9 +64,13 @@ test('abenteuer-bilder: Figuren, Leute und Dorfbilder zeigen auf ihre Zelle im a
   check(ADVENTURE_ENEMY_SPRITES, 'kapitel1');
   check(NPC_SPRITES, 'bewohner');
   check(VILLAGE_SPRITES, 'dorf');
-  // Jede Person und jede Art von Kleinkram auf den Karten hat ein Bild, jede Person ein Porträt.
+  // Jede Person und jede Art von Kleinkram auf den Karten hat ein Bild, jede Person ein Porträt. Neue Leute ohne Bild
+  // (Kapitel 2, bis Bilder kommen) haben eine Farbe für die 3D-Figur; ihr Porträt ist der Kreis mit Buchstaben.
   for (const map of Object.values(MAPS)) {
-    for (const n of map.npcs) { assertTrue(!!NPC_SPRITES[n.id], n.id); assertTrue(!!NPC_PORTRAITS.rects[n.id], `Porträt ${n.id}`); }
+    for (const n of map.npcs) {
+      if (!NPC_SPRITES[n.id]) { assertTrue(!!MAP_LOOK.npcs[n.id], `Ersatzfarbe ${n.id}`); continue; }
+      assertTrue(!!NPC_PORTRAITS.rects[n.id], `Porträt ${n.id}`);
+    }
     for (const p of map.props) assertTrue(!!VILLAGE_SPRITES[p.kind], p.kind);
   }
   for (const r of Object.values(NPC_PORTRAITS.rects)) {

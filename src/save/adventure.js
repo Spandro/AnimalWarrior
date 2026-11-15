@@ -33,6 +33,8 @@ const idList = (v, known) => (Array.isArray(v) ? [...new Set(v.filter((id) => ty
 
 const ALL = (kind) => new Set(Object.values(MAPS).flatMap((m) => m[kind].map((e) => e.id)));
 const KNOWN = { campfires: ALL('campfires'), bosses: ALL('bosses'), chests: ALL('chests'), spots: ALL('spots') };
+/** Kapitel, die es als Karte gibt (für `chapterDone`). */
+const CHAPTERS = new Set(Object.values(MAPS).filter((m) => m.chapter > 0).map((m) => String(m.chapter)));
 const QUEST_THINGS = new Set(Object.values(QUESTS).flatMap((q) => q.steps.filter((s) => s.type === 'collect').map((s) => s.target)));
 
 /** Ob ein Gegenstand an diesen Platz und zu dieser Klasse passt. */
@@ -145,7 +147,7 @@ function repairAdventure(a, hero, save) {
     bosses: idList(a.bosses, KNOWN.bosses), chests: idList(a.chests, KNOWN.chests), found: idList(a.found, KNOWN.spots),
     questItems, explored,
     introSeen: a.introSeen === true,
-    chapterDone: idList(a.chapterDone?.map?.(String), new Set(['1'])).map(Number),
+    chapterDone: idList(a.chapterDone?.map?.(String), CHAPTERS).map(Number),
     unlocked: idList(a.unlocked, new Set(UNLOCKABLE)),
     subclass: sub ? sub.id : null,
     passives,

@@ -183,6 +183,17 @@ export function isGateClosed(run, gateId) {
   return !(q && (q.state === 'done' || q.step >= on.step));
 }
 
+/**
+ * Ist ein Ausgang offen? Einer mit `requires.chapterDone` erst, wenn das Kapitel abgeschlossen ist (die Darstellung zeigt
+ * nur offene Ausgänge).
+ * @param {AdventureRun} run
+ * @param {MapDef['exits'][number]} exit
+ */
+export function exitOpen(run, exit) {
+  const need = exit.requires?.chapterDone;
+  return need === undefined || run.record.chapterDone.includes(need);
+}
+
 // ---------------------------------------------------------------- Schritt
 
 /**
@@ -225,7 +236,7 @@ function stepPlaying(run, dt, input) {
     emit(run, { type: 'dying' });
     return;
   }
-  const exit = run.map.exits.find((x) => dist(x, world.hero) <= x.r);
+  const exit = run.map.exits.find((x) => exitOpen(run, x) && dist(x, world.hero) <= x.r);
   if (exit) {
     enterMap(run, exit.to.map, exit.to.campfire);
     emit(run, { type: 'mapChange', map: exit.to.map });

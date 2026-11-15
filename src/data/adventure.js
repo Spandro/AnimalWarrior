@@ -43,7 +43,7 @@ export const LOOT = {
   bossMinRarity: 'selten',
   potionChance: 0.03,
   elitePearlChance: 0.05,
-  bossPearls: { graete: 2, zwickzwack: 3 },
+  bossPearls: { graete: 2, zwickzwack: 3, quak: 3, haudrauf: 4 },
   goldChance: 0.25,
   gold: [1, 4],
 };
@@ -140,6 +140,7 @@ export const MAP_LOOK = {
   },
   npcs: {
     panzerla: 0x6f8a4a, kruemel: 0xd29a5a, grabowski: 0x4a4048, nussa: 0xc0622e, pieps: 0x9a7a5a, amsel: 0x2a2a2a,
+    quappe: 0x6a5a3a,
   },
 };
 
@@ -149,6 +150,7 @@ export const MINIMAP = { size: 112, radius: 45, block: EXPLORE_BLOCK };
 /** Namen der Lagerfeuer für das Reisen. */
 export const CAMPFIRE_NAMES = {
   dorf_platz: 'Bachwinkel', k1_ufer: 'Bachufer', k1_bruecke: 'Alte Brücke', k1_wald: 'Tiefer Wald', k1_quelle: 'Quellteich',
+  k2_rand: 'Sumpfrand', k2_froschhof: 'Froschhof', k2_nebel: 'Nebelmoor', k2_hecht: 'Hechtloch',
 };
 
 /** Sprüche am Ladentisch und in der Schmiede. */

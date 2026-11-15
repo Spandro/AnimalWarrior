@@ -402,3 +402,32 @@ test('adventure: Reisen zählt als Rasten', () => {
   assertTrue(travel(run, 'k1_bruecke'));
   assertEqual(run.ledger.rests, before + 1);
 });
+
+test('adventure: Ausgang in den Sumpf erst nach Kapitel 1 – unsichtbar und unbenutzbar davor', async () => {
+  const { exitOpen } = await import('../src/modes/adventure.js');
+  const closed = setup({ map: 'dorf', campfire: 'dorf_platz' });
+  const exit = closed.map.exits.find((x) => x.id === 'nach_kapitel2');
+  assertTrue(!exitOpen(closed, exit));
+  assertTrue(exitOpen(closed, closed.map.exits.find((x) => x.id === 'nach_kapitel1')));
+  put(closed, exit.x, exit.z); step(closed);
+  assertEqual(closed.map.id, 'dorf');
+  const open = setup({ map: 'dorf', campfire: 'dorf_platz', mutate: (a) => { a.chapterDone = [1]; } });
+  assertTrue(exitOpen(open, exit));
+  put(open, exit.x, exit.z); step(open);
+  assertEqual(open.map.id, 'kapitel2');
+  assertTrue(Math.hypot(open.world.hero.x - 6, open.world.hero.z - 3) < 3);
+});
+
+test('adventure: alter Stand mit abgeschlossenem Kapitel 1 sieht den Ausgang sofort', async () => {
+  const { exitOpen } = await import('../src/modes/adventure.js');
+  const { repairSave } = await import('../src/save/adventure.js');
+  const save = defaultSave();
+  const h = addHero(save, { name: 'Alt', animal: 'hase', class: 'krieger' }, { now: 1, id: 'h1' });
+  h.adventure = newAdventure(h);
+  h.adventure.chapterDone = [1];
+  h.adventure.introSeen = true;
+  repairSave(save);
+  const run = createAdventureRun({ seed: 3, save, heroId: 'h1' });
+  assertEqual(run.map.id, 'dorf');
+  assertTrue(exitOpen(run, run.map.exits.find((x) => x.id === 'nach_kapitel2')));
+});
