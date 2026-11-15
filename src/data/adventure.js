@@ -135,7 +135,7 @@ export const MAP_LOOK = {
   path: 0x8a7150,
   water: 0x4d86a6,
   bridge: 0x7a5530,
-  /** Schlamm (Kapitel 2, bis Bilder kommen): Farbe braun-grün, Höhe über dem Boden (m). */
+  /** Schlamm (Kapitel 2): Höhe über dem Boden (m) und Farbe braun-grün, wenn `schlamm.webp` fehlt. */
   mud: { color: 0x5b5a30, y: 0.035 },
   /** Ring an offenen Ausgängen: Farbe, Deckkraft. */
   exit: { color: 0xffe08a, opacity: 0.45 },

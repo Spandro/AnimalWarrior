@@ -114,7 +114,7 @@ export const KAPITEL2 = {
     { kind: 'wegweiser', x: 12, z: 6 },
     { kind: 'flugblatt', x: 14, z: -6 },
     { kind: 'flugblatt', x: 470, z: -24 },
-    { kind: 'kroenungsschild', x: 426, z: -45 }, // Krönungsschild der Frösche am Eingang zum Froschhof
+    { kind: 'kroenungsschild', x: 426, z: -43 }, // Krönungsschild der Frösche am Eingang zum Froschhof
     { kind: 'wegweiser', x: 700, z: -12 },
     { kind: 'flugblatt', x: 1205, z: -24 },
   ],
