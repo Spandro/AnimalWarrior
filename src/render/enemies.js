@@ -1,7 +1,7 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { ENEMIES } from '../data/enemies.js';
 import { ABILITIES } from '../data/abilities.js';
-import { ENEMY_SPRITES, CROW_FLIGHT_HEIGHT, BILLBOARD, CURL_ROLL, DUO_FX, ADVENTURE_ENEMY_SPRITES, ADVENTURE_SPRITE_STANDIN, PICKUP_STANDIN } from '../data/sprites.js';
+import { ENEMY_SPRITES, CROW_FLIGHT_HEIGHT, BILLBOARD, CURL_ROLL, DUO_FX, ADVENTURE_ENEMY_SPRITES, ADVENTURE_SPRITE_STANDIN, PICKUP_STANDIN, ENEMY_FLASH } from '../data/sprites.js';
 import { isCurled } from '../core/world.js';
 import { SHADOW } from '../data/shadow.js';
 import { ENV_SPRITES } from '../data/environment.js';
@@ -492,6 +492,9 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
   ];
 
   const tracker = createTracker();
+  /** Gegner-id → Weltzeit, bis zu der er nach einem Treffer aufblitzt. */
+  const flashUntil = new Map();
+  let lastFlashTime = -Infinity;
   const m = new THREE.Matrix4(), wingRot = new THREE.Matrix4(), wm = new THREE.Matrix4();
   const pos = new THREE.Vector3(), scl = new THREE.Vector3(), euler = new THREE.Euler(), quat = new THREE.Quaternion();
   const color = new THREE.Color();
@@ -596,6 +599,7 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
       const g = gait.get(e.id);
 
       color.setRGB(1, 1, 1);
+      if ((flashUntil.get(e.id) ?? -1) > world.time) color.setRGB(...ENEMY_FLASH.color);
       if (e.elite) {
         const pulse = Math.sin(t * 5 + ph);
         color.multiply(TINT.elite).multiplyScalar(1 + 0.12 * pulse);
@@ -634,6 +638,7 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
       const ph = e.id * 1.7;
 
       color.setRGB(1, 1, 1);
+      if ((flashUntil.get(e.id) ?? -1) > world.time) color.setRGB(...ENEMY_FLASH.color);
       if (e.elite) {
         const pulse = Math.sin(t * 5 + ph);
         color.multiply(TINT.elite).multiplyScalar(1 + 0.12 * pulse);
@@ -777,6 +782,10 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
    * @param {number} alpha Anteil (0…1) des laufenden Logikschritts
    */
   function sync(world, alpha) {
+    if (world.time < lastFlashTime) flashUntil.clear(); // neue Welt
+    lastFlashTime = world.time;
+    for (const ev of world.events) if (ev.type === 'hit' && ev.id !== undefined) flashUntil.set(ev.id, world.time + ENEMY_FLASH.seconds);
+    if (flashUntil.size > 256) for (const [id, until] of flashUntil) if (until <= world.time) flashUntil.delete(id);
     tracker.begin(world.time);
     const t = tracker.lerpTime(alpha);
     for (const pool of allPools) pool.begin();

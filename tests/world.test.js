@@ -120,7 +120,7 @@ test('world: tödlicher Treffer zählt kills, legt xp ab und meldet kill', () =>
   assertEqual(w.pickups, [{ kind: 'xp', x: 7, z: 8, value: ENEMIES.ratte.xp }]);
   assertEqual(w.run.damageByAbility, { schwerthieb: 10 });
   assertEqual(w.events, [
-    { type: 'hit', x: 7, z: 8, amount: 10, crit: false },
+    { type: 'hit', x: 7, z: 8, amount: 10, crit: false, id: 1 },
     { type: 'kill', enemyType: 'ratte', x: 7, z: 8, id: rat.id, elite: false, boss: false, packId: null, bossId: null },
   ]);
 });
@@ -423,4 +423,11 @@ test('render: Tracker blendet nach einem Weltwechsel (Zeit springt zurück) nich
   t.begin(0.033);
   const p = t.pos(1, 3, 0, 0.5);
   assertEqual([p.x, p.z], [3, 0]);
+});
+
+test('world: Trefferereignis trägt die Kennung des Gegners (für das Aufblitzen)', () => {
+  const w = createWorld({ seed: 1, animalId: 'ente', classId: 'krieger' });
+  const e = spawnEnemy(w, 'ratte', 5, 0, { hpMul: 100 });
+  damageEnemy(w, e, { amount: 3, crit: false }, 'schwerthieb');
+  assertEqual(w.events.find((x) => x.type === 'hit').id, e.id);
 });

@@ -632,7 +632,7 @@ export function damageEnemy(world, enemy, hit, abilityId) {
   if (enemy.markedUntil > world.time) amount = Math.round(amount * (1 + enemy.markPct));
   const armor = ENEMIES[enemy.type]?.armor;
   if (armor) amount = Math.max(1, amount - armor);
-  world.events.push({ type: 'hit', x: enemy.x, z: enemy.z, amount, crit: hit.crit });
+  world.events.push({ type: 'hit', x: enemy.x, z: enemy.z, amount, crit: hit.crit, id: enemy.id });
   const dbA = world.run.damageByAbility;
   if (enemy.shadow) {
     const dealt = Math.max(0, Math.min(hit.amount, enemy.hp - 1));
