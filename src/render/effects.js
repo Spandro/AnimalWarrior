@@ -32,6 +32,19 @@ export const ABILITY_COLOR = {
   arkankugeln: 0xa880ff, wurfdolche: 0xdfe8ff, giftflaeche: 0x8ccf3c, schattenklon: 0x7a5ad0,
   klingenfaecher: 0xdfe8ff, rauchbombe: 0x9a9aa2,
   halsschwinger: 0xf2c46a, nussregen: 0xb07a40, stampede: 0xd9aa62, buddelfalle: 0x9a6a3a, grossfamilie: 0xe6c890,
+  // Astfähigkeiten der Unterklassen (Abenteuer)
+  roteruebe: 0xff4a3a, hockerwurf: 0xb07a40, thekenrutsche: 0xd9a050, letzterunde: 0xffb040,
+  breiteskreuz: 0x7ab8ff, ausweisbitte: 0xa8c8ff, rausschmiss: 0xc0a080, hausverbot: 0x8a9aff,
+  eintopf: 0xffc070, pfannenschwung: 0x9a9aa2, kellenwurf: 0xd0d0d8, fliegendeteller: 0xf0f0ff,
+  gewitterwolke: 0xc8d8ff, boevonvorn: 0xd8f0ff, hagelschauer: 0xe0f4ff, kugelblitz: 0xfff07a,
+  frostbeule: 0x9fe4ff, eiszapfen: 0xbff0ff, glatteis: 0xd0f4ff, schneesturm: 0xf0faff,
+  wundertuete: 0xd07aff, stinkbombe: 0x8ccf3c, blubberndephiole: 0x7aff9a, selbstversuch: 0xff7ad0,
+  langefinger: 0xffd040, griffindietasche: 0xffe08a, muenzwurf: 0xffd040, ablenkung: 0xe6c890,
+  hierwarniemand: 0x7a5ad0, dolchindenruecken: 0xdfe8ff, schattenschritt: 0x6a4ab0, rauchvorhang: 0x9a9aa2,
+  baerenfalle: 0x8a8a8a, stolperdraht: 0xc0b090, kraehenfuesse: 0x9a9aa2, abindiegrube: 0x8a6a3a,
+  applaus: 0xffd77a, peitschenknall: 0xc08a50, jonglage: 0xb07a40, grossesfinale: 0xff7ad0,
+  erdmaennchen: 0xd9aa62, nussgewitter: 0xb07a40, halsrutsche: 0xf2c46a, familientreffen: 0xe6c890,
+  dadrueben: 0xff4a4a, fernglaswurf: 0xc0c8d0, langerhals: 0xf2c46a, steinschlag: 0x8a8a8a,
 };
 const colorOf = (id) => ABILITY_COLOR[id] ?? 0xffffff;
 
@@ -485,7 +498,12 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
     }
   }
 
-  const CAST = { arc: castArc, ring: castRing, line: castLine, chain: castChain, zone: castZone, buff: castBuff, summon: castSummon, projectile: castProjectile };
+  const CAST = {
+    arc: castArc, ring: castRing, line: castLine, chain: castChain, zone: castZone, buff: castBuff, summon: castSummon, projectile: castProjectile,
+    // Besonderheiten der Unterklassen: kurzer Auslöse-Effekt; was länger bleibt, zeigt src/render/signatures.js.
+    rage: castBuff, shield: castBuff, healzone: castZone, cloud: castBuff, freeze: castRing, potion: castProjectile,
+    steal: castBuff, stealth: castBuff, trap: castBuff, applause: castBuff, pet: castBuff, mark: castBuff,
+  };
 
   // ------------------------------------------------ übrige Ereignisse
 
@@ -595,6 +613,11 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
         case 'cast': CAST[e.shape]?.(e); break;
         case 'explosion': if (e.abilityId === 'buddelfalle') dirtMound(e); else explosion(e); break;
         case 'hit': hit(e); break;
+        case 'cloudStrike': castChain({ abilityId: 'gewitterwolke', x: e.x, z: e.z, points: [{ x: e.tx, z: e.tz }] }); break;
+        case 'potionSplash': explosion({ abilityId: e.kind === 'feuer' ? 'feuerball' : e.kind === 'schleim' ? 'giftflaeche' : 'kriegsschrei', x: e.x, z: e.z, radius: e.radius }); break;
+        case 'trapSprung': burst(dust, 14, e.x, 0.2, e.z, { speed: 2.5, up: 2, life: 0.5, size: 0.14, endSize: 0.04, color: 0x6a6a6a, gravity: 8 }); break;
+        case 'freeze': burst(glow, 10, e.x, 0.6, e.z, { speed: 1.5, up: 1.5, life: 0.6, size: 0.08, color: 0xbff0ff, gravity: 0 }); break;
+        case 'stealGold': numbers.show(`+${e.value} Gold`, e.x, 1.4, e.z, 'loot'); break;
         case 'kill': kill(e); break;
         case 'bossTelegraph': bossTelegraph(e); break;
         case 'levelup': levelup(hero); break;

@@ -148,3 +148,25 @@ export function subclassesFor(classId) {
 
 /** Dauer-Bonus nach Kennung (über alle Unterklassen). */
 export const PASSIVES = Object.fromEntries(Object.values(SUBCLASSES).flatMap((s) => s.passives.map((d) => [d.id, { ...d, subclass: s.id }])));
+
+/**
+ * Bezeichnung und Einheit der besonderen Dauer-Boni für den Fähigkeitenbaum: `pct` Prozent, `sec` Sekunden, `num` Zahl.
+ * Ein Bonus mit `shape` nennt dahinter den Namen der Besonderheit; `label` je Dauer-Bonus geht vor.
+ */
+export const SPECIAL_TEXT = {
+  lifesteal: { label: 'Lebensraub', unit: 'pct' },
+  lootChance: { label: 'Beutechance', unit: 'pct' },
+  shieldPct: { label: 'Schild-Stärke', unit: 'pct' },
+  healPct: { label: 'Heilung', unit: 'pct' },
+  jumps: { label: 'Kettensprünge', unit: 'num' },
+  slowDuration: { label: 'Dauer der Verlangsamung', unit: 'sec' },
+  tickDamage: { label: 'Gift- und Flächenschaden', unit: 'pct' },
+  duration: { label: 'Dauer', unit: 'sec' },
+  damage: { label: 'Schaden', unit: 'pct' },
+  maxTraps: { label: 'Fallen gleichzeitig', unit: 'num' },
+  markPct: { label: 'Markierungsschaden', unit: 'pct' },
+  range: { label: 'Reichweite', unit: 'pct' },
+};
+
+/** Eigene Bezeichnung einzelner Dauer-Boni (statt Wert + Besonderheit). */
+export const PASSIVE_LABELS = { zugabe: 'Dauer von Stärkungen' };

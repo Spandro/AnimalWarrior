@@ -5,6 +5,7 @@ import { createMapView } from './render/mapView.js';
 import { createEnemyView } from './render/enemies.js';
 import { createHeroView } from './render/hero.js';
 import { createEffects } from './render/effects.js';
+import { createSignatureView } from './render/signatures.js';
 import {
   createAdventureRun, stepAdventure, useAbility, drinkPotion, interact, endTalk, acceptOffer, setPaused, closeMenu, travel,
   snapshot, clearLedger, refreshFromSave, markIntroSeen,
@@ -16,7 +17,8 @@ import { createPointerState, attachPointer, combineMove } from './input/pointer.
 import { createStick } from './ui/stick.js';
 import { createAdventureHud } from './ui/adventureHud.js';
 import { showDialogue } from './ui/dialogue.js';
-import { openPauseMenu, openCampfire, openBigMap, openQuests, playStory } from './ui/adventureMenus.js';
+import { openPauseMenu, openCampfire, openBigMap, openQuests, playStory, openRespec } from './ui/adventureMenus.js';
+import { SUBCLASS_RULES } from './data/adventure.js';
 import { openEquipment } from './ui/equipment.js';
 import { openShop } from './ui/shop.js';
 import { openSmith } from './ui/smith.js';
@@ -56,6 +58,7 @@ export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quali
   const enemyView = createEnemyView(view.scene, { sprites, camera: view.camera, env });
   const heroView = createHeroView(view.scene, run.hero.animal, run.hero.class, { sprites, camera: view.camera, reducedMotion });
   const effects = createEffects(view.scene, uiLayer, { quality, camera: view.camera });
+  const signatureView = createSignatureView(view.scene);
   const hud = createAdventureHud(uiLayer, {
     side: app.save.settings.buttonSide,
     onAbility: (slot) => useAbility(run, slot),
@@ -162,6 +165,7 @@ export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quali
       busy = false;
       commit(true);
       if (r.shop) await openPage(r.shop === 'merchant' ? openShop : openSmith);
+      if (r.npc === 'panzerla' && run.record.subclass && run.record.level >= SUBCLASS_RULES.chooseLevel) await openPage(openRespec);
     } else if (r.kind === 'campfire') {
       busy = true; keys.clear(); pointer.reset();
       commit(true);
@@ -248,6 +252,7 @@ export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quali
     view.setTarget(p.x, p.z);
     mapView.update(run, p.x, p.z, dt);
     enemyView.sync(run.world, alpha);
+    signatureView.sync(run.world, p);
     effects.update(busy || run.state === 'paused' ? 0 : dt, p);
     hud.update(run, realDt);
     stick.update(pointer);
@@ -278,6 +283,7 @@ export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quali
       mapView.dispose();
       enemyView.dispose();
       heroView.dispose();
+      signatureView.dispose();
       effects.dispose();
       hud.dispose();
       for (const node of uiLayer.querySelectorAll('.adv-overlay, .dialogue, .adv-story')) node.remove();

@@ -2,7 +2,7 @@
 // Alle Bilder sind optional: fehlt eine Datei, erscheint Ersatz aus Grundformen. Bildschirme scheitern nie an Bildern.
 import { el, formatNumber } from './dom.js';
 import { screenHeader, screenFooter, confirmDialog } from './menus.js';
-import { describeModifier } from './heroCreate.js';
+import { describeModifier } from './statText.js';
 import { chestSlots, foundCount, itemKindLabel } from './tavernText.js';
 import { TAVERN, HOSTS, TABLE_HOST, TAVERN_IMAGES } from '../data/tavern.js';
 import { ITEMS, RARITIES, TAVERN_ITEMS } from '../data/items.js';

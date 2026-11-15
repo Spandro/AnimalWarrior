@@ -1,3 +1,4 @@
+import { SIGNATURE_LOOK } from '../data/adventure.js';
 import * as THREE from '../../vendor/three.module.min.js';
 import { buildCharacter, animateCharacter, buildMeerkat, animateMeerkat } from './character.js';
 import { createTracker } from './enemies.js';
@@ -117,7 +118,8 @@ export function createHeroView(scene, animalId, classId, { sprites, camera, redu
       aim: t < aimDirUntil ? aimDir : null, speed, time: t, frameDt,
       attackT: since >= 0 && since < ATTACK_DURATION ? since / ATTACK_DURATION : undefined,
       visible: dying || !(world.time < hero.invulnerableUntil && Math.floor(t * BLINK_HZ) % 2),
-      flash: performance.now() < flashUntil, poisoned: !!hero.poison, dyingTilt, opacity,
+      flash: performance.now() < flashUntil, poisoned: !!hero.poison, dyingTilt,
+      opacity: hero.stealthUntil > world.time ? opacity * SIGNATURE_LOOK.stealthOpacity : opacity,
     });
     ringMat.opacity = RING_OPACITY * opacity;
     ring.position.set(position.x, 0.03, position.z);
