@@ -59,17 +59,25 @@ export const DECO = {
 export const GROUND = { tileM: 8, seamBlendPx: 48 };
 
 /**
- * Kacheln für Erdweg und Bach der Abenteuer-Karten (von oben gemalt, 1254 × 1254), geladen beim Betreten des Abenteuers:
- * Datei, Kantenlänge einer Kachel in Metern, wie breit die Ränder für die nahtlose Kachel gemischt werden (wie beim Boden)
- * und Deckkraft des Wassers.
+ * Kacheln der Abenteuer-Karten (von oben gemalt, 1254 × 1254): Erdweg und Bach, geladen beim Betreten des Abenteuers,
+ * Schlamm und Stege des Sumpfs (`CHAPTER_TILES`), geladen mit den Bögen von Kapitel 2. Datei, Kantenlänge einer Kachel in
+ * Metern, wie breit die Ränder für die nahtlose Kachel gemischt werden (wie beim Boden) und Deckkraft des Wassers.
+ * Die Bretter in `steg.webp` laufen waagerecht; `stegTurn` dreht die Kachel, damit sie wie die gezeichneten Bretter quer
+ * zu den (meist west-östlichen) Stegen und Brücken liegen. 8 Bretter je Kachel, also 0,3 m je Brett.
  */
 export const TRAIL_TILES = {
   weg: 'assets/abenteuer/weg.webp',
   wasser: 'assets/abenteuer/wasser.webp',
-  tileM: { weg: 5, wasser: 6 },
+  schlamm: 'assets/abenteuer/schlamm.webp',
+  steg: 'assets/abenteuer/steg.webp',
+  tileM: { weg: 5, wasser: 6, schlamm: 6, steg: 2.4 },
+  stegTurn: Math.PI / 2,
   seamBlendPx: 48,
   waterOpacity: 0.94,
 };
+
+/** Kacheln eines späteren Kapitels, nach Kapitelnummer (wie `CHAPTER_SHEETS` in `src/data/sprites.js`). */
+export const CHAPTER_TILES = { 2: ['schlamm', 'steg'] };
 
 /** Spalte und Zeile jedes Motivs im 3 × 2-Raster von `szenen.webp`. */
 export const SCENE_CELLS = {

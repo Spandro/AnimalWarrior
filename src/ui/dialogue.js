@@ -1,4 +1,4 @@
-// Gesprächskasten unten (Spec §10.2): Porträt (Kopf aus `bewohner.webp`, sonst ein Kreis mit Anfangsbuchstaben), Name,
+// Gesprächskasten unten (Spec §10.2): Porträt (Kopf aus `bewohner.webp`/`bewohner2.webp`, sonst ein Kreis mit Anfangsbuchstaben), Name,
 // ein Satz nach dem anderen. Weiter mit Tippen, Klick, Leertaste oder Enter; am Ende eines Nebenauftrags „Mach ich!“ oder „Später“.
 import { el } from './dom.js';
 import { NPCS } from '../data/dialogues.js';
@@ -9,8 +9,8 @@ import { probeImage } from './tavern.js';
 const PORTRAIT_SIZE = 56;
 
 /**
- * Porträt einer Person: Kopf-Ausschnitt aus `bewohner.webp`, sobald das Bild da ist und die Person ausgemessen ist
- * (wie die Wirte der Taverne), sonst ein Kreis mit dem Anfangsbuchstaben.
+ * Porträt einer Person: Kopf-Ausschnitt aus ihrem Bild (`bewohner.webp`, Frau Quappe `bewohner2.webp`), sobald das Bild
+ * da ist und die Person ausgemessen ist (wie die Wirte der Taverne), sonst ein Kreis mit dem Anfangsbuchstaben.
  * @param {string} npc
  * @param {string} name
  */
@@ -18,10 +18,11 @@ export function npcPortrait(npc, name) {
   const box = el('div', { class: 'dialogue-portrait', 'aria-hidden': 'true', text: name.charAt(0) });
   const rect = NPC_PORTRAITS.rects[npc];
   if (!rect) return box;
-  probeImage(NPC_PORTRAITS.sheet).then((img) => {
+  const sheet = rect.sheet ?? NPC_PORTRAITS.sheet;
+  probeImage(sheet).then((img) => {
     if (!img || !box.isConnected) return;
     const k = PORTRAIT_SIZE / Math.max(rect.w, rect.h);
-    box.style.backgroundImage = `url('${NPC_PORTRAITS.sheet}')`;
+    box.style.backgroundImage = `url('${sheet}')`;
     box.style.backgroundSize = `${img.naturalWidth * k}px ${img.naturalHeight * k}px`;
     box.style.backgroundPosition = `${(PORTRAIT_SIZE - rect.w * k) / 2 - rect.x * k}px ${(PORTRAIT_SIZE - rect.h * k) / 2 - rect.y * k}px`;
     box.classList.add('dialogue-portrait-image');

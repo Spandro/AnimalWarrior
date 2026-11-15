@@ -93,14 +93,14 @@ test('items: itemSheet und TAVERN_ITEMS trennen die Bögen und die Truhe der Tav
   assertTrue(Object.values(TAVERN_ITEMS).every((i) => i.source === 'taverne'));
 });
 
-test('items: Kapitel 2 – acht Gegenstände, stärker als die aus Kapitel 1, noch ohne Bild', () => {
+test('items: Kapitel 2 – acht Gegenstände, stärker als die aus Kapitel 1, Symbole aus beute2.webp', () => {
   const k2 = Object.values(ITEMS).filter((i) => i.source === 'kapitel2');
   assertEqual(k2.length, 8);
   assertEqual(k2.map((i) => i.icon).sort((a, b) => a - b), [0, 1, 2, 3, 4, 5, 6, 7]);
   assertTrue(k2.some((i) => i.rarity === 'selten') && k2.some((i) => i.rarity === 'legendaer'));
   for (const kind of ['nahkampf', 'zauber', 'wurf']) assertTrue(k2.some((i) => i.weaponKind === kind), kind);
   for (const item of k2) {
-    assertEqual(itemSheet(item), null, item.id);
+    assertEqual(itemSheet(item), 'beute2', item.id);
     for (const m of item.modifiers) {
       const kind = 'pct' in m ? 'pct' : 'flat';
       const same = k1.filter((i) => i.rarity === item.rarity).flatMap((i) => i.modifiers).filter((x) => x.stat === m.stat && kind in x);

@@ -25,6 +25,7 @@ import { openSmith } from './ui/smith.js';
 import { STORY } from './data/story.js';
 import { DIALOGUES, NPCS } from './data/dialogues.js';
 import { LOW_HEALTH_FRACTION } from './data/sprites.js';
+import { chaptersToLoad, chapterImagesDone, loadChapterImages } from './render/chapterImages.js';
 
 const STEP = 1 / 60;
 const MAX_STEPS_PER_FRAME = 5;
@@ -53,9 +54,26 @@ export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quali
     mapView?.dispose();
     mapView = createMapView(view.scene, run.map, run.grid, { env, sprites, tiles, camera: view.camera, seed: run.seed });
     mapId = run.map.id;
+    requestChapterImages();
   }
+  /**
+   * Bilder späterer Kapitel erst, wenn der Held das Kapitel betritt oder das davor abgeschlossen hat. Sind sie da, werden
+   * Karte und Gegner neu aufgebaut (Stellvertreter → eigene Bilder). Die Karte, auf der er startet, lädt main.js vorab.
+   */
+  function requestChapterImages() {
+    if (!sprites || !tiles) return;
+    for (const c of chaptersToLoad(run.record, run.map)) {
+      if (chapterImagesDone(tiles, c)) continue;
+      loadChapterImages(sprites, tiles, c).then(() => {
+        if (stopped) return;
+        mapId = null;
+        enemyView.dispose();
+        enemyView = createEnemyView(view.scene, { sprites, camera: view.camera, env });
+      });
+    }
+  }
+  let enemyView = createEnemyView(view.scene, { sprites, camera: view.camera, env });
   ensureMapView();
-  const enemyView = createEnemyView(view.scene, { sprites, camera: view.camera, env });
   const heroView = createHeroView(view.scene, run.hero.animal, run.hero.class, { sprites, camera: view.camera, reducedMotion });
   const effects = createEffects(view.scene, uiLayer, { quality, camera: view.camera });
   const signatureView = createSignatureView(view.scene);
@@ -222,7 +240,10 @@ export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quali
       else if (e.type === 'dying') { keys.clear(); pointer.reset(); }
       else if (e.type === 'questAdvanced' && e.questId === 'zwickzwack' && run.record.quests.zwickzwack?.step === 2) {
         storyQueue.push(() => showDialogue(uiLayer, { npc: 'flossian', speaker: NPCS.flossian.name, lines: DIALOGUES.flossian.progress.zwickzwack }));
-      } else if (e.type === 'chapterDone') storyQueue.push(() => playStory(uiLayer, [STORY.chapterEnd[e.chapter]]));
+      } else if (e.type === 'chapterDone') {
+        storyQueue.push(() => playStory(uiLayer, [STORY.chapterEnd[e.chapter]]));
+        requestChapterImages(); // das nächste Kapitel ist jetzt erreichbar
+      }
       else if ((e.type === 'mapChange' || e.type === 'travel') && startStoryWorld !== run.world && chapterStartDue(run) && STORY.chapterStart?.[run.map.chapter]) {
         // Ereignisse aus Aktionen (Reisen) kommen mit dem nächsten Schritt noch einmal: je Betreten (neue Welt) nur einmal.
         startStoryWorld = run.world;

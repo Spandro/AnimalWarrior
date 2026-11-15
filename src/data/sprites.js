@@ -16,7 +16,8 @@
 /**
  * Bildbögen, relativ zu index.html. Beim Start geladen wird nur, was ein Eintrag in `HERO_SPRITES` oder `ENEMY_SPRITES`
  * nutzt: `duo` erst, wenn es den Eintrag `giraffe-hochstapler` gibt. Die Bögen des Abenteuers (`kapitel1`, `bewohner`,
- * `dorf`, siehe `ADVENTURE_SHEETS`) kommen erst beim Betreten des Abenteuers dazu.
+ * `dorf`, siehe `ADVENTURE_SHEETS`) kommen erst beim Betreten des Abenteuers dazu, die eines späteren Kapitels
+ * (`CHAPTER_SHEETS`) erst, wenn es gebraucht wird.
  */
 export const SHEETS = {
   helden: 'assets/figuren/helden.webp',
@@ -27,10 +28,21 @@ export const SHEETS = {
   kapitel1: 'assets/figuren/kapitel1.webp',
   bewohner: 'assets/abenteuer/bewohner.webp',
   dorf: 'assets/abenteuer/dorf.webp',
+  kapitel2: 'assets/figuren/kapitel2.webp',
+  bewohner2: 'assets/abenteuer/bewohner2.webp',
+  sumpf: 'assets/abenteuer/sumpf.webp',
 };
 
 /** Bögen, die das Abenteuer beim Betreten nachlädt (Gegner des Kapitels, Leute, Häuser und Gegenstände der Karten). */
 export const ADVENTURE_SHEETS = ['kapitel1', 'bewohner', 'dorf'];
+
+/**
+ * Bögen eines späteren Kapitels (Gegner, Leute, Kulissen), nach Kapitelnummer. Geladen, sobald der Held auf einer Karte
+ * des Kapitels steht oder das Kapitel davor abgeschlossen hat (siehe `chaptersToLoad` in `src/render/sprites.js`); bis
+ * dahin und wenn ein Bild fehlt, zeigt das Spiel Stellvertreter.
+ * @type {Record<number, string[]>}
+ */
+export const CHAPTER_SHEETS = { 2: ['kapitel2', 'bewohner2', 'sumpf'] };
 
 /**
  * Eingeschlossenes Papierweiß je Bogen: Startpunkte (x, y von links oben), von denen das Freistellen zusätzlich
@@ -62,11 +74,29 @@ export const SHEET_HOLES = {
     [695, 870], [232, 1153], [817, 904], [313, 821], [1040, 864], [365, 263], [211, 533], [832, 903], [208, 548],
     [1203, 889], [385, 892], [821, 904], [866, 902], [249, 1167], [522, 878], [150, 555], [763, 867], [127, 1197],
     [608, 1207], [22, 310], [43, 168], [794, 904], [897, 191], [208, 563], [43, 870], [82, 113], [926, 910]],
+  // Schilfhelm des Ochsenfroschs (10 Lücken), zwischen Libellenfühler und Kopf, Hechtzähne, Quaks Krone; nicht die
+  // Libellenflügel (4) und ihr Augenglanz
+  kapitel2: [[287, 158], [271, 160], [193, 169], [223, 175], [233, 196], [198, 239], [185, 247], [148, 258], [169, 258],
+    [176, 266], [836, 288], [1206, 617], [525, 619]],
+  // Frau Quappes Schal aus Wasserpflanzen (alle 20 Lücken)
+  bewohner2: [[389, 314], [360, 327], [846, 353], [368, 358], [336, 374], [356, 383], [874, 384], [901, 431], [315, 492],
+    [298, 533], [290, 574], [273, 589], [953, 595], [297, 672], [285, 682], [947, 709], [885, 839], [337, 878], [396, 906],
+    [569, 948]],
+  // Sumpf: zwischen den Halmen der Schilfbüsche, im Wasser um die Seerosen, im Gras an Moorbaum, Baumstumpf und Schild
+  // (alle 59 Lücken)
+  sumpf: [[205, 132], [235, 145], [209, 157], [237, 179], [305, 205], [1004, 205], [222, 221], [216, 237], [355, 255],
+    [317, 294], [196, 303], [1205, 307], [304, 314], [330, 316], [320, 338], [343, 356], [317, 361], [88, 368], [288, 382],
+    [331, 410], [1194, 410], [1201, 416], [342, 420], [637, 449], [336, 471], [653, 478], [640, 492], [1148, 493],
+    [323, 494], [99, 496], [95, 512], [89, 514], [630, 514], [488, 525], [483, 527], [485, 578], [870, 1013], [164, 1031],
+    [566, 1038], [867, 1040], [862, 1041], [582, 1045], [1126, 1053], [879, 1063], [560, 1064], [886, 1072], [111, 1080],
+    [97, 1082], [375, 1082], [1167, 1089], [73, 1108], [1172, 1115], [65, 1116], [1184, 1130], [49, 1141], [396, 1144],
+    [446, 1149], [523, 1154], [1027, 1202]],
 };
 
 /**
  * Bögen, deren Stücke einzeln ausgeschnitten werden, weil sich ihre Rechtecke im gelieferten Bild überschneiden
- * (Zwickzwacks Scheren ragen in die Nachbarn, die Häuser oben rechts stehen übereinander). `pieces`: Rechteck je Stück im
+ * (Zwickzwacks Scheren ragen in die Nachbarn, die Häuser oben rechts stehen übereinander, Quaks Mantel reicht unter die
+ * Kaulquappe, die Kulissen des Sumpfs stehen eng). `pieces`: Rechteck je Stück im
  * gelieferten Bild (x, y von links oben; enge Umrandung aller Pixel, die sich von Weiß abheben, plus 6 px Rand, am
  * Bildrand gekappt), `width`/`height`: Größe des gelieferten Bildes. Das Laden gibt jedem Stück nur seine eigenen Pixel
  * und legt die Stücke nebeneinander in einen neuen Bogen (`cutLayout`, wie die Phasen des Duos); in den Figuren-Einträgen
@@ -120,6 +150,30 @@ export const SHEET_CUTS = {
       truhe_offen: { x: 812, y: 968, w: 326, h: 267 },
     },
   },
+  kapitel2: {
+    width: 1254,
+    height: 1254,
+    pieces: {
+      ochsenfrosch: { x: 21, y: 47, w: 427, h: 536 },
+      libelle: { x: 451, y: 30, w: 400, h: 498 },
+      blutegel: { x: 877, y: 100, w: 352, h: 427 },
+      kaulquappe: { x: 20, y: 733, w: 346, h: 307 },
+      hofmarschall_quak: { x: 298, y: 573, w: 504, h: 637 },
+      hecht_haudrauf: { x: 798, y: 590, w: 439, h: 633 },
+    },
+  },
+  sumpf: {
+    width: 1254,
+    height: 1254,
+    pieces: {
+      schilf_gross: { x: 14, y: 8, w: 432, h: 615 },
+      schilf_klein: { x: 428, y: 123, w: 276, h: 498 },
+      seerosen: { x: 696, y: 130, w: 551, h: 406 },
+      moorbaum: { x: 22, y: 580, w: 548, h: 651 },
+      stumpf: { x: 471, y: 785, w: 474, h: 439 },
+      kroenungsschild: { x: 915, y: 540, w: 310, h: 688 },
+    },
+  },
 };
 
 /** Höchste Breite (Pixel) eines ausgeschnittenen Bogens; Stücke, die nicht mehr in die Reihe passen, kommen in die nächste. */
@@ -149,6 +203,7 @@ export function cutLayout(pieces, maxWidth = CUT_SHEET_MAX_WIDTH) {
 export const CUT_LAYOUTS = Object.fromEntries(Object.entries(SHEET_CUTS).map(([id, cut]) => [id, cutLayout(cut.pieces)]));
 
 const K1 = CUT_LAYOUTS.kapitel1.cells, PEOPLE = CUT_LAYOUTS.bewohner.cells, VILLAGE = CUT_LAYOUTS.dorf.cells;
+const K2 = CUT_LAYOUTS.kapitel2.cells, SWAMP = CUT_LAYOUTS.sumpf.cells;
 
 /**
  * Hintergrundentfernung: Farbabstand zu Weiß (RGB, 0…441), unter `threshold` gilt als Hintergrund,
@@ -254,24 +309,21 @@ export const ENEMY_SPRITES = {
 };
 
 /**
- * Gegner, die es nur im Abenteuer gibt (Bogen `kapitel1`, Stücke einzeln ausgeschnitten, siehe `SHEET_CUTS`; x, y, w, h
- * hier im ausgeschnittenen Bogen). Nicht in `ENEMY_SPRITES`, damit der Wellen-Modus den Bogen weder lädt noch braucht;
- * das Abenteuer lädt ihn beim Betreten nach.
+ * Gegner, die es nur im Abenteuer gibt (Bögen `kapitel1` und `kapitel2`, Stücke einzeln ausgeschnitten, siehe
+ * `SHEET_CUTS`; x, y, w, h hier im ausgeschnittenen Bogen). Nicht in `ENEMY_SPRITES`, damit der Wellen-Modus die Bögen
+ * weder lädt noch braucht; das Abenteuer lädt sie nach (`ADVENTURE_SHEETS`, `CHAPTER_SHEETS`).
  * @type {Record<string, SpriteDef>}
  */
 export const ADVENTURE_ENEMY_SPRITES = {
   helmfisch: { sheet: 'kapitel1', ...K1.helmfisch, heightM: 0.9, motion: 'scurry', footOffset: 0.04 },
   krebs: { sheet: 'kapitel1', ...K1.krebs, heightM: 0.95, motion: 'scurry', footOffset: 0.05 },
   frosch: { sheet: 'kapitel1', ...K1.frosch, heightM: 0.8, motion: 'hopSlow', footOffset: 0.05 },
-  // Kapitel 2: bis eigene Bilder kommen, gemalte Stellvertreter aus kapitel1.webp (größer oder kleiner gezeigt);
-  // `cell` nennt das ausgeschnittene Stück, das sie zeigen.
-  ochsenfrosch: { sheet: 'kapitel1', ...K1.frosch, cell: 'frosch', heightM: 1.1, motion: 'hopSlow', footOffset: 0.07 },
-  kaulquappe: { sheet: 'kapitel1', ...K1.frosch, cell: 'frosch', heightM: 0.5, motion: 'scurry', footOffset: 0.03 },
-  hofmarschall_quak: { sheet: 'kapitel1', ...K1.frosch, cell: 'frosch', heightM: 2.4, motion: 'hopSlow', footOffset: 0.15 },
-  hecht_haudrauf: { sheet: 'kapitel1', ...K1.hauptmann_graete, cell: 'hauptmann_graete', heightM: 2.9, motion: 'trot', footOffset: 0.11 },
-  // Ohne passendes Stück in kapitel1.webp: Stellvertreter aus den Bögen des Wellen-Modus (`cell` = Gegnertyp dort).
-  libelle: { ...ENEMY_SPRITES.kraehe, cell: 'kraehe', heightM: 0.9 },
-  blutegel: { ...ENEMY_SPRITES.kreuzotter, cell: 'kreuzotter', heightM: 0.5, footOffset: 0.03 },
+  ochsenfrosch: { sheet: 'kapitel2', ...K2.ochsenfrosch, heightM: 1.25, motion: 'hopSlow', footOffset: 0.06 },
+  libelle: { sheet: 'kapitel2', ...K2.libelle, heightM: 0.9, motion: 'fly', footOffset: 0 },
+  blutegel: { sheet: 'kapitel2', ...K2.blutegel, heightM: 0.8, motion: 'slither', footOffset: 0.04 },
+  kaulquappe: { sheet: 'kapitel2', ...K2.kaulquappe, heightM: 0.5, motion: 'scurry', footOffset: 0.03 },
+  hofmarschall_quak: { sheet: 'kapitel2', ...K2.hofmarschall_quak, heightM: 2.6, motion: 'lumber', footOffset: 0.12 },
+  hecht_haudrauf: { sheet: 'kapitel2', ...K2.hecht_haudrauf, heightM: 3.0, motion: 'trot', footOffset: 0.12 },
   // Kapitel 3: Stellvertreter, bis eigene Bilder kommen.
   aal: { ...ENEMY_SPRITES.kreuzotter, cell: 'kreuzotter', heightM: 0.6, footOffset: 0.03 },
   bisam: { ...ENEMY_SPRITES.ratte, cell: 'ratte', heightM: 0.7 },
@@ -284,13 +336,29 @@ export const ADVENTURE_ENEMY_SPRITES = {
 };
 
 /**
- * @typedef {{ sheet: 'bewohner'|'dorf', x: number, y: number, w: number, h: number, heightM: number, footOffset: number }} PanelDef
+ * Wenn `kapitel2.webp` fehlt (oder noch lädt): gemalte Stellvertreter wie vor dem Einbau, Frösche und Hecht aus
+ * kapitel1.webp in anderer Größe (`cell` nennt das ausgeschnittene Stück), Libelle und Blutegel aus den Bögen des
+ * Wellen-Modus (`cell` = Gegnertyp dort). Fehlt auch deren Bogen, gilt `ADVENTURE_SPRITE_STANDIN`.
+ * @type {Record<string, SpriteDef & { cell: string }>}
+ */
+export const ADVENTURE_SPRITE_FALLBACK = {
+  ochsenfrosch: { sheet: 'kapitel1', ...K1.frosch, cell: 'frosch', heightM: 1.1, motion: 'hopSlow', footOffset: 0.07 },
+  kaulquappe: { sheet: 'kapitel1', ...K1.frosch, cell: 'frosch', heightM: 0.5, motion: 'scurry', footOffset: 0.03 },
+  hofmarschall_quak: { sheet: 'kapitel1', ...K1.frosch, cell: 'frosch', heightM: 2.4, motion: 'hopSlow', footOffset: 0.15 },
+  hecht_haudrauf: { sheet: 'kapitel1', ...K1.hauptmann_graete, cell: 'hauptmann_graete', heightM: 2.9, motion: 'trot', footOffset: 0.11 },
+  libelle: { ...ENEMY_SPRITES.kraehe, cell: 'kraehe', heightM: 0.9 },
+  blutegel: { ...ENEMY_SPRITES.kreuzotter, cell: 'kreuzotter', heightM: 0.5, footOffset: 0.03 },
+};
+
+/**
+ * @typedef {{ sheet: 'bewohner'|'bewohner2'|'dorf'|'sumpf', x: number, y: number, w: number, h: number, heightM: number, footOffset: number }} PanelDef
  *   Gemalte Tafel auf einer Abenteuer-Karte: Rechteck im ausgeschnittenen Bogen, Höhe in Weltmetern, Standpunkt über der
  *   Bildunterkante (m, wie bei den Figuren).
  */
 
 /**
- * Leute im Dorf (Bogen `bewohner`), gemalt nach rechts blickend; `faceX` -1 in der Karte spiegelt sie.
+ * Leute im Dorf (Bogen `bewohner`) und in den Kapiteln (Frau Quappe: `bewohner2`, eine Figur, nicht ausgeschnitten;
+ * Rechteck im gelieferten Bild), gemalt nach rechts blickend; `faceX` -1 in der Karte spiegelt sie.
  * @type {Record<string, PanelDef>}
  */
 export const NPC_SPRITES = {
@@ -300,6 +368,7 @@ export const NPC_SPRITES = {
   nussa: { sheet: 'bewohner', ...PEOPLE.nussa, heightM: 1.3, footOffset: 0.06 },
   pieps: { sheet: 'bewohner', ...PEOPLE.pieps, heightM: 0.95, footOffset: 0.05 },
   amsel: { sheet: 'bewohner', ...PEOPLE.amsel, heightM: 1.3, footOffset: 0.05 },
+  quappe: { sheet: 'bewohner2', x: 197, y: 34, w: 819, h: 1185, heightM: 1.3, footOffset: 0.05 },
 };
 
 /**
@@ -328,12 +397,42 @@ export const VILLAGE_SPRITES = {
   bruecke: { sheet: 'dorf', ...VILLAGE.bruecke, heightM: 2.2, footOffset: 0.3 },
 };
 
+/**
+ * Kulissen des Sumpfs (Bogen `sumpf`): Schilfbüsche, Seerosen, Moorbaum und Baumstumpf am Kartenrand (`MAP_SCENERY`),
+ * das Krönungsschild der Frösche als Kleinkram (`map.props`, Art `kroenungsschild`). Die Seerosen liegen flach auf dem
+ * Wasser, ihr Standpunkt ist daher die Mitte der Gruppe.
+ * @type {Record<string, PanelDef>}
+ */
+export const SWAMP_SPRITES = {
+  schilf_gross: { sheet: 'sumpf', ...SWAMP.schilf_gross, heightM: 3.0, footOffset: 0.25 },
+  schilf_klein: { sheet: 'sumpf', ...SWAMP.schilf_klein, heightM: 2.2, footOffset: 0.18 },
+  seerosen: { sheet: 'sumpf', ...SWAMP.seerosen, heightM: 1.3, footOffset: 0.5 },
+  moorbaum: { sheet: 'sumpf', ...SWAMP.moorbaum, heightM: 6, footOffset: 0.3 },
+  stumpf: { sheet: 'sumpf', ...SWAMP.stumpf, heightM: 1.7, footOffset: 0.15 },
+  kroenungsschild: { sheet: 'sumpf', ...SWAMP.kroenungsschild, heightM: 2.4, footOffset: 0.12 },
+};
+
+/** Gemalter Kleinkram der Karten nach Art (`map.props`): Dorf und Sumpf. */
+export const PROP_SPRITES = { ...VILLAGE_SPRITES, kroenungsschild: SWAMP_SPRITES.kroenungsschild };
+
+/**
+ * Kulissen am Kartenrand je Karte: Ein Anteil `share` der Randbäume und -felsen (`borderDecor`) wird zu einem Bild aus
+ * `SWAMP_SPRITES`, fest nach seiner Position gewählt (`borderScenery` in `src/core/environment.js`); Bäume aus `tree`,
+ * Felsen aus `rock` (Wiederholung = Gewicht). Fehlt der Bogen, bleibt es bei Bäumen und Felsen.
+ * @type {Record<string, { sheet: 'sumpf', share: number, tree: string[], rock: string[] }>}
+ */
+export const MAP_SCENERY = {
+  kapitel2: { sheet: 'sumpf', share: 0.6, tree: ['moorbaum', 'schilf_gross', 'schilf_gross'], rock: ['schilf_klein', 'seerosen', 'stumpf'] },
+};
+
 /** Lagerfeuer im Bild: Flackern der Flamme (Hz, Anteil der Bildhöhe). */
 export const FIRE_FLICKER = { freq: 1.6, amount: 0.035 };
 
 /**
  * Porträts im Gesprächskasten: Kopf und Schultern je Person im gelieferten `bewohner.webp` (1536 × 1024, quadratisch fürs
- * runde Porträt, x, y von links oben), wie die Wirte der Taverne. Wer hier fehlt, bekommt den Kreis mit Buchstaben.
+ * runde Porträt, x, y von links oben), wie die Wirte der Taverne; mit `sheet` aus einem anderen Bild (Frau Quappe aus
+ * `bewohner2.webp`, 1254 × 1254). Wer hier fehlt, bekommt den Kreis mit Buchstaben.
+ * @type {{ sheet: string, rects: Record<string, { x: number, y: number, w: number, h: number, sheet?: string }> }}
  */
 export const NPC_PORTRAITS = {
   sheet: SHEETS.bewohner,
@@ -344,12 +443,13 @@ export const NPC_PORTRAITS = {
     nussa: { x: 270, y: 530, w: 200, h: 200 },
     pieps: { x: 730, y: 566, w: 200, h: 200 },
     amsel: { x: 1250, y: 520, w: 226, h: 226 },
+    quappe: { x: 470, y: 34, w: 420, h: 420, sheet: SHEETS.bewohner2 },
   },
 };
 
 /**
- * Wenn `kapitel1.webp` fehlt: gemalte Stellvertreter aus den vorhandenen Bögen (Bildhöhe aus
- * `ADVENTURE_ENEMY_SPRITES`), in 3D die Form eines ähnlichen Tiers.
+ * Wenn `kapitel1.webp` fehlt (bei Kapitel 2 auch `kapitel2.webp` und der Bogen aus `ADVENTURE_SPRITE_FALLBACK`): gemalte
+ * Stellvertreter aus den vorhandenen Bögen (Bildhöhe aus `ADVENTURE_ENEMY_SPRITES`), in 3D die Form eines ähnlichen Tiers.
  */
 export const ADVENTURE_SPRITE_STANDIN = {
   helmfisch: 'ratte', krebs: 'igel', frosch: 'giftkroete', hauptmann_graete: 'wolf', kommandant_zwickzwack: 'dachs',

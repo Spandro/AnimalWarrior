@@ -1,18 +1,20 @@
 // Darstellung einer Abenteuer-Karte: Gras, Randbäume und Deko über die Geländeansicht (src/render/terrain.js), darauf
-// Weg, Bach, Brücken, Häuser, Leute, Lagerfeuer, Kisten, Fundorte und Tore. Mit geladenen Bildern sind Häuser, Kleinkram,
-// Lagerfeuer, Kisten, Nussverstecke und Barrikaden gemalte Tafeln aus `dorf.webp`, die Leute aus `bewohner.webp` und Weg
-// und Bach mit Kacheln belegt; fehlt ein Bild, bleibt es dort bei einfachen 3D-Formen und Farbflächen. Liest den Lauf nur.
+// Weg, Bach, Schlamm, Brücken, Stege, Häuser, Leute, Lagerfeuer, Kisten, Fundorte und Tore. Mit geladenen Bildern sind
+// Häuser, Kleinkram, Lagerfeuer, Kisten, Nussverstecke und Barrikaden gemalte Tafeln aus `dorf.webp`, die Leute aus
+// `bewohner.webp`/`bewohner2.webp`, Krönungsschild und Kulissen am Rand des Sumpfs aus `sumpf.webp`, und Weg, Bach,
+// Schlamm und Stege mit Kacheln belegt; fehlt ein Bild, bleibt es dort bei einfachen 3D-Formen, Randbäumen, gezeichneten
+// Brettern und Farbflächen. Liest den Lauf nur.
 import * as THREE from '../../vendor/three.module.min.js';
 import { createTerrainView } from './terrain.js';
 import { billboardOrientation, spriteUv, spriteWidth, spriteMaterial, shadowMaterial } from './sprites.js';
 import { borderDecor, cellAt, CELL } from '../core/mapGrid.js';
-import { decoInCell } from '../core/environment.js';
+import { decoInCell, borderScenery } from '../core/environment.js';
 import { npcState } from '../core/quests.js';
 import { isGateClosed, exitOpen } from '../modes/adventure.js';
 import { TERRAIN_CELL } from '../data/terrain.js';
 import { MAP_LOOK } from '../data/adventure.js';
 import { TRAIL_TILES } from '../data/environment.js';
-import { BILLBOARD, NPC_SPRITES, VILLAGE_SPRITES, FIRE_FLICKER, IDLE } from '../data/sprites.js';
+import { BILLBOARD, NPC_SPRITES, VILLAGE_SPRITES, PROP_SPRITES, SWAMP_SPRITES, MAP_SCENERY, FIRE_FLICKER, IDLE } from '../data/sprites.js';
 
 const JOINT_SEGMENTS = 12;
 
@@ -129,7 +131,15 @@ export function createMapView(scene, map, grid, { env, sprites, tiles, camera, s
   const cleared = (d) => map.props.some((p) => Math.hypot(d.x - p.x, d.z - p.z) < (MAP_LOOK.propClear[p.kind] ?? 0))
     || [map.npcs, map.campfires, map.chests, map.spots].some((list) => list.some((t) => Math.hypot(d.x - t.x, d.z - t.z) < MAP_LOOK.thingClear))
     || nearStrip(d, map.water) || nearStrip(d, map.bridges) || nearStrip(d, map.boardwalks ?? []);
-  for (const d of borderDecor(grid, seed)) if (!cleared(d)) addObstacle({ x: d.x, z: d.z, radius: MAP_LOOK.borderRadius[d.kind], kind: d.kind });
+  // Kulissen der Karte (Sumpf): ein Teil der Randbäume und -felsen wird zu Schilf, Seerosen, Moorbaum und Baumstumpf.
+  const scenery = MAP_SCENERY[map.id];
+  const sceneryTex = scenery ? sprites?.textures?.[scenery.sheet] : null;
+  for (const d of borderDecor(grid, seed)) {
+    if (cleared(d)) continue;
+    const look = sceneryTex ? borderScenery(d, scenery) : null;
+    const sprite = look ? { def: SWAMP_SPRITES[look.id], texture: sceneryTex, size: sprites.sizes[scenery.sheet], mirror: look.mirror } : undefined;
+    addObstacle({ x: d.x, z: d.z, radius: MAP_LOOK.borderRadius[d.kind], kind: d.kind, sprite });
+  }
   for (const o of map.obstacles) addObstacle(o);
   const obstacles = (x, z, r) => {
     const out = [];
@@ -164,13 +174,16 @@ export function createMapView(scene, map, grid, { env, sprites, tiles, camera, s
     ? std(0xffffff, { ...layer, map: tiles.wasser, roughness: 0.35, metalness: 0.05, transparent: true, opacity: TRAIL_TILES.waterOpacity })
     : std(MAP_LOOK.water, { ...layer, roughness: 0.25, metalness: 0.1, transparent: true, opacity: 0.88 });
   for (const w of map.water) flat(stripGeometry(w.points, w.width, 0.025, TRAIL_TILES.tileM.wasser), waterMat, 2);
-  // Schlamm (Kapitel 2): braun-grüne Fläche über Weg und Wasser; Stege wie Brücken.
+  // Schlamm (Kapitel 2) über Weg und Wasser: Kachel aus `schlamm.webp`, sonst braun-grüne Fläche.
   // Deckend: eine durchscheinende Fläche würde nach den Warnkreisen gezeichnet und sie blass überdecken.
-  const mudMat = std(MAP_LOOK.mud.color, layer);
-  for (const m of map.mud ?? []) flat(stripGeometry(m.points, m.width, MAP_LOOK.mud.y, TRAIL_TILES.tileM.weg), mudMat, 2);
-  const planked = [...map.bridges, ...(map.boardwalks ?? [])];
-  const bridgeMat = tiles?.weg && planked.length ? std(0xffffff, { ...layer, map: own(plankTexture()) }) : std(MAP_LOOK.bridge, layer);
-  for (const b of planked) flat(stripGeometry(b.points, b.width, 0.09, MAP_LOOK.planks.tileM), bridgeMat, 3);
+  const mudMat = tiles?.schlamm ? std(0xffffff, { ...layer, map: tiles.schlamm, roughness: 0.6 }) : std(MAP_LOOK.mud.color, layer);
+  for (const m of map.mud ?? []) flat(stripGeometry(m.points, m.width, MAP_LOOK.mud.y, TRAIL_TILES.tileM.schlamm), mudMat, 2);
+  // Brücken mit gezeichneten Brettern (neben gemalten Wegen), Stege mit der Kachel aus `steg.webp`, sonst wie Brücken.
+  const bridgeMat = tiles?.weg && (map.bridges.length || map.boardwalks?.length) ? std(0xffffff, { ...layer, map: own(plankTexture()) }) : std(MAP_LOOK.bridge, layer);
+  for (const b of map.bridges) flat(stripGeometry(b.points, b.width, 0.09, MAP_LOOK.planks.tileM), bridgeMat, 3);
+  const stegMat = tiles?.steg ? std(0xffffff, { ...layer, map: tiles.steg }) : bridgeMat;
+  const stegTileM = tiles?.steg ? TRAIL_TILES.tileM.steg : MAP_LOOK.planks.tileM;
+  for (const b of map.boardwalks ?? []) flat(stripGeometry(b.points, b.width, 0.09, stegTileM), stegMat, 3);
 
   // Ausgänge: heller Ring am Boden, nur solange der Ausgang offen ist.
   const exitMat = std(MAP_LOOK.exit.color, { ...layer, transparent: true, opacity: MAP_LOOK.exit.opacity, emissive: MAP_LOOK.exit.color, emissiveIntensity: 0.4, depthWrite: false });
@@ -182,8 +195,10 @@ export function createMapView(scene, map, grid, { env, sprites, tiles, camera, s
   });
 
   // Gemalte Tafeln wie die Bäume: fest zur Kamera geneigt, Standpunkt über der Bodenposition, weicher Bodenschatten.
-  const village = !!sprites?.textures?.dorf, people = !!sprites?.textures?.bewohner;
-  const orient = village || people ? billboardOrientation(camera) : null;
+  // `has(def)`: ist der Bogen dieses Bildes geladen?
+  const has = (def) => !!(def && sprites?.textures?.[def.sheet]);
+  const village = !!sprites?.textures?.dorf;
+  const orient = sprites?.ok && Object.keys(sprites.textures ?? {}).length ? billboardOrientation(camera) : null;
   const sheetMats = {};
   const blobMat = orient ? own(shadowMaterial()) : null;
   const blobGeo = orient ? own(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)) : null;
@@ -236,9 +251,9 @@ export function createMapView(scene, map, grid, { env, sprites, tiles, camera, s
       g.add(cyl(1.2, 0.8, 0x8a8478, 14));
       const r = roof(1.6, 0.9, 0x6b4a2b); r.position.y = 2.4; g.add(r);
       for (const s of [-1, 1]) { const post = cyl(0.08, 2.2, 0x5a3e24, 6); post.position.set(s * 1.1, 1.1, 0); g.add(post); }
-    } else if (kind === 'wegweiser') {
+    } else if (kind === 'wegweiser' || kind === 'kroenungsschild') {
       g.add(cyl(0.08, 1.8, 0x5a3e24, 6));
-      const sign = box(1.1, 0.3, 0.06, 0x8a6a45); sign.position.y = 1.5; g.add(sign);
+      const sign = box(1.1, kind === 'wegweiser' ? 0.3 : 0.6, 0.06, 0x8a6a45); sign.position.y = 1.5; g.add(sign);
     } else if (kind === 'zaun') {
       for (let i = -2; i <= 2; i++) { const post = cyl(0.06, 0.9, 0x6b4a2b, 6); post.position.x = i * 0.8; g.add(post); }
       const rail = box(3.4, 0.08, 0.06, 0x7a5530); rail.position.y = 0.65; g.add(rail);
@@ -252,7 +267,7 @@ export function createMapView(scene, map, grid, { env, sprites, tiles, camera, s
   const gatedProps = [];
   for (const p of map.props) {
     let g;
-    if (village && VILLAGE_SPRITES[p.kind]) g = painted(VILLAGE_SPRITES[p.kind], p.x, p.z, p.faceX === -1);
+    if (has(PROP_SPRITES[p.kind])) g = painted(PROP_SPRITES[p.kind], p.x, p.z, p.faceX === -1);
     else { g = prop(p.kind); g.position.set(p.x, 0, p.z); }
     root.add(g);
     if (p.requires) gatedProps.push({ prop: p, mesh: g });
@@ -265,7 +280,7 @@ export function createMapView(scene, map, grid, { env, sprites, tiles, camera, s
   /** Gemalte Leute, die im Stand leicht atmen. */
   const breathing = [];
   for (const n of map.npcs) {
-    const def = people ? NPC_SPRITES[n.id] : null;
+    const def = has(NPC_SPRITES[n.id]) ? NPC_SPRITES[n.id] : null;
     let top = 2.2;
     if (def) {
       const g = painted(def, n.x, n.z, n.faceX === -1);

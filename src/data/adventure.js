@@ -141,13 +141,13 @@ export const CAMPFIRE_OFFSET = 1.6;
  */
 export const MAP_LOOK = {
   borderRadius: { tree: 0.75, rock: 1.0 },
-  propClear: { haus_oma: 6, laden: 5, schmiede: 6, wohnhaus: 5.5, wohnhaus2: 5.5, brunnen: 2.5, wegweiser: 2, zaun: 2.5, flugblatt: 1.5 },
+  propClear: { haus_oma: 6, laden: 5, schmiede: 6, wohnhaus: 5.5, wohnhaus2: 5.5, brunnen: 2.5, wegweiser: 2, zaun: 2.5, flugblatt: 1.5, kroenungsschild: 2 },
   thingClear: 3,
   pathWidthShare: 0.7,
   path: 0x8a7150,
   water: 0x4d86a6,
   bridge: 0x7a5530,
-  /** Schlamm (Kapitel 2, bis Bilder kommen): Farbe braun-grün, Höhe über dem Boden (m). */
+  /** Schlamm (Kapitel 2): Höhe über dem Boden (m) und Farbe braun-grün, wenn `schlamm.webp` fehlt. */
   mud: { color: 0x5b5a30, y: 0.035 },
   /** Ring an offenen Ausgängen: Farbe, Deckkraft. */
   exit: { color: 0xffe08a, opacity: 0.45 },
