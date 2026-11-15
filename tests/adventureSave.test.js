@@ -299,3 +299,18 @@ test('adventureSave: commitAdventure zählt Blasen-Tötungen in stats.bubbleKill
   broken.stats.bubbleKills = -2;
   assertEqual(repairSave(broken).stats.bubbleKills, 0);
 });
+
+test('adventureSave: Ausbessern behält Lagerfeuer, Bosse, Kisten, Fundorte und Schleusen von Kapitel 3', () => {
+  const s = defaultSave();
+  const h = addHero(s, { name: 'Damm', animal: 'hase', class: 'dieb' }, { now: 1, id: 'h1' });
+  h.adventure = newAdventure(h);
+  Object.assign(h.adventure, {
+    mapId: 'kapitel3', campfireId: 'k3_auwald', campfires: ['dorf_platz', 'k3_ufer', 'k3_auwald'],
+    bosses: ['nagezahn'], chests: ['k3_kiste_altarm'], found: ['k3_treibholz_1'], chapterDone: [1, 2],
+    switches: { schleuse_nord: 'closed', schleuse_sued: 'open', schleuse_altarm: 'halb', biberschleuse: 'open' },
+  });
+  const a = repairSave(s).heroes[0].adventure;
+  assertEqual([a.mapId, a.campfireId, a.campfires], ['kapitel3', 'k3_auwald', ['dorf_platz', 'k3_ufer', 'k3_auwald']]);
+  assertEqual([a.bosses, a.chests, a.found], [['nagezahn'], ['k3_kiste_altarm'], ['k3_treibholz_1']]);
+  assertEqual(a.switches, { schleuse_nord: 'closed', schleuse_sued: 'open' });
+});

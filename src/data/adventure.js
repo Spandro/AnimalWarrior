@@ -166,6 +166,8 @@ export const MAP_LOOK = {
   npcs: {
     panzerla: 0x6f8a4a, kruemel: 0xd29a5a, grabowski: 0x4a4048, nussa: 0xc0622e, pieps: 0x9a7a5a, amsel: 0x2a2a2a,
     quappe: 0x6a5a3a,
+    rinde: 0x7a5232,
+    nagezahn: 0x8a6440,
   },
 };
 
@@ -182,6 +184,7 @@ export const MINIMAP = {
 export const CAMPFIRE_NAMES = {
   dorf_platz: 'Bachwinkel', k1_ufer: 'Bachufer', k1_bruecke: 'Alte Brücke', k1_wald: 'Tiefer Wald', k1_quelle: 'Quellteich',
   k2_rand: 'Sumpfrand', k2_froschhof: 'Froschhof', k2_nebel: 'Nebelmoor', k2_hecht: 'Hechtloch',
+  k3_ufer: 'Dammufer', k3_muehle: 'Mühlgraben', k3_auwald: 'Auwald', k3_stausee: 'Stausee',
 };
 
 /** Sprüche am Ladentisch und in der Schmiede. */

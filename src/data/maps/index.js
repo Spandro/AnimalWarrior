@@ -1,6 +1,7 @@
 import { DORF } from './dorf.js';
 import { KAPITEL1 } from './kapitel1.js';
 import { KAPITEL2 } from './kapitel2.js';
+import { KAPITEL3 } from './kapitel3.js';
 
 /**
  * Kartenbeschreibungen des Abenteuers (Spec §6.1). Kennungen werden nie umbenannt oder gelöscht.
@@ -33,5 +34,5 @@ import { KAPITEL2 } from './kapitel2.js';
  *   `opensOn` erfüllt ist (Biberschleuse).
  */
 
-/** @type {Record<'dorf'|'kapitel1'|'kapitel2', MapDef>} */
-export const MAPS = { dorf: DORF, kapitel1: KAPITEL1, kapitel2: KAPITEL2 };
+/** @type {Record<'dorf'|'kapitel1'|'kapitel2'|'kapitel3', MapDef>} */
+export const MAPS = { dorf: DORF, kapitel1: KAPITEL1, kapitel2: KAPITEL2, kapitel3: KAPITEL3 };

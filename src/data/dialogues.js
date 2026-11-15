@@ -10,6 +10,8 @@ export const NPCS = {
   pieps: { name: 'Pieps', animal: 'Spatz' },
   amsel: { name: 'Tante Amsel', animal: 'Amsel' },
   quappe: { name: 'Frau Quappe', animal: 'Unke' },
+  rinde: { name: 'Biberin Rinde', animal: 'Biber' },
+  nagezahn: { name: 'Bauleiter Nagezahn', animal: 'Biber' },
   flossian: { name: 'Flossian der Erste', animal: 'Goldfisch' },
 };
 

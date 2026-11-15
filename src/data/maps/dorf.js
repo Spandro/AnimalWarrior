@@ -1,5 +1,5 @@
 // Dorf Bachwinkel: kleiner Platz mit Brunnen, Häuser drumherum, Bach im Norden, Ausgang nach Osten zu Kapitel 1 und
-// (nach Kapitel 1) nach Westen in den Sumpf, Kapitel 2.
+// (nach Kapitel 1) nach Westen in den Sumpf, Kapitel 2, (nach Kapitel 2) nach Norden zum Biberdamm, Kapitel 3.
 // Koordinaten in Metern; x nach Osten, z nach Süden (wie in der Welt).
 
 /** @type {import('./index.js').MapDef} */
@@ -11,6 +11,7 @@ export const DORF = {
   paths: [
     { points: [[-30, 0], [60, 0]], width: 8 },
     { points: [[0, 0], [0, 22]], width: 6 },
+    { points: [[0, 0], [0, -37]], width: 6 },
   ],
   clearings: [{ x: 0, z: 0, r: 15 }, { x: 0, z: 22, r: 5 }],
   water: [{ points: [[-45, 31], [0, 30], [65, 33]], width: 6 }],
@@ -33,6 +34,7 @@ export const DORF = {
   exits: [
     { id: 'nach_kapitel1', x: 57, z: 0, r: 3, to: { map: 'kapitel1', campfire: 'k1_ufer' } },
     { id: 'nach_kapitel2', x: -27, z: 0, r: 3, to: { map: 'kapitel2', campfire: 'k2_rand' }, requires: { chapterDone: 1 } },
+    { id: 'nach_kapitel3', x: 0, z: -35, r: 3, to: { map: 'kapitel3', campfire: 'k3_ufer' }, requires: { chapterDone: 2 } },
   ],
   props: [
     { kind: 'haus_oma', x: -7, z: -21 },
@@ -46,6 +48,7 @@ export const DORF = {
     { kind: 'zaun', x: 34, z: 7 },
     { kind: 'flugblatt', x: 40, z: -6.5 },
     { kind: 'wegweiser', x: -20, z: -6, requires: { chapterDone: 1 } },
+    { kind: 'wegweiser', x: 5, z: -28, requires: { chapterDone: 2 } },
   ],
   start: { campfire: 'dorf_platz' },
 };
