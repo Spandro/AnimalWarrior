@@ -2,6 +2,8 @@
 
 Diese Datei ist für die nächste Sitzung gedacht, falls die laufende abbricht. Sie wird an jedem Pausenpunkt aktualisiert.
 
+**In Arbeit (2026-11-15): Etappe 3, Kapitel 2 „Der Sumpf“** nach `docs/superpowers/plans/2026-11-15-abenteuer-kapitel2.md`. Fertig und auf `main`: Task 1 (Schlamm, Stege) und Task 2 (Moorblasen). Weiter mit Task 3; Arbeitsprotokoll mit Entscheidungen in `.superpowers/sdd/2026-11-15-abenteuer-kapitel2/progress.md` (nicht in Git).
+
 Zuletzt aktualisiert: 2026-11-15 (Aufräumrunde der Kleinigkeiten erledigt, Abschnitt 8). **Abenteuer-Modus Etappe 2 (Unterklassen mit Fähigkeitenbaum) ist gebaut, getestet und auf `main`** (Spielversion 0.6.0, Spielstand Version 5). Spec `docs/superpowers/specs/2026-11-14-abenteuer-etappe2-design.md`, Plan `docs/superpowers/plans/2026-11-14-abenteuer-etappe2.md`, gebaut „sparsam“ (inline, am Ende ein frischer Prüfer). Was drin ist und welche Entscheidungen beim Bau fielen, steht in Abschnitt 1 („Abenteuer-Modus Etappe 2“). Etappe 1 (0.5.0) steht darüber. **Bilder des Abenteuers sind eingebaut** (2026-11-15, `docs/abenteuer-bilder.md`). Offen: Etappe 3 (Kapitel 2–4), Rückmeldung zum Spielgefühl der Unterklassen.
 
 ## 1. Was fertig ist
