@@ -1,5 +1,5 @@
 import { createRng } from './rng.js';
-import { MAP_CELL, GATE_HALF_WIDTH, EXPLORE_BLOCK, BORDER_DECOR } from '../data/adventure.js';
+import { MAP_CELL, GATE_HALF_WIDTH, EXPLORE_BLOCK, BORDER_DECOR, TERRAIN } from '../data/adventure.js';
 
 /**
  * Raster der begehbaren Fläche einer Abenteuer-Karte: für Kollision, Minikarte und Randdeko.
@@ -7,13 +7,14 @@ import { MAP_CELL, GATE_HALF_WIDTH, EXPLORE_BLOCK, BORDER_DECOR } from '../data/
  * @typedef {{ points: [number, number][], width: number }} Strip Linienzug mit Breite
  * @typedef {{ id: string, bounds: { minX: number, maxX: number, minZ: number, maxZ: number }, paths: Strip[],
  *   clearings: { x: number, z: number, r: number }[], water: Strip[], bridges: Strip[], obstacles: Obstacle[],
+ *   mud?: Strip[], boardwalks?: Strip[],
  *   gates: { id: string, points: [number, number][] }[] }} MapShape  (Ausschnitt von MapDef, src/data/maps)
  * @typedef {{ cell: number, minX: number, minZ: number, cols: number, rows: number, cells: Uint8Array }} MapGrid
  * @typedef {'walk'|'fly'|'shot'} MoveMode  laufen; fliegen (nur innerhalb der Karte); Geschoss (über Wasser, nicht durch den Rand)
  */
 
-/** Zellwerte. */
-export const CELL = { blocked: 0, walk: 1, water: 2, bridge: 3 };
+/** Zellwerte. `mud`: begehbar, bremst Laufende (Kapitel 2). */
+export const CELL = { blocked: 0, walk: 1, water: 2, bridge: 3, mud: 4 };
 
 /** Abstand von (x,z) zur Strecke a–b. */
 function segmentDistance(x, z, ax, az, bx, bz) {
@@ -57,7 +58,8 @@ function paintStrip(grid, strip, value) {
 }
 
 /**
- * Raster aus der Kartenbeschreibung: erst Wege und Lichtungen, dann Wasser darüber, zuletzt Brücken.
+ * Raster aus der Kartenbeschreibung: erst Wege und Lichtungen, dann Wasser darüber, dann Schlamm, dann Brücken,
+ * zuletzt Stege (wie Brücken, über Schlamm und Wasser).
  * @param {MapShape} map
  * @returns {MapGrid}
  */
@@ -72,7 +74,9 @@ export function buildMapGrid(map) {
       (x, z) => Math.hypot(x - c.x, z - c.z) <= c.r);
   }
   for (const w of map.water || []) paintStrip(grid, w, CELL.water);
+  for (const m of map.mud || []) paintStrip(grid, m, CELL.mud);
   for (const b of map.bridges || []) paintStrip(grid, b, CELL.bridge);
+  for (const b of map.boardwalks || []) paintStrip(grid, b, CELL.bridge);
   return grid;
 }
 
@@ -113,6 +117,10 @@ export function mapTerrain(map, grid, isGateClosed) {
       if (c === CELL.blocked) return false;
       if (mode === 'shot') return true;
       return c !== CELL.water && !inClosedGate(x, z);
+    },
+    /** Tempo-Faktor an (x,z): Schlamm bremst nur Laufende (`TERRAIN.mudSpeed`), sonst 1. */
+    speedFactor(x, z, mode = 'walk') {
+      return mode === 'walk' && cellAt(grid, x, z) === CELL.mud ? TERRAIN.mudSpeed : 1;
     },
   };
 }

@@ -7,6 +7,7 @@ import { KAPITEL1 } from './kapitel1.js';
  * @typedef {{ points: Pt[], width: number }} Strip
  * @typedef {{ id: string, name: string, chapter: number, bounds: { minX: number, maxX: number, minZ: number, maxZ: number },
  *   paths: Strip[], clearings: { x: number, z: number, r: number }[], water: Strip[], bridges: Strip[],
+ *   mud?: Strip[], boardwalks?: Strip[],
  *   obstacles: import('../../core/terrain.js').Obstacle[],
  *   gates: { id: string, kind: 'arena'|'barrier', points: Pt[], opensOn?: { boss: string } | { quest: string, step: number } }[],
  *   areas: { id: string, name: string, x: number, z: number, r: number }[],

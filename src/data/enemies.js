@@ -1,9 +1,10 @@
 /**
  * @typedef {{ id: string, name: string, hp: number, speed: number, damage: number, radius: number, xp: number, behavior: string,
- *   flying?: boolean, venom?: boolean, armor?: number, pounceMul?: number, adventureOnly?: boolean }} EnemyDef
+ *   flying?: boolean, venom?: boolean, armor?: number, pounceMul?: number, adventureOnly?: boolean, mudproof?: boolean }} EnemyDef
  *   name: Anzeigename (Bossanzeige); venom: Berührungstreffer vergiftet (siehe VENOM); armor: zieht flach von jedem
  *   Treffer ab (mindestens 1 Schaden bleibt); pounceMul: Sprungschaden statt POUNCE.damageMul.
  *   adventureOnly: nur im Abenteuer (nicht in `unlockMinute`, `weights` und `BOSS_POOL`).
+ *   mudproof: Schlamm bremst ihn nicht (Gelände, Kapitel 2).
  */
 
 /** @type {Record<string, EnemyDef>} */

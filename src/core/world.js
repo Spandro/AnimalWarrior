@@ -427,7 +427,20 @@ export function enemyTarget(world, enemy) {
  * @param {Enemy} enemy
  */
 export function enemySpeed(world, enemy) {
-  return world.time < enemy.slowUntil ? enemy.speed * (1 - enemy.slowFactor) : enemy.speed;
+  const base = world.time < enemy.slowUntil ? enemy.speed * (1 - enemy.slowFactor) : enemy.speed;
+  if (enemy.flying || ENEMIES[enemy.type]?.mudproof) return base;
+  return base * terrainFactor(world, enemy.x, enemy.z, 'walk');
+}
+
+/**
+ * Tempo-Faktor des Geländes an (x,z); 1, wenn die Geländequelle keinen meldet (Wellen-Modus).
+ * @param {World} world
+ * @param {number} x
+ * @param {number} z
+ * @param {'walk'|'fly'} mode
+ */
+export function terrainFactor(world, x, z, mode) {
+  return world.terrain.speedFactor ? world.terrain.speedFactor(x, z, mode) : 1;
 }
 
 /**
@@ -865,8 +878,9 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
   if (len > 0) {
     const dx = input.moveX / len, dz = input.moveZ / len;
     hero.facing = { x: dx, z: dz };
-    hero.x += dx * hero.stats.moveSpeed * dt;
-    hero.z += dz * hero.stats.moveSpeed * dt;
+    const step = hero.stats.moveSpeed * terrainFactor(world, hero.x, hero.z, 'walk') * dt;
+    hero.x += dx * step;
+    hero.z += dz * step;
     pushOutOfObstacles(world, hero);
   }
 

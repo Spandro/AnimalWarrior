@@ -100,3 +100,85 @@ test('mapGrid: Randdeko fest je Seed und nie auf begehbaren Zellen', () => {
   assertTrue(a.length > 0);
   for (const d of a) assertEqual(cellAt(grid, d.x, d.z), CELL.blocked);
 });
+
+// ---------------------------------------------------------------- Kapitel 2: Schlamm und Stege
+
+/** Weg (0,0)→(60,0) Breite 8; Schlamm (20,0)→(40,0) Breite 8; Steg (20,−3)→(40,−3) Breite 2; Bach quer bei x 50 mit Steg. */
+const MUD_MAP = {
+  id: 'sumpftest', bounds: { minX: -10, maxX: 70, minZ: -20, maxZ: 20 },
+  paths: [{ points: [[0, 0], [60, 0]], width: 8 }],
+  clearings: [],
+  water: [{ points: [[50, -20], [50, 20]], width: 4 }],
+  mud: [{ points: [[20, 0], [40, 0]], width: 8 }],
+  bridges: [],
+  boardwalks: [{ points: [[20, -3], [55, -3]], width: 2 }],
+  obstacles: [],
+  gates: [],
+};
+const mudGrid = buildMapGrid(MUD_MAP);
+
+function mudWorld(x, z, terrain = mapTerrain(MUD_MAP, mudGrid, () => false)) {
+  const world = createWorld({ seed: 1, animalId: 'hase', classId: 'krieger', terrain });
+  world.hero.x = x; world.hero.z = z;
+  world.hero.abilities = [];
+  return world;
+}
+
+test('mapGrid: Schlamm und Stege im Raster (Steg über Schlamm und Wasser ist Brücke)', () => {
+  assertEqual(CELL.mud, 4);
+  assertEqual(cellAt(mudGrid, 30, 2), CELL.mud);
+  assertEqual(cellAt(mudGrid, 30, -3), CELL.bridge);
+  assertEqual(cellAt(mudGrid, 50, -3), CELL.bridge);
+  assertEqual(cellAt(mudGrid, 50, 2), CELL.water);
+  assertEqual(cellAt(mudGrid, 10, 0), CELL.walk);
+});
+
+test('mapGrid: Schlamm begehbar, Tempo-Faktor 0,65 nur auf Schlamm und nur zu Fuß', async () => {
+  const { TERRAIN } = await import('../src/data/adventure.js');
+  assertEqual(TERRAIN.mudSpeed, 0.65);
+  const t = mapTerrain(MUD_MAP, mudGrid, () => false);
+  assertTrue(t.walkable(30, 2, 'walk'));
+  assertClose(t.speedFactor(30, 2), 0.65);
+  assertClose(t.speedFactor(30, 2, 'walk'), 0.65);
+  assertEqual(t.speedFactor(10, 0, 'walk'), 1);
+  assertEqual(t.speedFactor(30, -3, 'walk'), 1);
+  assertEqual(t.speedFactor(30, 2, 'fly'), 1);
+});
+
+test('mapGrid: Held läuft im Schlamm 0,65-mal so weit, auf dem Steg normal', () => {
+  const mud = mudWorld(22, 2);
+  const speed = mud.hero.stats.moveSpeed;
+  for (let i = 0; i < 30; i++) stepWorld(mud, 1 / 30, { moveX: 1, moveZ: 0 });
+  assertClose(mud.hero.x - 22, speed * 0.65, 1e-6);
+  const plank = mudWorld(22, -3);
+  for (let i = 0; i < 30; i++) stepWorld(plank, 1 / 30, { moveX: 1, moveZ: 0 });
+  assertClose(plank.hero.x - 22, speed, 1e-6);
+});
+
+test('mapGrid: Schlamm bremst Bodengegner, nicht Flieger und nicht „mudproof“', async () => {
+  const { ENEMIES } = await import('../src/data/enemies.js');
+  const { enemySpeed } = await import('../src/core/world.js');
+  const world = mudWorld(0, 0);
+  const ratte = spawnEnemy(world, 'ratte', 30, 2);
+  const kraehe = spawnEnemy(world, 'kraehe', 30, 2);
+  assertClose(enemySpeed(world, ratte), ENEMIES.ratte.speed * 0.65);
+  assertClose(enemySpeed(world, kraehe), ENEMIES.kraehe.speed);
+  ENEMIES.ratte.mudproof = true;
+  try {
+    assertClose(enemySpeed(world, ratte), ENEMIES.ratte.speed);
+  } finally {
+    delete ENEMIES.ratte.mudproof;
+  }
+});
+
+test('mapGrid: Geländequelle ohne speedFactor → Tempo wie vorher, kein Zufall verbraucht', () => {
+  const plain = mapTerrain(MUD_MAP, mudGrid, () => false);
+  const noFactor = { obstaclesNear: plain.obstaclesNear, walkable: plain.walkable };
+  const a = mudWorld(22, 2, noFactor);
+  const speed = a.hero.stats.moveSpeed;
+  for (let i = 0; i < 30; i++) stepWorld(a, 1 / 30, { moveX: 1, moveZ: 0 });
+  assertClose(a.hero.x - 22, speed, 1e-6);
+  const b = mudWorld(22, 2);
+  for (let i = 0; i < 30; i++) stepWorld(b, 1 / 30, { moveX: 1, moveZ: 0 });
+  assertEqual(a.rng.next(), b.rng.next());
+});

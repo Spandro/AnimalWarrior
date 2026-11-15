@@ -4,6 +4,9 @@
 /** Kantenlänge einer Rasterzelle der Karte in Metern. */
 export const MAP_CELL = 1;
 
+/** Gelände (Etappe 3, Spec §4.1): Tempo-Faktor auf Schlamm für Laufende (nicht fliegend, nicht `mudproof`). */
+export const TERRAIN = { mudSpeed: 0.65 };
+
 /** Halbe Breite eines geschlossenen Tors (Sperre) in Metern, gemessen von seinem Linienzug. */
 export const GATE_HALF_WIDTH = 1.2;
 
