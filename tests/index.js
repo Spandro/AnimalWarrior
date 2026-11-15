@@ -38,3 +38,4 @@ import './tavernSave.test.js';
 import './tavernText.test.js';
 import './tavernGames.test.js';
 import './adventureImages.test.js';
+import './hazards.test.js';

@@ -7,6 +7,17 @@ export const MAP_CELL = 1;
 /** Gelände (Etappe 3, Spec §4.1): Tempo-Faktor auf Schlamm für Laufende (nicht fliegend, nicht `mudproof`). */
 export const TERRAIN = { mudSpeed: 0.65 };
 
+/**
+ * Moorblasen (Spec §4.1, §14.1): nächste Blase nach `minInterval`–`maxInterval` s, Ort im Umkreis `range` (m) um den
+ * Helden auf Schlamm (bis `tries` Versuche, sonst diese Runde keine), Vorwarnung `warn` s, Radius `radius` (m); Schaden:
+ * Held `heroPct` seines höchsten Lebens, Gegner `enemyShare` × Leben eines Ochsenfroschs der Kartenstufe, Bosse höchstens
+ * `bossMaxPct` ihres Lebens; nie näher als `campfireClear` (m) an einem Lagerfeuer.
+ */
+export const BUBBLES = {
+  minInterval: 3, maxInterval: 5, range: 14, warn: 1.2, radius: 1.8, heroPct: 0.08, enemyShare: 2 / 3, bossMaxPct: 0.05,
+  campfireClear: 6, tries: 12,
+};
+
 /** Halbe Breite eines geschlossenen Tors (Sperre) in Metern, gemessen von seinem Linienzug. */
 export const GATE_HALF_WIDTH = 1.2;
 

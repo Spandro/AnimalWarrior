@@ -27,6 +27,7 @@ export const ENEMIES = {
   helmfisch: { id: 'helmfisch', adventureOnly: true, name: 'Helmfisch', hp: 12, speed: 3.6, damage: 5, radius: 0.4, xp: 2, behavior: 'chase' },
   krebs: { id: 'krebs', adventureOnly: true, name: 'Krebs', hp: 26, speed: 2.4, damage: 7, radius: 0.5, xp: 4, behavior: 'strafe', armor: 2 },
   frosch: { id: 'frosch', adventureOnly: true, name: 'Frosch', hp: 18, speed: 3.8, damage: 6, radius: 0.45, xp: 3, behavior: 'pounce', pounceMul: 0.8 },
+  ochsenfrosch: { id: 'ochsenfrosch', adventureOnly: true, name: 'Ochsenfrosch', hp: 36, speed: 3.4, damage: 8, radius: 0.6, xp: 5, behavior: 'pounce', pounceMul: 1, pounceRange: 11 },
   hauptmann_graete: { id: 'hauptmann_graete', adventureOnly: true, name: 'Hauptmann Gräte', hp: 600, speed: 3.4, damage: 14, radius: 1.1, xp: 150, behavior: 'boss' },
   kommandant_zwickzwack: { id: 'kommandant_zwickzwack', adventureOnly: true, name: 'Kommandant Zwickzwack', hp: 900, speed: 2.6, damage: 18, radius: 1.5, xp: 300, behavior: 'boss', armor: 3 },
 };

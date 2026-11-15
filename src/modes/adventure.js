@@ -1,7 +1,8 @@
 import { createWorld, stepWorld, spawnEnemy, recomputeHeroStats } from '../core/world.js';
 import { castManual } from '../core/abilities.js';
 import { createRng } from '../core/rng.js';
-import { buildMapGrid, mapTerrain, decodeExplored, encodeExplored, markExplored } from '../core/mapGrid.js';
+import { buildMapGrid, mapTerrain, decodeExplored, encodeExplored, markExplored, cellAt, CELL } from '../core/mapGrid.js';
+import { createBubbles, stepBubbles } from '../core/hazards.js';
 import { gainXp, adventureModifiers, enemyMultipliers, abilitySpecials, specialBonus } from '../core/adventureHero.js';
 import { talkTo, acceptQuest, questEvent } from '../core/quests.js';
 import { rollAdventureItem } from '../core/loot.js';
@@ -11,7 +12,7 @@ import { CLASSES } from '../data/classes.js';
 import { ENEMIES, ELITE } from '../data/enemies.js';
 import {
   MANUAL, ADVENTURE_BALANCE, PACK, DEATH, POTION, LOOT, INTERACT_RANGE, EXPLORE_RADIUS, CAMPFIRE_OFFSET, ARENA_INSET,
-  SUBCLASS_RULES,
+  SUBCLASS_RULES, BUBBLES,
 } from '../data/adventure.js';
 
 /**
@@ -102,6 +103,8 @@ function enterMap(run, mapId, campfireId) {
   world.drops = 'none';
   world.contactInterval = ADVENTURE_BALANCE.contactInterval;
   run.world = world;
+  run.bubbles = map.hazards?.bubbles ? createBubbles() : null;
+  run.bubbleDamage = undefined;
   run.worldSeen = 0;
   applyHeroSetup(run, true);
   placeAtCampfire(run, campfireId);
@@ -205,6 +208,7 @@ function stepPlaying(run, dt, input) {
   const full = run.record.potions >= POTION.max;
   for (const p of world.pickups) if (p.kind === 'potion_item') p.locked = full;
   stepWorld(world, dt, input);
+  if (run.bubbles) stepBubbles(world, run.bubbles, bubbleRules(run), dt);
   run.worldSeen = world.events.length;
   run.events.push(...world.events);
   for (const e of world.events) handleWorldEvent(run, e);
@@ -240,6 +244,21 @@ function stepDying(run, dt) {
   run.state = 'playing';
   emit(run, { type: 'wake', goldLost: loss });
   run.dirty = true;
+}
+
+/**
+ * Regeln der Moorblasen auf dieser Karte: nur auf Schlamm, nie nah an einem Lagerfeuer, nie in einer Bossarena außer
+ * einer mit `bubbleArena`; Gegner-Schaden nach der Stufe der Karte.
+ */
+function bubbleRules(run) {
+  const map = run.map;
+  run.bubbleDamage ??= BUBBLES.enemyShare * ENEMIES.ochsenfrosch.hp * enemyMultipliers(map.hazards.bubbles.level).hpMul;
+  return {
+    isMud: (x, z) => cellAt(run.grid, x, z) === CELL.mud,
+    forbidden: (x, z) => map.campfires.some((c) => Math.hypot(c.x - x, c.z - z) < BUBBLES.campfireClear)
+      || map.bosses.some((b) => !b.bubbleArena && Math.hypot(b.arena.x - x, b.arena.z - z) < b.arena.r),
+    enemyDamage: run.bubbleDamage,
+  };
 }
 
 /** Gold aus aufgesammelten Münzen ins Ledger. */
@@ -558,6 +577,7 @@ export function rest(run, campfireId) {
   clearSignatures(run.world);
   run.world.hero.hp = run.world.hero.stats.maxHp;
   resetPacks(run);
+  if (run.bubbles) run.bubbles.pending = [];
   run.ledger.rests++;
   emit(run, { type: 'rested', campfireId });
   run.dirty = true;
