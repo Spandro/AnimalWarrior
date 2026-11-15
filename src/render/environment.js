@@ -2,7 +2,7 @@
 // kommt `ok: false` zurück und alles bleibt bei der bisherigen 3D-Darstellung.
 import * as THREE from '../../vendor/three.module.min.js';
 import { loadImage, imageDataOf, prepareSheet, dataTexture } from './sprites.js';
-import { ENV_SHEETS, GROUND } from '../data/environment.js';
+import { ENV_SHEETS, GROUND, TRAIL_TILES } from '../data/environment.js';
 
 /**
  * Macht ein Bild kachelbar: mischt die äußeren `margin` Pixel jeder Kante mit der gegenüberliegenden
@@ -76,4 +76,32 @@ export async function loadEnvironment() {
     result.sizes = {};
   }
   return result;
+}
+
+/**
+ * @typedef {{ weg: THREE.Texture | null, wasser: THREE.Texture | null }} TrailTiles
+ * Kacheln für Weg und Bach; `null`, wo das Bild fehlt (dann bleibt es dort bei der Farbfläche).
+ */
+
+/**
+ * Lädt die Kacheln für Weg und Bach und macht sie nahtlos ({@link blendSeams}, wie den Boden). Löst nie mit einem Fehler
+ * auf: Fehlt ein Bild, ist sein Eintrag `null`.
+ * @param {{ load?: (url: string) => Promise<HTMLImageElement> }} [options] in Tests ersetzbar
+ * @returns {Promise<TrailTiles>}
+ */
+export async function loadTrailTiles({ load = loadImage } = {}) {
+  const tile = async (url) => {
+    try {
+      const data = imageDataOf(await load(url));
+      blendSeams(data, TRAIL_TILES.seamBlendPx);
+      const tex = dataTexture(data);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    } catch (e) {
+      console.warn(`Kachel ${url} nicht verfügbar, zeige dort eine Farbfläche.`, e);
+      return null;
+    }
+  };
+  const [weg, wasser] = await Promise.all([tile(TRAIL_TILES.weg), tile(TRAIL_TILES.wasser)]);
+  return { weg, wasser };
 }
