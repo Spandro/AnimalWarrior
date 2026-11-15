@@ -585,6 +585,8 @@ fieldset.setting { box-sizing: border-box; }
 }
 /* Im Spiel über der unteren Leiste, damit sie Fähigkeiten und Pause nicht verdeckt. */
 body[data-screen="game"] .toasts { top: auto; bottom: calc(var(--safe-bottom) + 76px); }
+/* Auf dem Ergebnisbildschirm unten, damit sie die Überschrift nicht verdecken. */
+body[data-screen="result"] .toasts { top: auto; bottom: calc(var(--safe-bottom) + 16px); }
 .toast {
   box-sizing: border-box; padding: 10px 14px; border-radius: 12px;
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: baseline;
