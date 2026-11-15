@@ -130,7 +130,7 @@ export function createHeroView(scene, animalId, classId, { sprites, camera, redu
     clonesNow.length = 0; familyNow.length = 0;
     for (const s of world.summons) (FAMILY_SUMMONS.has(s.abilityId) ? familyNow : clonesNow).push(s);
     body.updateClones(clonesNow, t);
-    family.update(familyNow, t);
+    family.update(familyNow, t, opacity);
   }
 
   function dispose() {
@@ -293,7 +293,7 @@ function createFamily(scene) {
   /** @type {THREE.Group[]} */
   const figures = [];
   return {
-    update(summons, t) {
+    update(summons, t, opacity = 1) {
       let i = 0;
       for (const s of summons) {
         const fade = Math.min(1, s.timeLeft / 0.4);
@@ -303,7 +303,7 @@ function createFamily(scene) {
           const a = (j / DUO_FX.familyCount) * Math.PI * 2 + 0.5;
           f.position.set(s.x + Math.cos(a) * DUO_FX.familySpread, 0, s.z + Math.sin(a) * DUO_FX.familySpread);
           f.rotation.y = Math.atan2(Math.cos(a), Math.sin(a)); // schauen nach außen, zu den Gegnern
-          f.scale.setScalar(0.4 + 0.6 * fade);
+          f.scale.setScalar((0.4 + 0.6 * fade) * Math.max(0.001, opacity)); // blendet beim Tod mit dem Helden aus
           animateMeerkat(f, t + j * 1.9);
           f.visible = true;
         }
