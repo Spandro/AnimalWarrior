@@ -135,8 +135,14 @@ function testMap(id, bubbleArena) {
     exits: [], props: [], start: { campfire: `${id}_feuer` }, hazards: { bubbles: { level: 13 } },
   };
 }
-MAPS.testsumpf = testMap('testsumpf', false);
-MAPS.testsumpf2 = testMap('testsumpf2', true);
+/** Die Testkarten stehen nur während eines Tests in MAPS (sonst prüfen die Kartentests sie mit). */
+function withTestMaps(fn) {
+  return () => {
+    MAPS.testsumpf = testMap('testsumpf', false);
+    MAPS.testsumpf2 = testMap('testsumpf2', true);
+    try { fn(); } finally { delete MAPS.testsumpf; delete MAPS.testsumpf2; }
+  };
+}
 
 function setupRun(map, mutate) {
   const save = defaultSave();
@@ -171,22 +177,22 @@ test('hazards: Karte ohne hazards hat keine Blasen', () => {
   assertTrue(!warned);
 });
 
-test('hazards: nie im Umkreis eines Lagerfeuers', () => {
+test('hazards: nie im Umkreis eines Lagerfeuers', withTestMaps(() => {
   const run = setupRun('testsumpf');
   const warns = runWarns(run, 9, 0, 120);
   assertTrue(warns.length > 10, `${warns.length}`);
   for (const w of warns) assertTrue(Math.hypot(w.x - 5, w.z) >= BUBBLES.campfireClear, `${w.x},${w.z}`);
-});
+}));
 
-test('hazards: nie in einer fremden Bossarena, wohl aber in der mit bubbleArena', () => {
+test('hazards: nie in einer fremden Bossarena, wohl aber in der mit bubbleArena', withTestMaps(() => {
   const plain = runWarns(setupRun('testsumpf'), 44, 0, 150);
   assertTrue(plain.length > 10);
   for (const w of plain) assertTrue(Math.hypot(w.x - 60, w.z) >= 12, `${w.x},${w.z}`);
   const pike = runWarns(setupRun('testsumpf2'), 44, 0, 150);
   assertTrue(pike.some((w) => Math.hypot(w.x - 60, w.z) < 12));
-});
+}));
 
-test('hazards: Gegner-Schaden der Regelschicht = 2/3 Ochsenfrosch der Kartenstufe; Tötung zählt für Aufträge', () => {
+test('hazards: Gegner-Schaden der Regelschicht = 2/3 Ochsenfrosch der Kartenstufe; Tötung zählt für Aufträge', withTestMaps(() => {
   const run = setupRun('testsumpf', (rec) => acceptQuest(rec.quests, 'nasse_pfoten'));
   const expected = BUBBLES.enemyShare * ENEMIES.ochsenfrosch.hp * enemyMultipliers(13).hpMul;
   const e = spawnEnemy(run.world, 'helmfisch', 30, 0, { hpMul: 100 });
@@ -202,9 +208,9 @@ test('hazards: Gegner-Schaden der Regelschicht = 2/3 Ochsenfrosch der Kartenstuf
   assertTrue(!run.world.enemies.includes(e));
   assertEqual(run.record.quests.nasse_pfoten.progress, 1);
   assertTrue(run.record.xp > xp || run.record.level > 1);
-});
+}));
 
-test('hazards: Rasten, Tod und Kartenwechsel leeren angekündigte Blasen', () => {
+test('hazards: Rasten, Tod und Kartenwechsel leeren angekündigte Blasen', withTestMaps(() => {
   const run = setupRun('testsumpf', (rec) => { rec.campfires.push('dorf_platz'); });
   run.bubbles.pending.push({ x: 30, z: 0, popAt: 99 });
   rest(run, 'testsumpf_feuer');
@@ -218,4 +224,4 @@ test('hazards: Rasten, Tod und Kartenwechsel leeren angekündigte Blasen', () =>
   run.bubbles.pending.push({ x: 30, z: 0, popAt: 99 });
   travel(run, 'dorf_platz');
   assertTrue(!run.bubbles);
-});
+}));

@@ -50,7 +50,7 @@ test('abenteuer-bilder: Figuren, Leute und Dorfbilder zeigen auf ihre Zelle im a
   const check = (defs, sheet) => {
     for (const [name, d] of Object.entries(defs)) {
       assertEqual(d.sheet, sheet, name);
-      assertEqual({ x: d.x, y: d.y, w: d.w, h: d.h }, CUT_LAYOUTS[sheet].cells[name], name);
+      assertEqual({ x: d.x, y: d.y, w: d.w, h: d.h }, CUT_LAYOUTS[sheet].cells[d.cell ?? name], name);
       assertTrue(d.heightM > 0 && d.footOffset >= 0 && d.footOffset < d.heightM, `${name} Maße`);
     }
   };

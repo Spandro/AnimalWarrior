@@ -263,6 +263,9 @@ export const ADVENTURE_ENEMY_SPRITES = {
   helmfisch: { sheet: 'kapitel1', ...K1.helmfisch, heightM: 0.9, motion: 'scurry', footOffset: 0.04 },
   krebs: { sheet: 'kapitel1', ...K1.krebs, heightM: 0.95, motion: 'scurry', footOffset: 0.05 },
   frosch: { sheet: 'kapitel1', ...K1.frosch, heightM: 0.8, motion: 'hopSlow', footOffset: 0.05 },
+  // Kapitel 2: bis eigene Bilder kommen, gemalte Stellvertreter aus kapitel1.webp (größer oder kleiner gezeigt);
+  // `cell` nennt das ausgeschnittene Stück, das sie zeigen.
+  ochsenfrosch: { sheet: 'kapitel1', ...K1.frosch, cell: 'frosch', heightM: 1.1, motion: 'hopSlow', footOffset: 0.07 },
   hauptmann_graete: { sheet: 'kapitel1', ...K1.hauptmann_graete, heightM: 2.6, motion: 'trot', footOffset: 0.1 },
   kommandant_zwickzwack: { sheet: 'kapitel1', ...K1.kommandant_zwickzwack, heightM: 2.8, motion: 'lumber', footOffset: 0.12 },
   flossian: { sheet: 'kapitel1', ...K1.flossian, heightM: 1.6, motion: 'lumber', footOffset: 0.08 },
@@ -338,6 +341,7 @@ export const NPC_PORTRAITS = {
  */
 export const ADVENTURE_SPRITE_STANDIN = {
   helmfisch: 'ratte', krebs: 'igel', frosch: 'giftkroete', hauptmann_graete: 'wolf', kommandant_zwickzwack: 'dachs',
+  ochsenfrosch: 'giftkroete',
 };
 
 /** Aufsammelbares des Abenteuers, gezeichnet wie: Trank, Truhe (Gegenstand), Kristall (Flussperle). */
