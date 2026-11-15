@@ -737,6 +737,7 @@ export function damageEnemy(world, enemy, hit, abilityId, { environment = false 
   world.run.kills++;
   const kill = { type: 'kill', enemyType: enemy.type, x: enemy.x, z: enemy.z, id: enemy.id, elite: enemy.elite, boss: enemy.boss, packId: enemy.packId ?? null, bossId: enemy.bossId ?? null };
   if (stealing) kill.doubleLoot = true;
+  if (environment) kill.source = abilityId;
   world.events.push(kill);
   for (const b of world.hero.buffs) {
     if (!b.applause) continue;

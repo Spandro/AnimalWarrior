@@ -219,7 +219,7 @@ test('save: validate lehnt ungültige Paare und Duo-Helden ohne Freischaltung ab
 test('save: migrate lässt die aktuelle Version unverändert und wirft sonst', () => {
   const s = defaultSave();
   assertEqual(migrate(s), s);
-  assertEqual(SAVE_VERSION, 5);
+  assertEqual(SAVE_VERSION, 6);
   assertThrows(() => migrate({ version: 99 }));
   assertThrows(() => migrate({ version: 0 }));
   assertThrows(() => migrate(null));
@@ -240,7 +240,7 @@ test('save: migrate hebt Version 1 auf die aktuelle Version mit leeren Erfolgen 
   assertEqual(old, copy, 'Eingabe bleibt unverändert');
   assertEqual(s.version, SAVE_VERSION);
   assertEqual(s.achievements, {});
-  assertEqual(s.stats, { kills: {}, runs: 12, wins: 3, winsByAnimal: { hase: 1, ente: 2 }, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0 });
+  assertEqual(s.stats, { kills: {}, runs: 12, wins: 3, winsByAnimal: { hase: 1, ente: 2 }, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0, bubbleKills: 0 });
   assertEqual([s.inventory, s.seenItems, s.unlocks], [[], [], []]);
   assertEqual(s.gold, 340);
   assertEqual(s.heroes, old.heroes.map((h) => ({ ...h, adventure: null })));
@@ -265,7 +265,7 @@ test('save: migrate leitet Siege je Tier aus den Helden ab, nur positive Zahlen 
 
 test('save: migrate einer Version 1 ohne Helden ergibt Nullzähler', () => {
   const s = migrate({ version: 1, gold: 0, metaUpgrades: {}, settings: { volume: 70, quality: 'high' }, heroes: [] });
-  assertEqual(s.stats, { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0 });
+  assertEqual(s.stats, { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0, bubbleKills: 0 });
   assertTrue(validate(s).ok);
 });
 
@@ -296,7 +296,7 @@ test('save: Version 3 mit Erfolgen und Statistik übersteht Speichern, Export un
   store.update((s) => {
     s.gold = 80;
     s.achievements = { 'erste-schritte': 1700000000000, pazifist: 1700000005000 };
-    s.stats = { kills: { ratte: 12, baer: 1 }, runs: 3, wins: 1, winsByAnimal: { hase: 1 }, shadowsRouted: 2, tavernRounds: 4, hiLoBestStreak: 2, campfireRests: 0 };
+    s.stats = { kills: { ratte: 12, baer: 1 }, runs: 3, wins: 1, winsByAnimal: { hase: 1 }, shadowsRouted: 2, tavernRounds: 4, hiLoBestStreak: 2, campfireRests: 0, bubbleKills: 0 };
   });
   const loaded = store.load();
   assertEqual(loaded.status, 'ok');
@@ -310,7 +310,7 @@ test('save: defaultSave enthält Erfolge, Nullstatistik und leere Taverne-Felder
   const s = defaultSave();
   assertEqual(s.version, SAVE_VERSION);
   assertEqual(s.achievements, {});
-  assertEqual(s.stats, { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0 });
+  assertEqual(s.stats, { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0, bubbleKills: 0 });
   assertEqual([s.inventory, s.seenItems, s.unlocks], [[], [], []]);
 });
 
@@ -412,7 +412,7 @@ test('save: exportText enthält den Spielstand im Speicher und lässt sich wiede
   addHero(save, spec, ctx(1));
   addHero(save, { name: 'Quak', animal: 'ente', class: 'magier' }, ctx(2));
   save.achievements['erste-schritte'] = 5;
-  save.stats = { kills: { ratte: 12 }, runs: 3, wins: 1, winsByAnimal: { hase: 1 }, shadowsRouted: 2, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0 };
+  save.stats = { kills: { ratte: 12 }, runs: 3, wins: 1, winsByAnimal: { hase: 1 }, shadowsRouted: 2, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0, bubbleKills: 0 };
   const text = exportText(save);
   assertEqual(JSON.parse(text), save);
   const back = createStore(memoryStorage()).importJson(text);
@@ -451,7 +451,7 @@ test('save: migrate hebt Version 2 auf die aktuelle Version, ergänzt leere List
   assertEqual(old, copy, 'Eingabe bleibt unverändert');
   assertEqual(s.version, SAVE_VERSION);
   assertEqual([s.inventory, s.seenItems, s.unlocks], [[], [], []]);
-  assertEqual(s.stats, { ...old.stats, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0 });
+  assertEqual(s.stats, { ...old.stats, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0, bubbleKills: 0 });
   assertEqual([s.gold, s.metaUpgrades, s.settings, s.heroes, s.achievements],
     [340, { leben: 2 }, { volume: 40, quality: 'low', buttonSide: 'right' }, old.heroes.map((h) => ({ ...h, adventure: null })), old.achievements]);
   assertTrue(validate(s).ok);

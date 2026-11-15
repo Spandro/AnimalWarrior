@@ -5,7 +5,7 @@ import { QUESTS } from './quests.js';
 /**
  * Lebenslange Zähler im Spielstand (gemeinsam für alle Helden).
  * @typedef {{ kills: Record<string, number>, runs: number, wins: number, winsByAnimal: Record<string, number>,
- *   shadowsRouted: number, tavernRounds: number, hiLoBestStreak: number, campfireRests: number }} LifetimeStats
+ *   shadowsRouted: number, tavernRounds: number, hiLoBestStreak: number, campfireRests: number, bubbleKills: number }} LifetimeStats
  *
  * Zahlen eines Durchgangs (`run.facts` aus modes/survivor.js), nur einfache Werte.
  * `ended`/`won`/`hpFractionAtEnd` gelten erst, wenn der Durchgang vorbei ist; `level10At`: Spielzeit, zu der Level 10
@@ -205,6 +205,10 @@ export const ACHIEVEMENTS = [
   {
     id: 'lagerfeuerromantik', title: 'Lagerfeuerromantik', condition: 'Raste 20-mal an einem Lagerfeuer',
     line: 'Marshmallows wären schön gewesen.', gold: 25, check: (c) => (c.stats.campfireRests ?? 0) >= 20,
+  },
+  {
+    id: 'blubb', title: 'Blubb', condition: 'Besiege im Abenteuer 25 Gegner mit Moorblasen',
+    line: 'Der Sumpf kämpft mit. Meistens für dich.', gold: 50, check: (c) => (c.stats.bubbleKills ?? 0) >= 25,
   },
   {
     id: 'spezialist', title: 'Spezialist', condition: 'Wähle im Abenteuer eine Unterklasse',

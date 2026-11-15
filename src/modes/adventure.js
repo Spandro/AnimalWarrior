@@ -310,6 +310,7 @@ function onKill(run, e) {
   const bossDef = e.bossId ? run.map.bosses.find((b) => b.id === e.bossId) : null;
   const level = bossDef?.level ?? pack?.def.level ?? 1;
   grantXp(run, def.xp * (e.elite ? ELITE.xpMul : 1) * enemyMultipliers(level).xpMul);
+  if (e.source === 'moorblase') run.ledger.bubbleKills = (run.ledger.bubbleKills ?? 0) + 1;
   quest(run, { type: 'kill', enemyType: e.enemyType });
   for (const [id, entry] of Object.entries(run.record.quests)) {
     const step = entry.state === 'active' ? QUESTS[id].steps[entry.step] : null;

@@ -23,7 +23,7 @@ import { isValidPair, animalUnlocked } from '../core/roster.js';
  *   (`repairSave` in src/save/adventure.js).
  */
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 export const STORAGE_KEY = 'animalwarrior.save';
 export const BACKUP_KEY = 'animalwarrior.save.corrupt';
 export const MAX_HEROES = 6;
@@ -38,7 +38,7 @@ export function defaultSave() {
     metaUpgrades: {},
     settings: { volume: 70, quality: 'high', buttonSide: 'right' },
     achievements: {},
-    stats: { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0 },
+    stats: { kills: {}, runs: 0, wins: 0, winsByAnimal: {}, shadowsRouted: 0, tavernRounds: 0, hiLoBestStreak: 0, campfireRests: 0, bubbleKills: 0 },
     inventory: [],
     seenItems: [],
     unlocks: [],
@@ -98,6 +98,16 @@ const MIGRATIONS = {
       ? data.heroes.map((h) => (h && typeof h === 'object' && h.adventure && typeof h.adventure === 'object'
         ? { ...h, adventure: { ...h.adventure, subclass: null, passives: {} } } : h))
       : data.heroes,
+  }),
+  // Etappe 3, Kapitel 3: Zustand der Schleusen je Held (leer = Ausgangszustand der Karte) und Zähler für „Blubb“.
+  5: (data) => ({
+    ...data,
+    version: 6,
+    heroes: Array.isArray(data.heroes)
+      ? data.heroes.map((h) => (h && typeof h === 'object' && h.adventure && typeof h.adventure === 'object'
+        ? { ...h, adventure: { ...h.adventure, switches: {} } } : h))
+      : data.heroes,
+    stats: { ...data.stats, bubbleKills: 0 },
   }),
 };
 
@@ -184,7 +194,7 @@ export function validate(data) {
   }
   const stats = data.stats;
   if (!isObject(stats)) return fail('Statistik fehlt');
-  for (const key of ['runs', 'wins', 'shadowsRouted', 'tavernRounds', 'hiLoBestStreak', 'campfireRests']) {
+  for (const key of ['runs', 'wins', 'shadowsRouted', 'tavernRounds', 'hiLoBestStreak', 'campfireRests', 'bubbleKills']) {
     if (!Number.isInteger(stats[key]) || stats[key] < 0) return fail('Ungültiger Zähler');
   }
   for (const [field, known] of [['kills', ENEMIES], ['winsByAnimal', ANIMALS]]) {
