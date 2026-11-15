@@ -37,6 +37,8 @@ export function createTracker() {
     /** @param {number} worldTime */
     begin(worldTime) {
       if (worldTime === time) return;
+      // Zeit läuft rückwärts: neue Welt (Kartenwechsel, Tod) – alte Positionen gelten nicht mehr.
+      if (worldTime < time) { prev.clear(); cur.clear(); time = NaN; }
       prevTime = Number.isNaN(time) ? worldTime : time;
       time = worldTime;
       const old = prev;

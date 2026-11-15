@@ -414,3 +414,13 @@ test('world: Lebensraub heilt einen Anteil des Schadens, höchstens bis zum höc
   damageEnemy(w, e, { amount: 20, crit: false }, 'schwerthieb');
   assertClose(w.hero.hp, w.hero.stats.maxHp);
 });
+
+test('render: Tracker blendet nach einem Weltwechsel (Zeit springt zurück) nicht von alten Positionen über', async () => {
+  const { createTracker } = await import('../src/render/enemies.js');
+  const t = createTracker();
+  t.begin(10); t.pos(1, 0, 0, 1);
+  t.begin(10.1); t.pos(1, 1, 0, 1);
+  t.begin(0.033);
+  const p = t.pos(1, 3, 0, 0.5);
+  assertEqual([p.x, p.z], [3, 0]);
+});

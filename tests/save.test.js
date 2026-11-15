@@ -530,3 +530,17 @@ test('store: scheitert das Anlegen der Kopie, lädt der Stand trotzdem', () => {
   storage.setItem = (k, v) => { if (k === versionBackupKey(2)) throw new Error('voll'); set(k, v); };
   assertEqual(createStore(storage).load().status, 'ok');
 });
+
+test('store: schlägt ein Schreiben fehl, baut das nächste Speichern auf dem ungespeicherten Stand auf (nichts geht verloren)', () => {
+  const map = new Map();
+  let failing = false;
+  const storage = { getItem: (k) => (map.has(k) ? map.get(k) : null), setItem: (k, v) => { if (failing) throw new Error('voll'); map.set(k, String(v)); }, removeItem: (k) => map.delete(k) };
+  const store = createStore(storage);
+  store.load();
+  store.update((s) => { s.gold = 10; });
+  failing = true;
+  assertEqual(store.update((s) => { s.gold += 50; }).saved, false);
+  failing = false;
+  const r = store.update((s) => { s.gold += 5; });
+  assertEqual([r.saved, r.data.gold, JSON.parse(map.get(STORAGE_KEY)).gold], [true, 65, 65]);
+});

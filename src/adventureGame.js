@@ -75,8 +75,8 @@ export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quali
     change(mutator) {
       commit(true);
       app.update((save) => mutator(save, save.heroes.find((h) => h.id === heroId)));
-      refreshFromSave(run, app.save);
       announceAchievements();
+      refreshFromSave(run, app.save);
     },
   };
 
@@ -91,8 +91,8 @@ export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quali
     app.update((save) => { commitAdventure(save, heroId, snapshot(run)); });
     clearLedger(run);
     run.dirty = false;
-    run.save = app.save;
     announceAchievements();
+    run.save = app.save; // nach den Erfolgsbelohnungen, damit z. B. der Goldverlust beim Tod mit dem richtigen Gold rechnet
   }
   function announceAchievements() {
     for (const id of app.unlockStoredAchievements()) app.announceAchievement(id);
@@ -159,19 +159,26 @@ export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quali
     if (r.kind === 'talk') {
       busy = true; keys.clear(); pointer.reset();
       commit(true);
-      const answer = await showDialogue(uiLayer, { npc: r.npc, speaker: r.speaker, lines: r.lines, choice: !!r.offer && !r.autoAccept });
-      if (answer === 'accept' && r.offer) acceptOffer(run, r.offer);
-      endTalk(run);
-      busy = false;
+      try {
+        const answer = await showDialogue(uiLayer, { npc: r.npc, speaker: r.speaker, lines: r.lines, choice: !!r.offer && !r.autoAccept });
+        if (answer === 'accept' && r.offer) acceptOffer(run, r.offer);
+      } finally {
+        endTalk(run);
+        busy = false;
+      }
       commit(true);
       if (r.shop) await openPage(r.shop === 'merchant' ? openShop : openSmith);
       if (offerRespec(r, run.record)) await openPage(openRespec);
     } else if (r.kind === 'campfire') {
       busy = true; keys.clear(); pointer.reset();
       commit(true);
-      const target = await openCampfire(ctx, r);
-      if (target) travel(run, target); else closeMenu(run);
-      busy = false;
+      let target = null;
+      try {
+        target = await openCampfire(ctx, r);
+      } finally {
+        if (target) travel(run, target); else closeMenu(run);
+        busy = false;
+      }
       commit(true);
     } else {
       commit(true);

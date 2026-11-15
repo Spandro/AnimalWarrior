@@ -91,9 +91,13 @@ export function createStore(storage) {
     return { data, status };
   }
 
+  /** Stand, dessen Schreiben zuletzt fehlschlug (bis zum nächsten erfolgreichen Schreiben). */
+  let unsaved = null;
+
   function write(data) {
     try {
       storage.setItem(STORAGE_KEY, JSON.stringify(data));
+      unsaved = null;
       return true;
     } catch (e) {
       return false;
@@ -113,11 +117,14 @@ export function createStore(storage) {
       if (current.status === 'newer' || current.status === 'unavailable' || current.backupFailed) {
         return { data: current.data, saved: false };
       }
-      const data = current.data;
+      // Ging das letzte Schreiben schief, baut dieses auf dem ungespeicherten Stand auf (sonst ginge z. B. Beute verloren).
+      const data = unsaved ? structuredClone(unsaved) : current.data;
       mutator(data);
       const check = validate(data);
       if (!check.ok) throw new Error(`Ungültiger Spielstand: ${check.error}`);
-      return { data, saved: write(data) };
+      const saved = write(data);
+      if (!saved) unsaved = data;
+      return { data, saved };
     },
 
     exportJson() {
