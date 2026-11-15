@@ -70,7 +70,9 @@ test('sprites: Startpunkt auf dunklem Pixel ändert nichts', () => {
 });
 
 test('sprites: SHEET_HOLES enthält die sieben Punkte aus der Bilder-Doku und die Lücken des Duos', () => {
-  assertEqual(SHEET_HOLES, {
+  const { kapitel1, bewohner, dorf, ...older } = SHEET_HOLES;
+  assertTrue(kapitel1.length > 0 && bewohner.length > 0 && dorf.length > 0, 'Abenteuer-Bögen (eigener Test)');
+  assertEqual(older, {
     gegner2: [[290, 921], [753, 516], [172, 904]],
     bosse: [[198, 427], [302, 1011], [296, 165], [388, 127]],
     duo: [[160, 669], [567, 674], [898, 673], [1337, 673], [340, 121], [1203, 512], [915, 499], [296, 243], [223, 191],
@@ -346,10 +348,11 @@ test('hero: die Figur dreht sich beim Zielen in die Zielrichtung, sonst in die L
   assertClose(lookYaw(lauf, { x: 0, z: 0 }), Math.atan2(1, 0));
 });
 
-test('sprites: Abenteuer-Gegner liegen im Raster von kapitel1.webp, Stellvertreter und Aufsammelbares sind bekannt', async () => {
-  const { ADVENTURE_SPRITE_STANDIN, PICKUP_STANDIN } = await import('../src/data/sprites.js');
+test('sprites: Abenteuer-Gegner liegen im ausgeschnittenen Bogen von kapitel1.webp, Stellvertreter und Aufsammelbares sind bekannt', async () => {
+  const { ADVENTURE_SPRITE_STANDIN, PICKUP_STANDIN, CUT_LAYOUTS } = await import('../src/data/sprites.js');
+  const { width: W, height: H } = CUT_LAYOUTS.kapitel1;
   for (const [type, d] of Object.entries(ADVENTURE_ENEMY_SPRITES)) {
-    assertTrue(d.x >= 0 && d.y >= 0 && d.x + d.w <= 1254 && d.y + d.h <= 1254, type);
+    assertTrue(d.x >= 0 && d.y >= 0 && d.x + d.w <= W && d.y + d.h <= H, type);
     if (type !== 'flossian') assertTrue(Object.hasOwn(ENEMY_SPRITES, ADVENTURE_SPRITE_STANDIN[type]), type);
   }
   assertEqual(Object.values(PICKUP_STANDIN).sort(), ['chest', 'potion', 'xp']);

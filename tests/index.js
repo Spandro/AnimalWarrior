@@ -35,3 +35,4 @@ import './roster.test.js';
 import './tavernSave.test.js';
 import './tavernText.test.js';
 import './tavernGames.test.js';
+import './adventureImages.test.js';
