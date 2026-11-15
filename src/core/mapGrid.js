@@ -8,9 +8,11 @@ import { MAP_CELL, GATE_HALF_WIDTH, EXPLORE_BLOCK, BORDER_DECOR, TERRAIN } from 
  * @typedef {{ id: string, bounds: { minX: number, maxX: number, minZ: number, maxZ: number }, paths: Strip[],
  *   clearings: { x: number, z: number, r: number }[], water: Strip[], bridges: Strip[], obstacles: Obstacle[],
  *   mud?: Strip[], boardwalks?: Strip[], currents?: Strip[],
+ *   sluices?: { id: string, start: 'open'|'closed', strips: Strip[], open: CellKind, closed: CellKind }[],
  *   gates: { id: string, points: [number, number][] }[] }} MapShape  (Ausschnitt von MapDef, src/data/maps)
  * @typedef {{ cell: number, minX: number, minZ: number, cols: number, rows: number, cells: Uint8Array,
  *   flow: Float32Array | null }} MapGrid  `flow`: Einheitsrichtung der Strömung je Zelle (x, z), nur bei Karten mit Strömung
+ * @typedef {'walk'|'mud'|'water'|'current'} CellKind  Zellart einer Schleusenfläche je Zustand
  * @typedef {'walk'|'fly'|'shot'} MoveMode  laufen; fliegen (nur innerhalb der Karte); Geschoss (über Wasser, nicht durch den Rand)
  */
 
@@ -83,7 +85,8 @@ function paintCurrent(grid, strip) {
 
 /**
  * Malt das Raster (neu) aus der Kartenbeschreibung: erst Wege und Lichtungen, dann Wasser darüber, dann Schlamm, dann
- * Strömung, dann Brücken, zuletzt Stege (wie Brücken, über Schlamm, Wasser und Strömung).
+ * Strömung, dann Schleusenflächen mit der Zellart ihres Zustands (`switches[id]`, sonst `start`), dann Brücken, zuletzt
+ * Stege (wie Brücken, über Schlamm, Wasser und Strömung).
  * @param {MapGrid} grid
  * @param {MapShape} map
  * @param {Record<string, 'open'|'closed'>} [switches] Zustände der Schleusen (Kapitel 3)
@@ -99,6 +102,13 @@ export function paintMapGrid(grid, map, switches = {}) {
   for (const w of map.water || []) paintStrip(grid, w, CELL.water);
   for (const m of map.mud || []) paintStrip(grid, m, CELL.mud);
   for (const c of map.currents || []) paintCurrent(grid, c);
+  for (const sl of map.sluices || []) {
+    const kind = sl[switches[sl.id] ?? sl.start];
+    for (const st of sl.strips) {
+      if (kind === 'current') paintCurrent(grid, st);
+      else paintStrip(grid, st, CELL[kind]);
+    }
+  }
   for (const b of map.bridges || []) paintStrip(grid, b, CELL.bridge);
   for (const b of map.boardwalks || []) paintStrip(grid, b, CELL.bridge);
   return grid;
@@ -117,6 +127,14 @@ export function buildMapGrid(map, switches = {}) {
   const flowing = (map.currents?.length ?? 0) > 0 || (map.sluices?.length ?? 0) > 0;
   const grid = { cell, minX, minZ, cols, rows, cells: new Uint8Array(cols * rows), flow: flowing ? new Float32Array(cols * rows * 2) : null };
   return paintMapGrid(grid, map, switches);
+}
+
+/**
+ * Liegt (x,z) in einer Schleusenfläche der Karte?
+ * @param {MapShape} map
+ */
+export function inSluice(map, x, z) {
+  return (map.sluices || []).some((sl) => sl.strips.some((st) => stripDistance(x, z, st.points) <= st.width / 2));
 }
 
 /**

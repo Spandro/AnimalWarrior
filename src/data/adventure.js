@@ -12,6 +12,13 @@ export const MAP_CELL = 1;
 export const TERRAIN = { mudSpeed: 0.65, currentSpeed: 2.5, heroHeadway: 1 };
 
 /**
+ * Wegspülen beim Fluten einer Schleusenfläche (Spec §4.2): Gegner verlieren `enemyPct` ihres höchsten Lebens (Bosse
+ * höchstens `bossMaxPct`) und werden auf Strömung `push` m in Flussrichtung geschoben, aus Wasser an die nächste begehbare
+ * Stelle; der Held kommt ohne Schaden ans nächste Ufer im Umkreis `searchRadius`, sonst ans Lagerfeuer.
+ */
+export const WASH = { enemyPct: 0.35, bossMaxPct: 0.05, push: 6, searchRadius: 40 };
+
+/**
  * Moorblasen (Spec §4.1, §14.1): nächste Blase nach `minInterval`–`maxInterval` s, Ort im Umkreis `range` (m) um den
  * Helden auf Schlamm (bis `tries` Versuche, sonst diese Runde keine), Vorwarnung `warn` s, Radius `radius` (m); Schaden:
  * Held `heroPct` seines höchsten Lebens, Gegner `enemyShare` × Leben eines Ochsenfroschs der Kartenstufe, Bosse höchstens

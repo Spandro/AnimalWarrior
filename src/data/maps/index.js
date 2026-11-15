@@ -20,11 +20,16 @@ import { KAPITEL2 } from './kapitel2.js';
  *     bubbleArena?: boolean }[],
  *   exits: { id: string, x: number, z: number, r: number, to: { map: string, campfire: string }, requires?: { chapterDone: number } }[],
  *   props: { kind: string, x: number, z: number, faceX?: number, requires?: { chapterDone: number } }[], start: { campfire: string },
- *   hazards?: { bubbles?: { level: number } } }} MapDef
+ *   hazards?: { bubbles?: { level: number } },
+ *   sluices?: { id: string, name: string, lever?: { x: number, z: number }, start: 'open'|'closed', strips: Strip[],
+ *     open: import('../../core/mapGrid.js').CellKind, closed: import('../../core/mapGrid.js').CellKind,
+ *     opensOn?: { boss: string } | { quest: string, step: number } }[] }} MapDef
  *   Der erste Eintrag in `paths` ist der Hauptweg. Tore: `arena` schließt sich im Bosskampf, `barrier` ist zu, bis
  *   `opensOn` erfüllt ist. Ein Ausgang mit `requires` ist erst offen (sichtbar und benutzbar), wenn das Kapitel abgeschlossen ist. Ein Gebiet ist das kleinste, dessen Kreis den Helden enthält. `hazards.bubbles`: Moorblasen auf
  *   dem Schlamm dieser Karte, Gegner-Schaden nach Stufe `level`; `bubbleArena`: Moorblasen auch in dieser Bossarena.
- *   `currents`: Strömung (begehbar, schiebt in Richtung des Linienzugs, Kapitel 3).
+ *   `currents`: Strömung (begehbar, schiebt in Richtung des Linienzugs, Kapitel 3). `sluices`: Schleusen (Kapitel 3); ihre
+ *   Flächen haben je Zustand eine Zellart; mit `lever` legt der Held sie um (Zustand gespeichert), ohne öffnet sie sich, sobald
+ *   `opensOn` erfüllt ist (Biberschleuse).
  */
 
 /** @type {Record<'dorf'|'kapitel1'|'kapitel2', MapDef>} */

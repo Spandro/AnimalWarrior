@@ -119,3 +119,173 @@ test('dam: Geländequelle ohne flowAt schiebt nichts', () => {
   const w = createWorld({ seed: 3, animalId: 'hase', classId: 'krieger' });
   assertEqual(flowAt(w, 0, 0), null);
 });
+
+// ---------------------------------------------------------------- Schleusen und Hebel (Task 3)
+
+/**
+ * Testdamm: Weg (0,0)→(80,0), 12 m breit. Schleuse quer bei x = 30 (zu: Weg, offen: Wasser, Hebel bei (10, −4)),
+ * Strömungsschleuse bei x = 50 (offen: Strömung nach Süden, zu: Schlamm), Biberschleuse bei x = 70 (zu: Wasser, offen:
+ * Weg, sobald „Ruf aus dem Sumpf“ beim zweiten Schritt ist). Das Gebiet heißt wie das erste Sumpf-Ziel.
+ */
+const DAMM = {
+  id: 'testdamm', name: 'Testdamm', chapter: 3, bounds: { minX: -10, maxX: 90, minZ: -30, maxZ: 30 },
+  paths: [{ points: [[0, 0], [80, 0]], width: 12 }], clearings: [], water: [], bridges: [], obstacles: [], gates: [],
+  sluices: [
+    { id: 'td_schleuse', name: 'Testschleuse', lever: { x: 10, z: -4 }, start: 'closed', strips: [{ points: [[30, -6], [30, 6]], width: 10 }], open: 'water', closed: 'walk' },
+    { id: 'td_strom', name: 'Strömungsschleuse', lever: { x: 60, z: -4 }, start: 'open', strips: [{ points: [[50, -7], [50, 7]], width: 6 }], open: 'current', closed: 'mud' },
+    { id: 'td_biber', name: 'Biberschleuse', start: 'closed', strips: [{ points: [[70, -7], [70, 7]], width: 4 }], open: 'walk', closed: 'water', opensOn: { quest: 'ruf_aus_dem_sumpf', step: 1 } },
+  ],
+  areas: [{ id: 'schilfrand', name: 'Testdamm', x: 40, z: 0, r: 80 }],
+  campfires: [{ id: 'testdamm_feuer', x: 5, z: 0 }], npcs: [], spots: [], chests: [], packs: [], bosses: [],
+  exits: [], props: [], start: { campfire: 'testdamm_feuer' },
+};
+
+function withDam(fn) {
+  return async () => {
+    const { MAPS } = await import('../src/data/maps/index.js');
+    MAPS.testdamm = DAMM;
+    try { await fn(); } finally { delete MAPS.testdamm; }
+  };
+}
+
+async function damRun(mutate) {
+  const { defaultSave, addHero } = await import('../src/save/store.js');
+  const { newAdventure } = await import('../src/save/adventure.js');
+  const { createAdventureRun } = await import('../src/modes/adventure.js');
+  const save = defaultSave();
+  const h = addHero(save, { name: 'Hoppel', animal: 'hase', class: 'krieger' }, { now: 1, id: 'h1' });
+  h.adventure = newAdventure(h);
+  Object.assign(h.adventure, { mapId: 'testdamm', campfireId: 'testdamm_feuer', introSeen: true });
+  h.adventure.campfires.push('testdamm_feuer');
+  mutate?.(h.adventure);
+  const run = createAdventureRun({ seed: 7, save, heroId: 'h1' });
+  return { run, save };
+}
+
+/** Held an (x,z) stellen, einen Schritt laufen lassen, dann (falls in Reichweite) umlegen. */
+async function pull(run, x = 10, z = -2) {
+  const { stepAdventure, interact } = await import('../src/modes/adventure.js');
+  run.world.hero.x = x; run.world.hero.z = z;
+  stepAdventure(run, 1 / 60, still);
+  return interact(run);
+}
+
+test('dam: Hebel schaltet die Fläche um, zweites Umlegen schaltet zurück; nur in Reichweite', withDam(async () => {
+  const { stepAdventure } = await import('../src/modes/adventure.js');
+  const { run } = await damRun();
+  assertEqual(cellAt(run.grid, 30, 0), CELL.walk);
+  run.world.hero.x = 20; run.world.hero.z = 0;
+  stepAdventure(run, 1 / 60, still);
+  assertEqual(run.interactable, null);
+  const version = run.gridVersion ?? 0;
+  const r = await pull(run);
+  assertEqual([r.kind, r.id, r.state], ['lever', 'td_schleuse', 'open']);
+  assertEqual(cellAt(run.grid, 30, 0), CELL.water);
+  assertEqual(run.record.switches, { td_schleuse: 'open' });
+  assertTrue(run.events.some((e) => e.type === 'sluiceSwitched' && e.id === 'td_schleuse' && e.state === 'open'));
+  assertTrue(run.gridVersion > version);
+  assertTrue(run.dirty);
+  await pull(run);
+  assertEqual(cellAt(run.grid, 30, 0), CELL.walk);
+  assertEqual(run.record.switches.td_schleuse, 'closed');
+}));
+
+test('dam: Schleusen behalten ihren Zustand bei Tod, Reisen und neuem Lauf', withDam(async () => {
+  const { stepAdventure, travel, createAdventureRun } = await import('../src/modes/adventure.js');
+  const { run, save } = await damRun((rec) => { rec.switches = { td_schleuse: 'open', td_strom: 'closed' }; });
+  assertEqual([cellAt(run.grid, 30, 0), cellAt(run.grid, 50, 0)], [CELL.water, CELL.mud]);
+  run.world.hero.hp = 0;
+  for (let i = 0; i < 200 && run.state !== 'playing' || i < 2; i++) stepAdventure(run, 1 / 30, still);
+  assertEqual(run.state, 'playing');
+  assertEqual([cellAt(run.grid, 30, 0), cellAt(run.grid, 50, 0)], [CELL.water, CELL.mud]);
+  travel(run, 'testdamm_feuer');
+  assertEqual(cellAt(run.grid, 30, 0), CELL.water);
+  save.heroes[0].adventure = structuredClone(run.record);
+  const again = createAdventureRun({ seed: 9, save, heroId: 'h1' });
+  assertEqual([cellAt(again.grid, 30, 0), cellAt(again.grid, 50, 0)], [CELL.water, CELL.mud]);
+}));
+
+test('dam: die Biberschleuse ohne Hebel öffnet mit ihrer Bedingung und wird nicht gespeichert', withDam(async () => {
+  const { stepAdventure, sluiceState } = await import('../src/modes/adventure.js');
+  const { run } = await damRun((rec) => { rec.quests.ruf_aus_dem_sumpf = { state: 'active', step: 0, progress: 0 }; });
+  assertEqual(sluiceState(run, 'td_biber'), 'closed');
+  assertEqual(cellAt(run.grid, 70, 0), CELL.water);
+  run.world.hero.x = 20; run.world.hero.z = 0;
+  stepAdventure(run, 1 / 60, still); // betritt das Gebiet → Auftrag beim zweiten Schritt
+  assertEqual(run.record.quests.ruf_aus_dem_sumpf.step, 1);
+  assertEqual(sluiceState(run, 'td_biber'), 'open');
+  assertEqual(cellAt(run.grid, 70, 0), CELL.walk);
+  assertEqual(run.record.switches.td_biber, undefined);
+}));
+
+test('dam: Fluten spült Gegner weg (35 % Schaden, danach begehbar) und setzt den Helden ohne Schaden ans Ufer', withDam(async () => {
+  const { interact } = await import('../src/modes/adventure.js');
+  const { WASH } = await import('../src/data/adventure.js');
+  const { run } = await damRun();
+  const e = spawnEnemy(run.world, 'krebs', 31, 2, { hpMul: 10 });
+  e.passive = true;
+  const hero = run.world.hero;
+  hero.x = 29; hero.z = 1;
+  hero.hp = hero.stats.maxHp * 0.5;
+  const hp = hero.hp;
+  run.interactable = { kind: 'lever', id: 'td_schleuse', x: 10, z: -4 };
+  interact(run);
+  assertClose(e.maxHp - e.hp, Math.max(1, e.maxHp * WASH.enemyPct - ENEMIES.krebs.armor), 1e-6);
+  assertTrue(run.world.terrain.walkable(e.x, e.z, 'walk'), `Gegner bei ${e.x},${e.z}`);
+  assertEqual(hero.hp, hp);
+  const c = cellAt(run.grid, hero.x, hero.z);
+  assertTrue(c === CELL.walk, `Held auf Zelle ${c}`);
+  assertTrue(Math.hypot(hero.x - 29, hero.z - 1) < 6, `Held bei ${hero.x},${hero.z}`);
+  assertTrue(run.events.some((x) => x.type === 'heroWashed'));
+}));
+
+test('dam: geflutete Strömung schiebt Gegner in Flussrichtung weg', withDam(async () => {
+  const { interact } = await import('../src/modes/adventure.js');
+  const { WASH } = await import('../src/data/adventure.js');
+  const { run } = await damRun((rec) => { rec.switches = { td_strom: 'closed' }; });
+  const e = spawnEnemy(run.world, 'helmfisch', 50, -2, { hpMul: 10 });
+  e.passive = true;
+  run.world.hero.x = 60; run.world.hero.z = -2;
+  run.interactable = { kind: 'lever', id: 'td_strom', x: 60, z: -4 };
+  interact(run);
+  assertEqual(cellAt(run.grid, 50, 0), CELL.current);
+  assertTrue(e.hp < e.maxHp);
+  assertTrue(e.z > -2 + WASH.push * 0.5, `z ${e.z}`);
+  assertTrue(run.world.terrain.walkable(e.x, e.z, 'walk'));
+}));
+
+test('dam: kein Ufer in Reichweite → Held kommt ans Lagerfeuer', withDam(async () => {
+  const { rescueHero, nearestShore } = await import('../src/modes/adventure.js');
+  const { run } = await damRun((rec) => { rec.switches = { td_schleuse: 'open' }; });
+  assertEqual(nearestShore(run, 30, 0, 3), null);
+  const s = nearestShore(run, 30, 0);
+  assertTrue(Math.abs(s.x - 30) >= 5 && Math.abs(s.x - 30) < 6.5, `${s.x}`);
+  run.world.hero.x = 30; run.world.hero.z = 0;
+  rescueHero(run, 3);
+  assertTrue(Math.hypot(run.world.hero.x - 5, run.world.hero.z) < 2, `${run.world.hero.x},${run.world.hero.z}`);
+}));
+
+test('dam: Auftragsschritt „Hebel umlegen“ mit Zielzustand, sofort erfüllt, wenn er schon stimmt; Ziel ist der Hebel', withDam(async () => {
+  const { QUESTS } = await import('../src/data/quests.js');
+  const { acceptOffer } = await import('../src/modes/adventure.js');
+  const { questTarget } = await import('../src/core/quests.js');
+  const { MAPS } = await import('../src/data/maps/index.js');
+  QUESTS.__hebel = {
+    id: '__hebel', chapter: 3, kind: 'side', title: 'Hebel', giver: 'niemand', requires: [],
+    steps: [{ type: 'lever', target: 'td_schleuse', state: 'open', map: 'testdamm', text: 'Öffne die Testschleuse' }], reward: { xp: 1, gold: 1 },
+  };
+  try {
+    const { run } = await damRun();
+    acceptOffer(run, '__hebel');
+    assertEqual(questTarget(run.record.quests, '__hebel', MAPS), { map: 'testdamm', x: 10, z: -4 });
+    await pull(run); // öffnet → erledigt
+    assertEqual(run.record.quests.__hebel.state, 'done');
+    const { run: ready } = await damRun((rec) => { rec.switches = { td_schleuse: 'open' }; });
+    acceptOffer(ready, '__hebel');
+    assertEqual(ready.record.quests.__hebel.state, 'done');
+    const { run: wrong } = await damRun();
+    QUESTS.__hebel.steps[0].state = 'closed';
+    acceptOffer(wrong, '__hebel');
+    assertEqual(wrong.record.quests.__hebel.state, 'done', 'zu ist schon der Ausgangszustand');
+  } finally { delete QUESTS.__hebel; }
+}));

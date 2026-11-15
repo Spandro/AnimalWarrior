@@ -1,7 +1,7 @@
-import { createWorld, stepWorld, spawnEnemy, recomputeHeroStats } from '../core/world.js';
+import { createWorld, stepWorld, spawnEnemy, recomputeHeroStats, damageEnemy, flowAt } from '../core/world.js';
 import { castManual } from '../core/abilities.js';
 import { createRng } from '../core/rng.js';
-import { buildMapGrid, mapTerrain, decodeExplored, encodeExplored, markExplored, cellAt, CELL } from '../core/mapGrid.js';
+import { buildMapGrid, paintMapGrid, mapTerrain, decodeExplored, encodeExplored, markExplored, cellAt, inSluice, CELL } from '../core/mapGrid.js';
 import { createBubbles, stepBubbles } from '../core/hazards.js';
 import { gainXp, adventureModifiers, enemyMultipliers, abilitySpecials, specialBonus } from '../core/adventureHero.js';
 import { talkTo, acceptQuest, questEvent } from '../core/quests.js';
@@ -12,7 +12,7 @@ import { CLASSES } from '../data/classes.js';
 import { ENEMIES, ELITE } from '../data/enemies.js';
 import {
   MANUAL, ADVENTURE_BALANCE, PACK, DEATH, POTION, LOOT, INTERACT_RANGE, EXPLORE_RADIUS, CAMPFIRE_OFFSET, ARENA_INSET,
-  SUBCLASS_RULES, BUBBLES,
+  SUBCLASS_RULES, BUBBLES, WASH,
 } from '../data/adventure.js';
 
 /**
@@ -23,13 +23,14 @@ import {
  * Ereignisse eines Schritts stehen in `run.events`: alle Welt-Ereignisse und `levelUp`, `abilityUnlocked`,
  * `questAccepted`, `questAdvanced`, `questCompleted`, `questItem`, `loot`, `areaEnter`, `bossStart`, `bossDefeated`,
  * `arenaClosed`, `arenaOpened`, `dying`, `wake`, `rested`, `travel`, `mapChange`, `potion`, `abilityFail`, `chapterDone`,
- * `subclassAvailable` (Level 10 erreicht ohne Unterklasse). Gold aus `stealGold` geht ins Ledger.
+ * `subclassAvailable` (Level 10 erreicht ohne Unterklasse), `sluiceSwitched` (Schleuse umgelegt oder von den Bibern
+ * geöffnet), `heroWashed` (Held ans Ufer gesetzt). Gold aus `stealGold` geht ins Ledger.
  *
  * @typedef {import('../save/adventure.js').AdventureRecord} AdventureRecord
  * @typedef {import('../save/adventure.js').Ledger} Ledger
  * @typedef {import('../data/maps/index.js').MapDef} MapDef
  * @typedef {{ def: MapDef['packs'][number], state: 'idle'|'engaged'|'cleared', ids: Set<number> }} PackState
- * @typedef {{ kind: 'npc'|'campfire'|'spot'|'chest', id: string, x: number, z: number }} Interactable
+ * @typedef {{ kind: 'npc'|'campfire'|'spot'|'chest'|'lever', id: string, x: number, z: number }} Interactable
  * @typedef {{ world: import('../core/world.js').World, map: MapDef, grid: import('../core/mapGrid.js').MapGrid,
  *   save: import('../save/schema.js').Save, heroId: string, hero: import('../save/schema.js').Hero, record: AdventureRecord,
  *   ledger: Ledger & { rests: number }, state: 'playing'|'paused'|'talking'|'menu'|'dying', events: object[], dirty: boolean,
@@ -93,7 +94,9 @@ function enterMap(run, mapId, campfireId) {
   if (run.map && run.explored) run.record.explored[run.map.id] = encodeExplored(run.explored);
   const map = MAPS[mapId];
   run.map = map;
-  run.grid = buildMapGrid(map);
+  run.sluices = sluiceStates(run);
+  run.grid = buildMapGrid(map, run.sluices);
+  run.gridVersion = (run.gridVersion ?? 0) + 1;
   run.explored = decodeExplored(run.record.explored[mapId], run.grid);
   run.activeBoss = null;
   run.area = null;
@@ -109,6 +112,7 @@ function enterMap(run, mapId, campfireId) {
   run.worldSeen = 0;
   applyHeroSetup(run, true);
   placeAtCampfire(run, campfireId);
+  if (!world.terrain.walkable(world.hero.x, world.hero.z, 'walk')) rescueHero(run);
   resetPacks(run);
 }
 
@@ -177,11 +181,144 @@ export function isGateClosed(run, gateId) {
   const gate = run.map.gates.find((g) => g.id === gateId);
   if (!gate) return false;
   if (gate.kind === 'arena') return run.activeBoss !== null && run.map.bosses.some((b) => b.gate === gateId && b.id === run.activeBoss.id);
-  const on = gate.opensOn;
-  if (!on) return true;
-  if ('boss' in on) return !run.record.bosses.includes(on.boss);
+  return !gate.opensOn || !conditionMet(run, gate.opensOn);
+}
+
+/** Bedingung einer Sperre oder Biberschleuse: Boss besiegt oder Auftrag mindestens beim Schritt `step` (oder erledigt). */
+function conditionMet(run, on) {
+  if ('boss' in on) return run.record.bosses.includes(on.boss);
   const q = run.record.quests[on.quest];
-  return !(q && (q.state === 'done' || q.step >= on.step));
+  return !!q && (q.state === 'done' || q.step >= on.step);
+}
+
+// ---------------------------------------------------------------- Schleusen (Kapitel 3)
+
+const findSluice = (id) => {
+  for (const m of Object.values(MAPS)) {
+    const s = (m.sluices ?? []).find((x) => x.id === id);
+    if (s) return s;
+  }
+  return null;
+};
+
+/**
+ * Zustand einer Schleuse: umgelegt (gespeichert) oder Ausgangszustand; eine ohne Hebel (Biberschleuse) ist offen,
+ * sobald ihre Bedingung erfüllt ist.
+ * @param {AdventureRun} run
+ * @param {string} id
+ * @returns {'open'|'closed'|null}
+ */
+export function sluiceState(run, id) {
+  const sl = findSluice(id);
+  if (!sl) return null;
+  if (sl.lever) return run.record.switches?.[id] ?? sl.start;
+  return sl.opensOn && conditionMet(run, sl.opensOn) ? 'open' : sl.start;
+}
+
+function sluiceStates(run) {
+  return Object.fromEntries((run.map.sluices ?? []).map((s) => [s.id, sluiceState(run, s.id)]));
+}
+
+/** Hat sich ein Schleusenzustand geändert (Hebel, Biber), Raster neu malen und wegspülen. */
+function syncSluices(run) {
+  if (!run.map.sluices?.length) return;
+  const now = sluiceStates(run);
+  const changed = run.map.sluices.filter((s) => now[s.id] !== run.sluices[s.id]);
+  if (!changed.length) return;
+  const world = run.world;
+  const wet = (c) => c === CELL.water || c === CELL.current;
+  const before = new Map([world.hero, ...world.enemies].map((e) => [e, cellAt(run.grid, e.x, e.z)]));
+  run.sluices = now;
+  paintMapGrid(run.grid, run.map, now);
+  run.gridVersion++;
+  for (const s of changed) emit(run, { type: 'sluiceSwitched', id: s.id, state: now[s.id], x: s.lever?.x ?? s.strips[0].points[0][0], z: s.lever?.z ?? s.strips[0].points[0][1] });
+  for (const [e, old] of before) {
+    const c = cellAt(run.grid, e.x, e.z);
+    if (!wet(c) || wet(old)) continue;
+    if (e === world.hero) { rescueHero(run); continue; }
+    if (!e.flying) washEnemy(run, e, c);
+  }
+}
+
+/** Gegner in neu gefluteter Fläche: Schaden, dann mit der Strömung weg bzw. aus dem Wasser an die nächste begehbare Stelle. */
+function washEnemy(run, e, cell) {
+  const world = run.world;
+  const amount = e.maxHp * (e.boss ? WASH.bossMaxPct : WASH.enemyPct);
+  damageEnemy(world, e, { amount, crit: false }, 'flut', { environment: true });
+  if (!world.enemies.includes(e)) return;
+  if (cell === CELL.current) {
+    const f = flowAt(world, e.x, e.z);
+    const len = f ? Math.hypot(f.x, f.z) : 0;
+    for (let moved = 0; len > 0 && moved < WASH.push; moved += 0.5) {
+      const nx = e.x + (f.x / len) * 0.5, nz = e.z + (f.z / len) * 0.5;
+      if (!world.terrain.walkable(nx, nz, 'walk')) break;
+      e.x = nx; e.z = nz;
+    }
+    return;
+  }
+  const p = nearestCell(run, e.x, e.z, (x, z) => world.terrain.walkable(x, z, 'walk'), WASH.searchRadius);
+  if (p) { e.x = p.x; e.z = p.z; }
+}
+
+/** Nächste Zellmitte im Umkreis `maxR`, für die `ok` gilt (Suche über das Raster), sonst null. */
+function nearestCell(run, x, z, ok, maxR) {
+  const g = run.grid;
+  const c0 = Math.floor((x - g.minX) / g.cell), r0 = Math.floor((z - g.minZ) / g.cell), n = Math.ceil(maxR / g.cell);
+  let best = null, bestD = Infinity;
+  for (let r = r0 - n; r <= r0 + n; r++) {
+    for (let c = c0 - n; c <= c0 + n; c++) {
+      const cx = g.minX + (c + 0.5) * g.cell, cz = g.minZ + (r + 0.5) * g.cell;
+      const d = Math.hypot(cx - x, cz - z);
+      if (d > maxR || d >= bestD || !ok(cx, cz)) continue;
+      best = { x: cx, z: cz }; bestD = d;
+    }
+  }
+  return best;
+}
+
+/**
+ * Nächstes Ufer: begehbare Stelle, die weder Strömung noch Schleusenfläche ist und an der kein Hindernis steht.
+ * @param {AdventureRun} run
+ * @returns {{ x: number, z: number } | null}
+ */
+export function nearestShore(run, x, z, maxR = WASH.searchRadius) {
+  const w = run.world, h = w.hero;
+  return nearestCell(run, x, z, (cx, cz) => w.terrain.walkable(cx, cz, 'walk') && cellAt(run.grid, cx, cz) !== CELL.current
+    && !inSluice(run.map, cx, cz) && w.terrain.obstaclesNear(cx, cz, h.radius).length === 0, maxR);
+}
+
+/**
+ * Setzt den Helden ohne Schaden ans nächste Ufer, notfalls ans letzte Lagerfeuer dieser Karte (Spec §4.2, §14.1).
+ * @param {AdventureRun} run
+ * @param {number} [maxR]
+ */
+export function rescueHero(run, maxR) {
+  const h = run.world.hero;
+  const p = nearestShore(run, h.x, h.z, maxR);
+  if (p) { h.x = p.x; h.z = p.z; } else {
+    const fire = run.map.campfires.find((c) => c.id === run.record.campfireId) ?? run.map.campfires[0];
+    const spots = [[CAMPFIRE_OFFSET, 0], [-CAMPFIRE_OFFSET, 0], [0, CAMPFIRE_OFFSET], [0, -CAMPFIRE_OFFSET], [0, 0]];
+    const ok = spots.find(([dx, dz]) => run.world.terrain.walkable(fire.x + dx, fire.z + dz, 'walk')) ?? [0, 0];
+    h.x = fire.x + ok[0]; h.z = fire.z + ok[1];
+  }
+  emit(run, { type: 'heroWashed', x: h.x, z: h.z });
+}
+
+/**
+ * Legt den Hebel einer Schleuse um (Aktion über {@link interact}). Gespeichert, Raster neu, Wegspülen, Auftragsereignis.
+ * @param {AdventureRun} run
+ * @param {string} id
+ * @returns {'open'|'closed'|null}
+ */
+function toggleSluice(run, id) {
+  const sl = run.map.sluices?.find((s) => s.id === id);
+  if (!sl?.lever) return null;
+  const state = sluiceState(run, id) === 'open' ? 'closed' : 'open';
+  run.record.switches[id] = state;
+  syncSluices(run);
+  quest(run, { type: 'lever', sluice: id, state });
+  run.dirty = true;
+  return state;
 }
 
 /**
@@ -353,6 +490,7 @@ function onBossDefeated(run, bossDef, e) {
   const pearls = LOOT.bossPearls[bossDef.id] ?? 0;
   if (pearls) { run.ledger.materials.flussperle = (run.ledger.materials.flussperle ?? 0) + pearls; emit(run, { type: 'loot', kind: 'material', id: 'flussperle', count: pearls }); }
   quest(run, { type: 'boss', bossId: bossDef.id });
+  syncSluices(run);
   run.dirty = true;
 }
 
@@ -373,14 +511,19 @@ function quest(run, event) {
   if (r.changed) run.dirty = true;
   for (const id of r.advanced) { emit(run, { type: 'questAdvanced', questId: id }); run.dirty = true; }
   for (const id of r.completed) completeQuest(run, id);
+  if (r.changed) syncSluices(run);
   if (r.advanced.length) skipBeatenBosses(run);
 }
 
-/** Ein Bossschritt, dessen Boss schon besiegt ist (vor dem Auftrag), gilt sofort als erledigt. */
+/**
+ * Ein Bossschritt, dessen Boss schon besiegt ist (vor dem Auftrag), gilt sofort als erledigt; ebenso ein Hebelschritt,
+ * dessen Schleuse schon im verlangten Zustand steht.
+ */
 function skipBeatenBosses(run) {
   for (const [id, e] of Object.entries(run.record.quests)) {
     const s = e.state === 'active' ? QUESTS[id].steps[e.step] : null;
     if (s?.type === 'boss' && run.record.bosses.includes(s.target)) { quest(run, { type: 'boss', bossId: s.target }); return; }
+    if (s?.type === 'lever' && sluiceState(run, s.target) === s.state) { quest(run, { type: 'lever', sluice: s.target, state: s.state }); return; }
   }
 }
 
@@ -502,6 +645,7 @@ function findInteractable(run) {
     ...m.campfires.map((c) => ({ kind: 'campfire', id: c.id, x: c.x, z: c.z })),
     ...m.spots.filter((s) => spotUseful(run, s)).map((s) => ({ kind: 'spot', id: s.id, x: s.x, z: s.z })),
     ...m.chests.filter((c) => !run.record.chests.includes(c.id)).map((c) => ({ kind: 'chest', id: c.id, x: c.x, z: c.z })),
+    ...(m.sluices ?? []).filter((s) => s.lever).map((s) => ({ kind: 'lever', id: s.id, x: s.lever.x, z: s.lever.z })),
   ].filter((o) => dist(o, h) <= INTERACT_RANGE).sort((a, b) => dist(a, h) - dist(b, h));
   return all[0] ?? null;
 }
@@ -516,6 +660,7 @@ export function interact(run) {
   if (run.state !== 'playing' || !run.interactable) return null;
   const t = run.interactable;
   if (t.kind === 'npc') return talk(run, t.id);
+  if (t.kind === 'lever') return { kind: 'lever', id: t.id, state: toggleSluice(run, t.id) };
   if (t.kind === 'campfire') {
     rest(run, t.id);
     run.state = 'menu';

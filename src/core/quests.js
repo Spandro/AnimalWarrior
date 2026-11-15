@@ -6,7 +6,8 @@ import { DIALOGUES, NPCS } from '../data/dialogues.js';
  * `acceptQuest` und `questEvent` ändern ihn.
  * @typedef {Record<string, { state: 'active'|'done', step: number, progress: number }>} QuestLog
  * @typedef {{ type: 'talk', npc: string } | { type: 'reach', place: string } | { type: 'kill', enemyType: string }
- *   | { type: 'collect', thing: string } | { type: 'boss', bossId: string }} QuestEvent
+ *   | { type: 'collect', thing: string } | { type: 'boss', bossId: string }
+ *   | { type: 'lever', sluice: string, state: 'open'|'closed' }} QuestEvent
  */
 
 const isDone = (log, id) => log[id]?.state === 'done';
@@ -74,6 +75,7 @@ function matches(step, e) {
     case 'kill': return e.type === 'kill' && e.enemyType === step.target;
     case 'collect': return e.type === 'collect' && e.thing === step.target;
     case 'boss': return e.type === 'boss' && e.bossId === step.target;
+    case 'lever': return e.type === 'lever' && e.sluice === step.target && (!step.state || e.state === step.state);
     default: return false;
   }
 }
@@ -130,6 +132,7 @@ export function questTarget(log, questId, maps, found = []) {
     if (s.type === 'talk') hit = m.npcs.find((n) => n.id === s.target);
     else if (s.type === 'reach') hit = m.areas.find((a) => a.id === s.target);
     else if (s.type === 'boss') hit = m.bosses.find((b) => b.id === s.target);
+    else if (s.type === 'lever') hit = (m.sluices ?? []).find((sl) => sl.id === s.target)?.lever ?? null;
     else if (s.type === 'collect' && s.from === 'spot') hit = m.spots.find((p) => p.kind === s.target && !found.includes(p.id));
     else {
       const types = s.type === 'kill' ? [s.target] : s.from;
