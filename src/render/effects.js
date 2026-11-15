@@ -550,6 +550,7 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
 
   function bossTelegraph(e) {
     if (e.kind === 'dash') { dashTelegraph(e); return; }
+    if (e.kind === 'bubbles') { for (const p of e.points) bossTelegraph({ ...e, kind: 'leap', x: p.x, z: p.z }); return; }
     const swipe = e.kind === 'swipe';
     const halfAngle = e.halfAngle ?? BOSS_MOVES.baer.near.halfAngle;
     const geoFill = swipe ? shapes.sector(2 * halfAngle / DEG) : shapes.disc;

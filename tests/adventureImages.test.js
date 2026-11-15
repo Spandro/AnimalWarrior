@@ -4,7 +4,7 @@ import { test, assertEqual, assertTrue } from './runner.js';
 import * as THREE from '../vendor/three.module.min.js';
 import {
   SHEETS, SHEET_HOLES, SHEET_CUTS, CUT_LAYOUTS, CUT_SHEET_MAX_WIDTH, cutLayout, ADVENTURE_SHEETS, ADVENTURE_ENEMY_SPRITES,
-  NPC_SPRITES, VILLAGE_SPRITES, NPC_PORTRAITS,
+  NPC_SPRITES, VILLAGE_SPRITES, NPC_PORTRAITS, ENEMY_SPRITES,
 } from '../src/data/sprites.js';
 import { ITEMS, ITEM_SHEETS, itemIconRect, itemSheet } from '../src/data/items.js';
 import { MAPS } from '../src/data/maps/index.js';
@@ -49,6 +49,12 @@ test('abenteuer-bilder: cutLayout füllt Reihe um Reihe bis zur Höchstbreite', 
 test('abenteuer-bilder: Figuren, Leute und Dorfbilder zeigen auf ihre Zelle im ausgeschnittenen Bogen', () => {
   const check = (defs, sheet) => {
     for (const [name, d] of Object.entries(defs)) {
+      if (defs === ADVENTURE_ENEMY_SPRITES && d.sheet !== sheet) {
+        // Stellvertreter aus einem Bogen des Wellen-Modus: dasselbe Rechteck wie dort.
+        const w = ENEMY_SPRITES[d.cell];
+        assertEqual({ sheet: d.sheet, x: d.x, y: d.y, w: d.w, h: d.h }, { sheet: w.sheet, x: w.x, y: w.y, w: w.w, h: w.h }, name);
+        continue;
+      }
       assertEqual(d.sheet, sheet, name);
       assertEqual({ x: d.x, y: d.y, w: d.w, h: d.h }, CUT_LAYOUTS[sheet].cells[d.cell ?? name], name);
       assertTrue(d.heightM > 0 && d.footOffset >= 0 && d.footOffset < d.heightM, `${name} Maße`);

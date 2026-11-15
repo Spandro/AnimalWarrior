@@ -211,6 +211,8 @@ const FALLBACK_SHAPE = {
   fuchs: 'wolf', luchs: 'wolf', dachs: 'wildschwein', keiler: 'wildschwein', igel: 'ratte', kreuzotter: 'ratte',
   uhu: 'kraehe', hirsch: 'baer', wisent: 'baer',
   helmfisch: 'ratte', krebs: 'ratte', frosch: 'giftkroete', hauptmann_graete: 'wolf', kommandant_zwickzwack: 'baer',
+  ochsenfrosch: 'giftkroete', libelle: 'kraehe', blutegel: 'ratte', kaulquappe: 'giftkroete', hofmarschall_quak: 'giftkroete',
+  hecht_haudrauf: 'wolf',
 };
 
 /**

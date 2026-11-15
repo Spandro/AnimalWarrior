@@ -1,10 +1,13 @@
 /**
  * @typedef {{ id: string, name: string, hp: number, speed: number, damage: number, radius: number, xp: number, behavior: string,
- *   flying?: boolean, venom?: boolean, armor?: number, pounceMul?: number, adventureOnly?: boolean, mudproof?: boolean }} EnemyDef
+ *   flying?: boolean, venom?: boolean, armor?: number, pounceMul?: number, adventureOnly?: boolean, mudproof?: boolean,
+ *   pounceRange?: number, leech?: { slow: number, seconds: number, healPct: number } }} EnemyDef
  *   name: Anzeigename (Bossanzeige); venom: Berührungstreffer vergiftet (siehe VENOM); armor: zieht flach von jedem
  *   Treffer ab (mindestens 1 Schaden bleibt); pounceMul: Sprungschaden statt POUNCE.damageMul.
  *   adventureOnly: nur im Abenteuer (nicht in `unlockMinute`, `weights` und `BOSS_POOL`).
- *   mudproof: Schlamm bremst ihn nicht (Gelände, Kapitel 2).
+ *   mudproof: Schlamm bremst ihn nicht (Gelände, Kapitel 2). pounceRange: Sprungweite statt POUNCE.engageRange.
+ *   leech: ein durchgekommener Berührungstreffer bremst den Helden `seconds` s um den Anteil `slow` und heilt den Gegner
+ *   um `healPct` seines höchsten Lebens (Blutegel).
  */
 
 /** @type {Record<string, EnemyDef>} */
@@ -28,6 +31,11 @@ export const ENEMIES = {
   krebs: { id: 'krebs', adventureOnly: true, name: 'Krebs', hp: 26, speed: 2.4, damage: 7, radius: 0.5, xp: 4, behavior: 'strafe', armor: 2 },
   frosch: { id: 'frosch', adventureOnly: true, name: 'Frosch', hp: 18, speed: 3.8, damage: 6, radius: 0.45, xp: 3, behavior: 'pounce', pounceMul: 0.8 },
   ochsenfrosch: { id: 'ochsenfrosch', adventureOnly: true, name: 'Ochsenfrosch', hp: 36, speed: 3.4, damage: 8, radius: 0.6, xp: 5, behavior: 'pounce', pounceMul: 1, pounceRange: 11 },
+  libelle: { id: 'libelle', adventureOnly: true, name: 'Libelle', hp: 14, speed: 5.2, damage: 6, radius: 0.4, xp: 4, behavior: 'circle', flying: true },
+  blutegel: { id: 'blutegel', adventureOnly: true, name: 'Blutegel', hp: 30, speed: 1.8, damage: 6, radius: 0.4, xp: 4, behavior: 'chase', leech: { slow: 0.4, seconds: 1.5, healPct: 0.1 } },
+  kaulquappe: { id: 'kaulquappe', adventureOnly: true, name: 'Kaulquappe', hp: 6, speed: 3.6, damage: 3, radius: 0.3, xp: 1, behavior: 'chase' },
+  hofmarschall_quak: { id: 'hofmarschall_quak', adventureOnly: true, name: 'Hofmarschall Quak', hp: 800, speed: 3.0, damage: 15, radius: 1.3, xp: 220, behavior: 'boss' },
+  hecht_haudrauf: { id: 'hecht_haudrauf', adventureOnly: true, name: 'Hecht Haudrauf', hp: 1200, speed: 3.2, damage: 18, radius: 1.5, xp: 400, behavior: 'boss', mudproof: true },
   hauptmann_graete: { id: 'hauptmann_graete', adventureOnly: true, name: 'Hauptmann Gräte', hp: 600, speed: 3.4, damage: 14, radius: 1.1, xp: 150, behavior: 'boss' },
   kommandant_zwickzwack: { id: 'kommandant_zwickzwack', adventureOnly: true, name: 'Kommandant Zwickzwack', hp: 900, speed: 2.6, damage: 18, radius: 1.5, xp: 300, behavior: 'boss', armor: 3 },
 };
@@ -123,12 +131,15 @@ export const BOSS = {
  * - `ring`: Kreis um den Boss (Radius = Boss-Radius + `reach`); ein Treffer stößt den Helden `push` weit weg
  * - `dash`: Streifen (`length` × `width`) ab dem Boss Richtung Held; der Boss rennt ihn in `dashTime` s ab und trifft
  *   höchstens einmal je Ansturm; `count` Anstürme, dazwischen `gap` s, jeder neu ausgerichtet und angekündigt
+ * - `bubbles`: `count` Moorblasen (Kreise mit `radius`), die erste am Helden, die übrigen im Umkreis `spread` um ihn;
+ *   nach `windup` trifft es den Helden, wenn er in einem der Kreise steht (Hecht Haudrauf)
  * Schaden: Bossschaden × `damageMul`.
  * @typedef {{ kind: 'swipe', reach: number, halfAngle: number, windup: number, damageMul: number }
  *   | { kind: 'leap', radius: number, windup: number, damageMul: number }
  *   | { kind: 'ring', reach: number, windup: number, damageMul: number, push: number }
  *   | { kind: 'dash', length: number, width: number, windup: number, dashTime: number, damageMul: number,
- *       count: number, gap: number }} BossAttack
+ *       count: number, gap: number }
+ *   | { kind: 'bubbles', count: number, spread: number, radius: number, windup: number, damageMul: number }} BossAttack
  * @typedef {{ chaseTime: number, recover: number, triggerRange: number, near: BossAttack, far: BossAttack,
  *   summon?: { every: number, type: string, count: number, radius: number } }} BossMoves
  *   `summon` (nur Abenteuer): alle `every` s erscheinen `count` Gegner `type` im Abstand `radius` um den Boss,
@@ -166,5 +177,16 @@ export const BOSS_MOVES = {
     near: { kind: 'swipe', reach: 3.2, halfAngle: Math.PI / 2.5, windup: 0.8, damageMul: 1.2 },
     far: { kind: 'ring', reach: 7, windup: 1.2, damageMul: 1, push: 3 },
     summon: { every: 25, type: 'krebs', count: 3, radius: 3 },
+  },
+  hofmarschall_quak: {
+    chaseTime: 2.5, recover: 0.7, triggerRange: 3.5,
+    near: { kind: 'leap', radius: 3, windup: 0.9, damageMul: 1.2 },
+    far: { kind: 'leap', radius: 3.5, windup: 1.2, damageMul: 1.6 },
+    summon: { every: 20, type: 'kaulquappe', count: 4, radius: 3 },
+  },
+  hecht_haudrauf: {
+    chaseTime: 2.5, recover: 0.8, triggerRange: 4,
+    near: { kind: 'dash', length: 14, width: 2.6, windup: 0.8, dashTime: 0.6, damageMul: 1.3, count: 2, gap: 0.5 },
+    far: { kind: 'bubbles', count: 4, spread: 5, radius: 1.8, windup: 1.2, damageMul: 1.2 },
   },
 };

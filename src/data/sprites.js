@@ -266,6 +266,12 @@ export const ADVENTURE_ENEMY_SPRITES = {
   // Kapitel 2: bis eigene Bilder kommen, gemalte Stellvertreter aus kapitel1.webp (größer oder kleiner gezeigt);
   // `cell` nennt das ausgeschnittene Stück, das sie zeigen.
   ochsenfrosch: { sheet: 'kapitel1', ...K1.frosch, cell: 'frosch', heightM: 1.1, motion: 'hopSlow', footOffset: 0.07 },
+  kaulquappe: { sheet: 'kapitel1', ...K1.frosch, cell: 'frosch', heightM: 0.5, motion: 'scurry', footOffset: 0.03 },
+  hofmarschall_quak: { sheet: 'kapitel1', ...K1.frosch, cell: 'frosch', heightM: 2.4, motion: 'hopSlow', footOffset: 0.15 },
+  hecht_haudrauf: { sheet: 'kapitel1', ...K1.hauptmann_graete, cell: 'hauptmann_graete', heightM: 2.9, motion: 'trot', footOffset: 0.11 },
+  // Ohne passendes Stück in kapitel1.webp: Stellvertreter aus den Bögen des Wellen-Modus (`cell` = Gegnertyp dort).
+  libelle: { ...ENEMY_SPRITES.kraehe, cell: 'kraehe', heightM: 0.9 },
+  blutegel: { ...ENEMY_SPRITES.kreuzotter, cell: 'kreuzotter', heightM: 0.5, footOffset: 0.03 },
   hauptmann_graete: { sheet: 'kapitel1', ...K1.hauptmann_graete, heightM: 2.6, motion: 'trot', footOffset: 0.1 },
   kommandant_zwickzwack: { sheet: 'kapitel1', ...K1.kommandant_zwickzwack, heightM: 2.8, motion: 'lumber', footOffset: 0.12 },
   flossian: { sheet: 'kapitel1', ...K1.flossian, heightM: 1.6, motion: 'lumber', footOffset: 0.08 },
@@ -341,7 +347,8 @@ export const NPC_PORTRAITS = {
  */
 export const ADVENTURE_SPRITE_STANDIN = {
   helmfisch: 'ratte', krebs: 'igel', frosch: 'giftkroete', hauptmann_graete: 'wolf', kommandant_zwickzwack: 'dachs',
-  ochsenfrosch: 'giftkroete',
+  ochsenfrosch: 'giftkroete', kaulquappe: 'giftkroete', hofmarschall_quak: 'giftkroete', hecht_haudrauf: 'wolf',
+  libelle: 'kraehe', blutegel: 'kreuzotter',
 };
 
 /** Aufsammelbares des Abenteuers, gezeichnet wie: Trank, Truhe (Gegenstand), Kristall (Flussperle). */

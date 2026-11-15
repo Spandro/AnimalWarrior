@@ -17,8 +17,9 @@ import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
  * @typedef {{ modifiers: Modifier[], timeLeft: number, abilityId?: string }} Buff
  * @typedef {{ x: number, z: number, facing: {x:number,z:number}, hp: number, stats: Stats, modifiers: Modifier[],
  *   abilities: HeroAbility[], buffs: Buff[], radius: number, invulnerableUntil: number,
- *   poison: { until: number, dps: number, nextTick: number } | null, animalId: string, classId: string }} Hero
- *   `poison`: Gift der Kreuzotter (VENOM), nur im Lauf.
+ *   poison: { until: number, dps: number, nextTick: number } | null, animalId: string, classId: string,
+ *   slowUntil?: number, slowFactor?: number }} Hero
+ *   `poison`: Gift der Kreuzotter (VENOM), nur im Lauf. `slowUntil`/`slowFactor`: vom Blutegel gebremst (Abenteuer).
  * @typedef {{ id: number, type: string, x: number, z: number, hp: number, maxHp: number, radius: number, speed: number,
  *   damage: number, elite: boolean, boss: boolean, flying: boolean, behavior: string, slowUntil: number, slowFactor: number,
  *   confusedUntil: number, stunnedUntil: number, contactReadyAt: number, hitReadyAt: Record<string, number>, ai: object,
@@ -118,7 +119,7 @@ const BEHAVIORS = {
     }
     const target = enemyTarget(world, enemy);
     const to = towards(enemy, target);
-    if (t >= (ai.readyAt ?? 0) && to.d <= POUNCE.engageRange) {
+    if (t >= (ai.readyAt ?? 0) && to.d <= (ENEMIES[enemy.type]?.pounceRange ?? POUNCE.engageRange)) {
       ai.phase = 'crouch'; ai.crouchStart = t; ai.until = t + POUNCE.crouch; ai.tx = target.x; ai.tz = target.z;
       world.events.push({
         type: 'bossTelegraph', kind: 'leap', x: target.x, z: target.z, radius: POUNCE.radius,
@@ -311,6 +312,17 @@ function startBossAttack(world, enemy, mv) {
   const a = to.d <= enemy.radius + mv.triggerRange ? mv.near : mv.far;
   if (a.kind === 'swipe') { startSwipe(world, enemy, to, a); return; }
   if (a.kind === 'dash') { enemy.ai.dash = a; enemy.ai.dashLeft = a.count; startDash(world, enemy, a); return; }
+  if (a.kind === 'bubbles') {
+    const points = [{ x: hero.x, z: hero.z }];
+    for (let i = 1; i < a.count; i++) {
+      const ang = world.rng.range(0, Math.PI * 2), r = a.spread * Math.sqrt(world.rng.next());
+      points.push({ x: hero.x + Math.cos(ang) * r, z: hero.z + Math.sin(ang) * r });
+    }
+    telegraph(world, enemy, {
+      kind: 'bubbles', x: hero.x, z: hero.z, points, radius: a.radius, delay: a.windup, dirX: to.x, dirZ: to.z, damageMul: a.damageMul,
+    });
+    return;
+  }
   if (a.kind === 'ring') {
     telegraph(world, enemy, {
       kind: 'ring', x: enemy.x, z: enemy.z, radius: enemy.radius + a.reach, delay: a.windup,
@@ -382,6 +394,11 @@ function telegraph(world, enemy, a) {
 /** Schaden, wenn der Held jetzt in der angekündigten Form steht; dann `recover` s Pause. */
 function resolveAttack(world, enemy, recover) {
   const ai = enemy.ai, a = ai.attack, hero = world.hero;
+  if (a.kind === 'bubbles') {
+    if (a.points.some((p) => Math.hypot(hero.x - p.x, hero.z - p.z) <= a.radius)) damageHero(world, enemy.damage * a.damageMul);
+    ai.phase = 'recover'; ai.until = world.time + recover; ai.attack = null;
+    return;
+  }
   if (a.kind === 'leap') { enemy.x = a.x; enemy.z = a.z; }
   const dx = hero.x - a.x, dz = hero.z - a.z;
   const d = Math.hypot(dx, dz);
@@ -766,6 +783,17 @@ function poisonHero(world, enemy) {
   }
 }
 
+/**
+ * Blutegel: bremst den Helden (`hero.slowUntil`/`hero.slowFactor`, ein neuer Treffer frischt auf) und heilt sich
+ * höchstens bis zum vollen Leben.
+ */
+function leechHero(world, enemy, l) {
+  const hero = world.hero;
+  hero.slowUntil = world.time + l.seconds;
+  hero.slowFactor = l.slow;
+  enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * l.healPct);
+}
+
 /** Gift-Ticks bis zur aktuellen Zeit; nach dem letzten Tick ist das Gift weg. */
 function stepPoison(world) {
   const hero = world.hero, p = hero.poison;
@@ -878,7 +906,8 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
   if (len > 0) {
     const dx = input.moveX / len, dz = input.moveZ / len;
     hero.facing = { x: dx, z: dz };
-    const step = hero.stats.moveSpeed * terrainFactor(world, hero.x, hero.z, 'walk') * dt;
+    const slowed = hero.slowUntil > world.time ? 1 - hero.slowFactor : 1;
+    const step = hero.stats.moveSpeed * slowed * terrainFactor(world, hero.x, hero.z, 'walk') * dt;
     hero.x += dx * step;
     hero.z += dz * step;
     pushOutOfObstacles(world, hero);
@@ -919,7 +948,11 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
     const min = e.radius + hero.radius + CONTACT_TOLERANCE;
     if (dx * dx + dz * dz <= min * min && world.time >= e.contactReadyAt) {
       e.contactReadyAt = world.time + (world.contactInterval ?? CONTACT_INTERVAL);
-      if (damageHero(world, e.damage) && ENEMIES[e.type]?.venom) poisonHero(world, e);
+      if (damageHero(world, e.damage)) {
+        const def = ENEMIES[e.type];
+        if (def?.venom) poisonHero(world, e);
+        if (def?.leech) leechHero(world, e, def.leech);
+      }
     }
   }
   stepPoison(world);
