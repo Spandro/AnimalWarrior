@@ -145,7 +145,9 @@ export function createTerrainView(scene, seed, { env, camera, obstacles = (x, z,
 
   let grassTex, groundMat;
   if (painted) {
-    grassTex = env.ground;
+    // Eigene Kopie: die Bodentextur gehört der App, die Kachelung soll sie nicht verändern.
+    grassTex = env.ground.clone();
+    grassTex.needsUpdate = true;
     grassTex.repeat.set(TERRAIN_CELL / GROUND.tileM, TERRAIN_CELL / GROUND.tileM);
     groundMat = new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1, metalness: 0 });
   } else {
@@ -427,7 +429,13 @@ export function createTerrainView(scene, seed, { env, camera, obstacles = (x, z,
   /** Setzt die Deckkraft eines Baumes; das durchscheinende Material entsteht erst, wenn es gebraucht wird. */
   function applyFade(t) {
     if (t.fade <= 0) {
-      if (t.mat) t.panel.material = spriteMat;
+      if (t.mat) {
+        // Wieder deckend: das durchscheinende Material freigeben, damit es sich im Durchgang nicht ansammelt.
+        t.panel.material = spriteMat;
+        t.mat.dispose();
+        fadeMats.splice(fadeMats.indexOf(t.mat), 1);
+        t.mat = null;
+      }
       return;
     }
     if (!t.mat) {
@@ -471,8 +479,8 @@ export function createTerrainView(scene, seed, { env, camera, obstacles = (x, z,
   function dispose() {
     for (const key of [...tiles.keys()]) removeTile(key);
     scene.remove(root);
-    // Die gemalten Texturen gehören der App (einmal geladen) und bleiben für den nächsten Durchgang.
-    if (!painted) grassTex.dispose();
+    // Die gemalten Bilder gehören der App (einmal geladen) und bleiben; freigegeben wird nur die eigene Kopie.
+    grassTex.dispose();
     groundMat.dispose();
     spriteMat?.dispose();
     blobMat?.dispose();
