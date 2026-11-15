@@ -102,3 +102,28 @@ export const TAVERN_ITEMS = Object.fromEntries(Object.entries(ITEMS).filter(([, 
 export function itemSheet(item) {
   return item.source === 'taverne' ? 'beute' : 'beute1';
 }
+
+/**
+ * Bildbögen der Gegenstände (relativ zu index.html): Größe in Pixeln, Kanten der Spalten und Zeilen (Pixel, von links
+ * bzw. oben; Zelle k liegt in Spalte k % 6, Zeile ⌊k / 6⌋) und Abstand zu den Zellkanten. `beute1.webp` hat hellgraue
+ * Rasterlinien bei x = 255/256, 511/512, … und y = 212, 415/416, 617, 812, die Zeilen sind daher ungleich hoch; der
+ * Abstand von 2 px hält die Linien aus dem Symbol (die Gegenstände reichen fast bis an die Linien).
+ * @type {Record<'beute'|'beute1', { url: string, width: number, height: number, cols: number[], rows: number[], inset: number }>}
+ */
+export const ITEM_SHEETS = {
+  beute: { url: 'assets/taverne/beute.webp', width: 1536, height: 1024, cols: [0, 256, 512, 768, 1024, 1280, 1536], rows: [0, 256, 512, 768, 1024], inset: 0 },
+  beute1: { url: 'assets/abenteuer/beute1.webp', width: 1536, height: 1024, cols: [0, 256, 512, 768, 1024, 1280, 1536], rows: [0, 213, 416, 618, 813, 1024], inset: 2 },
+};
+
+/**
+ * Ausschnitt des Symbols eines Gegenstands in seinem Bogen (x, y von links oben, in Pixeln).
+ * @param {ItemDef} item
+ * @returns {{ url: string, width: number, height: number, x: number, y: number, w: number, h: number }}
+ */
+export function itemIconRect(item) {
+  const sheet = ITEM_SHEETS[itemSheet(item)];
+  const perRow = sheet.cols.length - 1;
+  const c = item.icon % perRow, r = Math.floor(item.icon / perRow);
+  const x = sheet.cols[c] + sheet.inset, y = sheet.rows[r] + sheet.inset;
+  return { url: sheet.url, width: sheet.width, height: sheet.height, x, y, w: sheet.cols[c + 1] - sheet.inset - x, h: sheet.rows[r + 1] - sheet.inset - y };
+}

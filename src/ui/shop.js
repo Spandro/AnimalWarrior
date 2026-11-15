@@ -2,7 +2,7 @@
 import { el, formatNumber } from './dom.js';
 import { panel } from './adventureMenus.js';
 import { confirmDialog } from './menus.js';
-import { itemTitle } from './equipment.js';
+import { itemTitle, itemRow } from './equipment.js';
 import { ITEMS, RARITIES } from '../data/items.js';
 import { POTION, SHOP_LINES } from '../data/adventure.js';
 import { buyPotion, buyItem, sellItem, shopStock, shopPrice } from '../save/adventure.js';
@@ -24,7 +24,7 @@ export function openShop(ctx) {
         el('strong', { text: `Heiltrank – ${POTION.price} Gold` }), el('span', { class: 'adv-muted', text: `In der Tasche: ${rec.potions} von ${POTION.max}` })));
       for (const id of shopStock()) {
         const owned = save.inventory.includes(id);
-        body.append(el('button', { class: 'adv-quest-row', type: 'button', 'data-key': id, disabled: owned, style: `border-color:${RARITIES[ITEMS[id].rarity].color}`, onclick: () => act((s) => buyItem(s, id)) },
+        body.append(itemRow({ class: 'adv-quest-row', type: 'button', 'data-key': id, disabled: owned, style: `border-color:${RARITIES[ITEMS[id].rarity].color}`, onclick: () => act((s) => buyItem(s, id)) }, id,
           el('strong', { text: `${ITEMS[id].name} – ${shopPrice(id)} Gold` }),
           el('span', { class: 'adv-muted', text: owned ? 'Schon in deiner Truhe' : `„${ITEMS[id].line}“` })));
       }
@@ -33,13 +33,13 @@ export function openShop(ctx) {
     if (save.inventory.length === 0) body.append(el('p', { class: 'adv-note', text: 'Deine Truhe ist leer.' }));
     for (const id of save.inventory) {
       const wearer = save.heroes.find((h) => h.adventure && Object.values(h.adventure.equipment).includes(id));
-      body.append(el('button', {
+      body.append(itemRow({
         class: 'adv-quest-row', type: 'button', 'data-key': id, disabled: !!wearer, style: `border-color:${RARITIES[ITEMS[id].rarity].color}`,
         onclick: async () => {
           const ok = await confirmDialog({ title: 'Verkaufen?', message: `${itemTitle(id, save.itemLevels)} für ${RARITIES[ITEMS[id].rarity].resale} Gold verkaufen? Eine Verbesserung geht dabei verloren.`, confirmLabel: 'Verkaufen' });
           if (ok) act((s) => sellItem(s, id));
         },
-      },
+      }, id,
       el('strong', { text: `${itemTitle(id, save.itemLevels)} – ${RARITIES[ITEMS[id].rarity].resale} Gold` }),
       el('span', { class: 'adv-muted', text: wearer ? `angelegt von ${wearer.name}` : RARITIES[ITEMS[id].rarity].name })));
     }

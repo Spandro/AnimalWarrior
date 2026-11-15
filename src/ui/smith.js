@@ -2,7 +2,8 @@
 import { el, formatNumber } from './dom.js';
 import { panel } from './adventureMenus.js';
 import { describeModifier } from './heroCreate.js';
-import { itemTitle } from './equipment.js';
+import { itemTitle, itemRow } from './equipment.js';
+import { lootIcon } from './tavern.js';
 import { ITEMS, RARITIES } from '../data/items.js';
 import { SMITH, SMITH_LINES } from '../data/adventure.js';
 import { scaledModifiers } from '../core/adventureHero.js';
@@ -20,14 +21,14 @@ export function openSmith(ctx) {
     if (!pick) {
       if (save.inventory.length === 0) body.append(el('p', { class: 'adv-note', text: 'Bring mir erst mal was zum Hämmern.' }));
       for (const id of save.inventory) {
-        body.append(el('button', { class: 'adv-quest-row', type: 'button', 'data-key': id, style: `border-color:${RARITIES[ITEMS[id].rarity].color}`, onclick: () => { pick = id; api.refresh(); } },
+        body.append(itemRow({ class: 'adv-quest-row', type: 'button', 'data-key': id, style: `border-color:${RARITIES[ITEMS[id].rarity].color}`, onclick: () => { pick = id; api.refresh(); } }, id,
           el('strong', { text: itemTitle(id, levels) }), el('span', { class: 'adv-muted', text: `Stufe ${levels[id] ?? 0} von ${SMITH.maxLevel}` })));
       }
       return;
     }
     const level = levels[pick] ?? 0;
     body.append(el('button', { class: 'btn', type: 'button', onclick: () => { pick = null; api.refresh(); } }, '← Alle Stücke'));
-    body.append(el('h3', { text: itemTitle(pick, levels) }));
+    body.append(el('div', { class: 'adv-item-head' }, lootIcon(ITEMS[pick], 'loot-row'), el('h3', { text: itemTitle(pick, levels) })));
     body.append(el('p', { class: 'adv-muted', text: `Jetzt: ${scaledModifiers(pick, level).map(describeModifier).join(', ')}` }));
     if (level >= SMITH.maxLevel) { body.append(el('p', { class: 'adv-note', text: REASON.max })); return; }
     const cost = smithCost(pick, level + 1);

@@ -1,7 +1,34 @@
-// Gesprächskasten unten (Spec §10.2): Porträt (bis zum Bild ein Kreis mit Anfangsbuchstaben), Name, ein Satz nach dem
-// anderen. Weiter mit Tippen, Klick, Leertaste oder Enter; am Ende eines Nebenauftrags „Mach ich!“ oder „Später“.
+// Gesprächskasten unten (Spec §10.2): Porträt (Kopf aus `bewohner.webp`, sonst ein Kreis mit Anfangsbuchstaben), Name,
+// ein Satz nach dem anderen. Weiter mit Tippen, Klick, Leertaste oder Enter; am Ende eines Nebenauftrags „Mach ich!“ oder „Später“.
 import { el } from './dom.js';
 import { NPCS } from '../data/dialogues.js';
+import { NPC_PORTRAITS } from '../data/sprites.js';
+import { probeImage } from './tavern.js';
+
+/** Kantenlänge des Porträts in Pixeln (wie `.dialogue-portrait` in styles.css). */
+const PORTRAIT_SIZE = 56;
+
+/**
+ * Porträt einer Person: Kopf-Ausschnitt aus `bewohner.webp`, sobald das Bild da ist und die Person ausgemessen ist
+ * (wie die Wirte der Taverne), sonst ein Kreis mit dem Anfangsbuchstaben.
+ * @param {string} npc
+ * @param {string} name
+ */
+export function npcPortrait(npc, name) {
+  const box = el('div', { class: 'dialogue-portrait', 'aria-hidden': 'true', text: name.charAt(0) });
+  const rect = NPC_PORTRAITS.rects[npc];
+  if (!rect) return box;
+  probeImage(NPC_PORTRAITS.sheet).then((img) => {
+    if (!img || !box.isConnected) return;
+    const k = PORTRAIT_SIZE / Math.max(rect.w, rect.h);
+    box.style.backgroundImage = `url('${NPC_PORTRAITS.sheet}')`;
+    box.style.backgroundSize = `${img.naturalWidth * k}px ${img.naturalHeight * k}px`;
+    box.style.backgroundPosition = `${(PORTRAIT_SIZE - rect.w * k) / 2 - rect.x * k}px ${(PORTRAIT_SIZE - rect.h * k) / 2 - rect.y * k}px`;
+    box.classList.add('dialogue-portrait-image');
+    box.textContent = '';
+  });
+  return box;
+}
 
 /**
  * @param {HTMLElement} uiLayer
@@ -11,7 +38,7 @@ import { NPCS } from '../data/dialogues.js';
 export function showDialogue(uiLayer, { npc, speaker, lines, choice = false }) {
   return new Promise((resolve) => {
     let index = 0;
-    const portrait = el('div', { class: 'dialogue-portrait', 'aria-hidden': 'true', text: (NPCS[npc]?.name ?? speaker).charAt(0) });
+    const portrait = npcPortrait(npc, NPCS[npc]?.name ?? speaker);
     const text = el('p', { class: 'dialogue-text', 'aria-live': 'polite' });
     const next = el('button', { class: 'btn btn-primary dialogue-next', type: 'button' }, 'Weiter ▸');
     const accept = el('button', { class: 'btn btn-primary', type: 'button', hidden: true }, 'Mach ich!');

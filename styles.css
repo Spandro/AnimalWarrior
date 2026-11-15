@@ -758,13 +758,14 @@ button.chest-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rg
 .loot-small { width: 64px; height: 64px; }
 .loot-large { width: 112px; height: 112px; align-self: center; }
 /* Bild vom Auftraggeber hat weißen Grund: auf eine helle Kachel legen. */
-.loot-icon.loot-image { background-color: #f4ecd8; border-radius: 8px; }
+.loot-icon.loot-image { background-color: #fcfbfc; border-radius: 8px; overflow: hidden; }
+.loot-art { display: block; width: 100%; max-height: 100%; background-repeat: no-repeat; }
 
 .item-detail { display: flex; flex-direction: column; gap: 8px; border-color: var(--rarity, var(--line)); }
 .item-detail h2 { margin: 0; font-size: 1.4rem; text-align: center; }
 .item-detail p { margin: 0; }
 .item-detail .loot-large { background-color: #251a0e; border-radius: 14px; border: 3px solid var(--rarity); }
-.item-detail .loot-large.loot-image { background-color: #f4ecd8; }
+.item-detail .loot-large.loot-image { background-color: #fcfbfc; }
 .item-kind { text-align: center; color: var(--rarity); font-weight: 700; }
 .item-mods { margin: 4px 0 0; padding: 0; list-style: none; text-align: center; font-weight: 600; }
 .item-mods li::before { content: '✦ '; color: var(--leaf); font-weight: 400; }
@@ -831,7 +832,7 @@ button.chest-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rg
   animation: loot-pop 0.35s ease-out;
 }
 .loot-moment .loot-small { border-radius: 10px; background-color: #251a0e; }
-.loot-moment .loot-small.loot-image { background-color: #f4ecd8; }
+.loot-moment .loot-small.loot-image { background-color: #fcfbfc; }
 .loot-moment-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .loot-kicker { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-hi); }
 .loot-name { font-family: var(--serif); font-size: 1.1rem; }
@@ -960,6 +961,9 @@ button.chest-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rg
 .adv-potion-icon { position: absolute; top: 4px; left: 6px; font-size: 0.9rem; }
 .adv-talk { min-height: 48px; min-width: 136px; }
 .adv-banner { margin-top: 6px; padding: 6px 14px; border-radius: 8px; background: rgba(20, 16, 10, 0.75); color: #f6e7b8; font-weight: 600; text-align: center; }
+.adv-banner.adv-banner-item { display: flex; align-items: center; gap: 10px; text-align: left; }
+.adv-banner[hidden] { display: none; }
+.loot-banner { width: 40px; height: 40px; border-radius: 6px; background-color: rgba(0, 0, 0, 0.25); }
 .adv-shake { animation: adv-shake 0.3s; }
 @keyframes adv-shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 @media (prefers-reduced-motion: reduce) { .adv-shake { animation: none; outline: 2px solid #e04a3a; } }
@@ -967,6 +971,7 @@ button.chest-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rg
 /* Gesprächskasten */
 .dialogue { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom)); width: min(640px, calc(100% - 24px)); display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: 12px; background: rgba(32, 24, 14, 0.94); border: 2px solid #c9a86a; color: #f3ead2; z-index: 30; pointer-events: auto; }
 .dialogue-portrait { flex: 0 0 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: #6f8a4a; font-size: 1.6rem; font-weight: 700; }
+.dialogue-portrait.dialogue-portrait-image { background-color: #fcfbfc; background-repeat: no-repeat; box-shadow: 0 0 0 2px #c9a86a; }
 .dialogue-body { flex: 1; display: flex; flex-direction: column; gap: 6px; }
 .dialogue-name { color: #ffd98a; }
 .dialogue-text { margin: 0; line-height: 1.4; min-height: 2.8em; }
@@ -993,6 +998,11 @@ button.chest-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rg
 .adv-slot.on, .adv-quest-row.on { background: #5f7a3a; }
 .adv-quest-row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px; min-height: 44px; border-radius: 8px; border: 2px solid rgba(201, 168, 106, 0.5); background: rgba(255, 255, 255, 0.05); color: inherit; font: inherit; cursor: pointer; }
 .adv-quest-row:disabled { cursor: default; opacity: 0.7; }
+.adv-item-row { flex-direction: row; align-items: center; gap: 10px; }
+.adv-item-text { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.adv-item-head { display: flex; align-items: center; gap: 10px; }
+.adv-item-head h3 { margin: 0; }
+.loot-row { width: 52px; height: 52px; border-radius: 8px; background-color: rgba(0, 0, 0, 0.25); }
 .adv-tabs { display: flex; gap: 8px; }
 .adv-bigmap { width: 100%; height: auto; border-radius: 8px; }
 .adv-story { position: absolute; inset: 0; z-index: 40; background-color: #1b2414; background-size: 300% 200%; display: flex; align-items: flex-end; justify-content: center; padding: 16px; pointer-events: auto; }
