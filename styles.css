@@ -991,9 +991,14 @@ button.chest-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rg
 .adv-muted { color: #c2b48f; font-size: 0.86rem; }
 .adv-desc { color: #d8ccb0; font-size: 0.82rem; font-style: italic; }
 .adv-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; padding: 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.05); }
-.adv-row.locked { opacity: 0.55; }
+.adv-row.locked > .adv-row-main { opacity: 0.55; }
 .adv-row-main { display: flex; flex-direction: column; gap: 2px; flex: 1 1 200px; }
 .adv-row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.adv-tree-head { margin: 10px 0 2px; font-size: 1rem; color: #f3d98b; }
+.adv-subclass-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.adv-subclass-card { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(243, 217, 139, 0.35); }
+.adv-subclass-card .btn { align-self: flex-start; min-height: 44px; }
+.adv-remind { color: #f3d98b; }
 .adv-slot { min-width: 44px; }
 .adv-slot.on, .adv-quest-row.on { background: #5f7a3a; }
 .adv-quest-row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px; min-height: 44px; border-radius: 8px; border: 2px solid rgba(201, 168, 106, 0.5); background: rgba(255, 255, 255, 0.05); color: inherit; font: inherit; cursor: pointer; }

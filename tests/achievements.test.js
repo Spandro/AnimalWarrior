@@ -22,7 +22,7 @@ const byId = (id) => ACHIEVEMENTS.find((a) => a.id === id);
 // ------------------------------------------------------------------ Daten
 
 test('achievements: 37 eindeutige Ids mit Titel, Bedingung, Spruch und positivem Gold', () => {
-  assertEqual(ACHIEVEMENTS.length, 41);
+  assertEqual(ACHIEVEMENTS.length, 43);
   assertEqual(new Set(ACHIEVEMENTS.map((a) => a.id)).size, ACHIEVEMENTS.length);
   for (const a of ACHIEVEMENTS) {
     for (const key of ['id', 'title', 'condition', 'line']) assertTrue(typeof a[key] === 'string' && a[key].trim() !== '', `${a.id}.${key}`);
@@ -115,6 +115,10 @@ const CASES = [
   ['hilfsbereit', { save: { heroes: [{ adventure: { quests: { verbuddelt: { state: 'done' }, post_amsel: { state: 'done' } } } }] } },
     { save: { heroes: [{ adventure: { quests: { verbuddelt: { state: 'done' }, post_amsel: { state: 'done' }, hamsterkauf: { state: 'done' } } } }] } }],
   ['lagerfeuerromantik', { stats: { campfireRests: 19 } }, { stats: { campfireRests: 20 } }],
+  ['spezialist', { save: { heroes: [{ adventure: { subclass: null } }] } }, { save: { heroes: [{ adventure: null }, { adventure: { subclass: 'tuersteher' } }] } }],
+  ['meister-seines-fachs',
+    { save: { heroes: [{ adventure: { subclass: 'tuersteher', abilities: { breiteskreuz: 5, ausweisbitte: 5, rausschmiss: 5, hausverbot: 4 } } }] } },
+    { save: { heroes: [{ adventure: { subclass: 'tuersteher', abilities: { breiteskreuz: 5, ausweisbitte: 5, rausschmiss: 5, hausverbot: 5 } } }] } }],
 ];
 
 test('achievements: die Tabelle deckt jede Erfolgs-Id genau einmal ab', () => {
@@ -455,8 +459,8 @@ test('achievements: evaluateStored löst Schatzsucher nie ohne Durchgang aus', (
 
 // ---------------------------------------------------------------- Abenteuer
 
-test('achievements: vier Abenteuer-Erfolge aus dem gespeicherten Stand', () => {
-  assertEqual(ACHIEVEMENTS.length, 41);
+test('achievements: sechs Abenteuer-Erfolge aus dem gespeicherten Stand', () => {
+  assertEqual(ACHIEVEMENTS.length, 43);
   const hero = (adventure) => ({ id: 'h', name: 'H', animal: 'hase', class: 'krieger', createdAt: 1, survivor: { bestTime: 0, wins: 0, runs: 0 }, adventure });
   const ids = (save) => evaluateStored(saveWith({ ...save, stats: stats(save.stats) }));
   assertEqual(ids({}), []);
@@ -468,4 +472,5 @@ test('achievements: vier Abenteuer-Erfolge aus dem gespeicherten Stand', () => {
   assertEqual(ids({ inventory: ['paddel'], itemLevels: { paddel: 4 } }), []);
   assertEqual(ids({ stats: { campfireRests: 20 } }), ['lagerfeuerromantik']);
   assertEqual(ids({ stats: { campfireRests: 19 } }), []);
+  assertEqual(ids({ heroes: [hero({ chapterDone: [], quests: {}, subclass: 'kneipenschlaeger', abilities: { schwerthieb: 1 } })] }), ['spezialist']);
 });

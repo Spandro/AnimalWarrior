@@ -1,8 +1,9 @@
 import { test, assertEqual, assertTrue, assertClose } from './runner.js';
-import { xpToNextAdventure, gainXp, spendPoint, setButton, adventureModifiers, enemyMultipliers } from '../src/core/adventureHero.js';
+import { xpToNextAdventure, gainXp, spendPoint, setButton, adventureModifiers, enemyMultipliers,
+  pointsSpent, chooseSubclass, unlockBranch, spendPassive, specialBonus } from '../src/core/adventureHero.js';
 import { castManual, abilityParams } from '../src/core/abilities.js';
 import { createWorld, stepWorld, spawnEnemy } from '../src/core/world.js';
-import { newAdventure } from '../src/save/adventure.js';
+import { newAdventure, respecAdventure } from '../src/save/adventure.js';
 import { defaultSave, addHero } from '../src/save/store.js';
 import { ADVENTURE_LEVEL, MANUAL, ADVENTURE_BALANCE } from '../src/data/adventure.js';
 import { MAPS } from '../src/data/maps/index.js';
@@ -146,4 +147,115 @@ test('adventureHero: itemDelta vergleicht angelegtes und neues Stück mit Verbes
   assertEqual(itemDelta('helm_zuversicht', 'helm_zuversicht', { helm_zuversicht: 5 }), [{ stat: 'armor', kind: 'flat', from: 2, to: 2 }]);
   assertEqual(itemDelta('topf_kinnriemen', 'helm_zuversicht', {}),
     [{ stat: 'maxHp', kind: 'pct', from: 0.05, to: 0 }, { stat: 'armor', kind: 'flat', from: 0, to: 1 }]);
+});
+
+// ---------------------------------------------------------------- Etappe 2: Fähigkeitenbaum
+
+/** Held mit Level `level`, alle Stammfähigkeiten frei, Punkte wie aus gainXp. */
+function leveled(level, cls = 'krieger') {
+  const x = hero(cls === 'hochstapler' ? 'giraffe' : 'hase', cls);
+  if (cls === 'hochstapler') x.save.unlocks.push('duo');
+  let need = 0;
+  for (let l = 1; l < level; l++) need += xpToNextAdventure(l);
+  gainXp(x.a, need, cls);
+  return x;
+}
+const invariant = (a, cls = 'krieger') => assertEqual(pointsSpent(a, cls) + a.skillPoints, a.level - 1, 'Punkte-Summe');
+
+test('adventureHero: Unterklasse erst ab Level 10, nur passende, nur einmal', () => {
+  const { a } = leveled(9);
+  assertTrue(!chooseSubclass(a, 'krieger', 'tuersteher'), 'Level 9');
+  const b = leveled(10).a;
+  assertTrue(!chooseSubclass(b, 'krieger', 'wetterfrosch'), 'fremde Klasse');
+  assertTrue(!chooseSubclass(b, 'krieger', 'gibtsnicht'));
+  assertTrue(chooseSubclass(b, 'krieger', 'tuersteher'));
+  assertEqual(b.subclass, 'tuersteher');
+  assertTrue(!chooseSubclass(b, 'krieger', 'kochstelle'), 'schon gewählt');
+});
+
+test('adventureHero: Wahl gibt alle Punkte zurück, Stamm auf 1, Knöpfe bleiben', () => {
+  const { a } = leveled(12);
+  spendPoint(a, 'schwerthieb'); spendPoint(a, 'schwerthieb'); spendPoint(a, 'wirbelschlag');
+  const buttons = [...a.buttons];
+  assertEqual(a.skillPoints, 8);
+  assertTrue(chooseSubclass(a, 'krieger', 'kneipenschlaeger'));
+  assertEqual(a.skillPoints, 11);
+  assertTrue(Object.entries(a.abilities).every(([, l]) => l === 1));
+  assertEqual(a.buttons, buttons);
+  assertEqual(a.passives, {});
+  invariant(a);
+});
+
+test('adventureHero: Astfähigkeit freischalten kostet 1 Punkt, nur eigener Ast, dann ausbauen und auf Knopf', () => {
+  const { a } = leveled(10);
+  chooseSubclass(a, 'krieger', 'tuersteher');
+  assertTrue(!unlockBranch(a, 'roteruebe'), 'fremder Ast');
+  assertTrue(!unlockBranch(a, 'schwerthieb'), 'Stamm');
+  assertTrue(!setButton(a, 0, 'breiteskreuz'), 'noch gesperrt');
+  assertTrue(unlockBranch(a, 'breiteskreuz'));
+  assertEqual([a.abilities.breiteskreuz, a.skillPoints], [1, 8]);
+  assertTrue(!unlockBranch(a, 'breiteskreuz'), 'schon frei');
+  assertTrue(spendPoint(a, 'breiteskreuz'));
+  assertEqual([a.abilities.breiteskreuz, a.skillPoints], [2, 7]);
+  assertTrue(setButton(a, 0, 'breiteskreuz'));
+  assertEqual(a.buttons[0], 'breiteskreuz');
+  a.skillPoints = 0;
+  assertTrue(!unlockBranch(a, 'ausweisbitte'), 'ohne Punkt');
+  const fresh = leveled(10).a;
+  assertTrue(!unlockBranch(fresh, 'breiteskreuz'), 'ohne Unterklasse');
+});
+
+test('adventureHero: Dauer-Boni bis Stufe 3, nur eigene; allgemeine wirken auf Werte, besondere über specialBonus', () => {
+  const { save, h, a } = leveled(14);
+  chooseSubclass(a, 'krieger', 'kneipenschlaeger');
+  assertTrue(!spendPassive(a, 'dickehaut'), 'fremder Dauer-Bonus');
+  const before = adventureModifiers(save, h).filter((m) => m.stat === 'damage').reduce((s, m) => s + (m.pct ?? 0), 0);
+  for (let i = 0; i < 3; i++) assertTrue(spendPassive(a, 'wucht'));
+  assertTrue(!spendPassive(a, 'wucht'), 'über 3');
+  assertEqual(a.passives.wucht, 3);
+  const after = adventureModifiers(save, h).filter((m) => m.stat === 'damage').reduce((s, m) => s + (m.pct ?? 0), 0);
+  assertClose(after - before, 0.12);
+  spendPassive(a, 'zapfhahn'); spendPassive(a, 'zapfhahn');
+  assertClose(specialBonus(a, 'lifesteal'), 0.04);
+  assertEqual(specialBonus(a, 'shieldPct'), 0);
+  assertEqual(a.skillPoints, 13 - 5);
+  invariant(a);
+});
+
+test('adventureHero: Punkte-Summe bleibt bei Wahl → Ausbau → Umlernen → Wahl', () => {
+  const { save, h, a } = leveled(15);
+  save.gold = 2000;
+  invariant(a);
+  spendPoint(a, 'schwerthieb'); spendPoint(a, 'erdspalter');
+  invariant(a);
+  chooseSubclass(a, 'krieger', 'tuersteher');
+  invariant(a);
+  unlockBranch(a, 'breiteskreuz'); unlockBranch(a, 'hausverbot'); spendPoint(a, 'breiteskreuz'); spendPassive(a, 'dickehaut'); spendPoint(a, 'wirbelschlag');
+  setButton(a, 0, 'breiteskreuz'); setButton(a, 1, 'wirbelschlag');
+  invariant(a);
+  assertEqual(respecAdventure(save, h.id), { ok: true });
+  invariant(a);
+  assertEqual([a.subclass, a.passives, a.skillPoints, save.gold], [null, {}, 14, 1500]);
+  assertTrue(!Object.hasOwn(a.abilities, 'breiteskreuz') && !Object.hasOwn(a.abilities, 'hausverbot'));
+  assertTrue(Object.values(a.abilities).every((l) => l === 1));
+  assertEqual(a.buttons, [null, 'wirbelschlag', 'kriegsschrei']);
+  assertTrue(chooseSubclass(a, 'krieger', 'kochstelle'));
+  unlockBranch(a, 'eintopf'); spendPassive(a, 'grossertopf');
+  invariant(a);
+});
+
+test('adventureHero: Umlernen kostet 500 Gold, ohne Gold, ohne Unterklasse oder unter Level 10 abgelehnt', () => {
+  const { save, h, a } = leveled(10);
+  save.gold = 499;
+  assertEqual(respecAdventure(save, h.id), { ok: false, reason: 'none' });
+  chooseSubclass(a, 'krieger', 'tuersteher');
+  assertEqual(respecAdventure(save, h.id), { ok: false, reason: 'gold' });
+  assertEqual([a.subclass, save.gold], ['tuersteher', 499]);
+  save.gold = 500;
+  assertEqual(respecAdventure(save, h.id), { ok: true });
+  assertEqual(save.gold, 0);
+  const low = leveled(9);
+  low.save.gold = 900;
+  low.a.subclass = 'tuersteher';
+  assertEqual(respecAdventure(low.save, low.h.id), { ok: false, reason: 'level' });
 });

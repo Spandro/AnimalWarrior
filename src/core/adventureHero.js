@@ -1,6 +1,8 @@
 import { CLASSES } from '../data/classes.js';
 import { ITEMS } from '../data/items.js';
-import { ADVENTURE_LEVEL, ADVENTURE_BALANCE, AREA_SCALE, SMITH, MAX_ADVENTURE_LEVEL } from '../data/adventure.js';
+import { ADVENTURE_LEVEL, ADVENTURE_BALANCE, AREA_SCALE, SMITH, MAX_ADVENTURE_LEVEL, SUBCLASS_RULES } from '../data/adventure.js';
+import { SUBCLASSES, PASSIVES } from '../data/subclasses.js';
+import { ABILITIES } from '../data/abilities.js';
 import { metaModifiers } from '../save/meta.js';
 
 /**
@@ -69,6 +71,101 @@ export function setButton(record, slot, abilityId) {
   return true;
 }
 
+// ---------------------------------------------------------------- Fähigkeitenbaum (Etappe 2)
+
+/** Ob eine Fähigkeit zum Stamm der Klasse gehört (Grundattacke und `abilityPool`). */
+function isTrunk(classId, abilityId) {
+  const c = CLASSES[classId];
+  return abilityId === c.startAbility || c.abilityPool.includes(abilityId);
+}
+
+/**
+ * Verteilte Punkte: Stammstufen über 1, Astfähigkeiten mit ihrer Stufe (1 Punkt Freischalten plus Ausbau) und Dauer-Boni.
+ * Zusammen mit `skillPoints` immer `level − 1`.
+ * @param {AdventureRecord} record
+ * @param {string} classId
+ */
+export function pointsSpent(record, classId) {
+  let n = 0;
+  for (const [id, level] of Object.entries(record.abilities)) n += isTrunk(classId, id) ? level - 1 : level;
+  for (const rank of Object.values(record.passives ?? {})) n += rank;
+  return n;
+}
+
+/** Setzt den Stamm auf Stufe 1 und gibt alle Punkte zurück. */
+function refundTrunk(record) {
+  for (const id of Object.keys(record.abilities)) record.abilities[id] = 1;
+  record.skillPoints = record.level - 1;
+}
+
+/**
+ * Wählt die Unterklasse (ab Level 10, nur wenn noch keine gewählt ist): Stamm auf 1, alle Punkte zurück, Knöpfe bleiben.
+ * @param {AdventureRecord} record
+ * @param {string} classId
+ * @param {string} subclassId
+ */
+export function chooseSubclass(record, classId, subclassId) {
+  const sub = Object.hasOwn(SUBCLASSES, subclassId) ? SUBCLASSES[subclassId] : null;
+  if (!sub || sub.classId !== classId || record.subclass || record.level < SUBCLASS_RULES.chooseLevel) return false;
+  record.subclass = subclassId;
+  record.passives = {};
+  refundTrunk(record);
+  return true;
+}
+
+/** Schaltet eine Astfähigkeit der eigenen Unterklasse für `unlockCost` Punkte frei (Stufe 1). */
+export function unlockBranch(record, abilityId) {
+  const sub = record.subclass ? SUBCLASSES[record.subclass] : null;
+  if (!sub || !sub.abilities.includes(abilityId) || Object.hasOwn(record.abilities, abilityId)) return false;
+  if (record.skillPoints < SUBCLASS_RULES.unlockCost) return false;
+  record.abilities[abilityId] = 1;
+  record.skillPoints -= SUBCLASS_RULES.unlockCost;
+  return true;
+}
+
+/** Ein Punkt auf einen Dauer-Bonus der eigenen Unterklasse, höchstens `maxRank`. */
+export function spendPassive(record, passiveId) {
+  const def = Object.hasOwn(PASSIVES, passiveId) ? PASSIVES[passiveId] : null;
+  if (!def || def.subclass !== record.subclass || record.skillPoints < 1) return false;
+  const rank = record.passives[passiveId] ?? 0;
+  if (rank >= def.maxRank) return false;
+  record.passives[passiveId] = rank + 1;
+  record.skillPoints--;
+  return true;
+}
+
+/** Dauer-Boni des Helden mit Stufe. */
+function passiveEntries(record) {
+  return Object.entries(record.passives ?? {}).filter(([id]) => Object.hasOwn(PASSIVES, id)).map(([id, rank]) => ({ def: PASSIVES[id], rank }));
+}
+
+/**
+ * Summe der besonderen Dauer-Boni mit diesem Namen (Wert × Stufe), z. B. `lifesteal` oder `lootChance`.
+ * @param {AdventureRecord} record
+ * @param {string} special
+ */
+export function specialBonus(record, special) {
+  let n = 0;
+  for (const { def, rank } of passiveEntries(record)) if (def.perRank.special === special) n += def.perRank.value * rank;
+  return n;
+}
+
+/**
+ * Besondere Dauer-Boni, die auf Werte der Fähigkeiten wirken (für `abilityParams`), mit Wert × Stufe.
+ * @param {AdventureRecord} record
+ * @returns {import('../data/subclasses.js').SpecialBonus[]}
+ */
+export function abilitySpecials(record) {
+  return passiveEntries(record)
+    .filter(({ def }) => def.perRank.special && def.perRank.special !== 'lifesteal' && def.perRank.special !== 'lootChance')
+    .map(({ def, rank }) => ({ ...def.perRank, value: def.perRank.value * rank }));
+}
+
+/** Ob eine Fähigkeit eine Astfähigkeit ist. */
+export function isBranchAbility(abilityId) {
+  return !!ABILITIES[abilityId]?.subclass;
+}
+
 /** Rundet Werte eines verbesserten Gegenstands: Rüstung ganz, Anteile auf ganze Prozent, Regeneration auf 0,1. */
 function roundStat(stat, value) {
   if (stat === 'armor') return Math.round(value);
@@ -78,7 +175,7 @@ function roundStat(stat, value) {
 
 /**
  * Modifikatoren eines Helden im Abenteuer: Leben × 3 (Ausgleich), Zuwachs je Level, angelegte Ausrüstung mit ihrer
- * Verbesserungsstufe und die Dauerboni (ohne „Neun Leben“, das keinen Modifikator hat).
+ * Verbesserungsstufe, die allgemeinen Dauer-Boni der Unterklasse und die Dauerboni (ohne „Neun Leben“, das keinen Modifikator hat).
  * @param {import('../save/schema.js').Save} save
  * @param {import('../save/schema.js').Hero} hero
  * @returns {Modifier[]}
@@ -92,6 +189,14 @@ export function adventureModifiers(save, hero) {
   ];
   for (const id of Object.values(a.equipment)) {
     if (id && Object.hasOwn(ITEMS, id)) out.push(...scaledModifiers(id, save.itemLevels[id] ?? 0));
+  }
+  for (const { def, rank } of passiveEntries(a)) {
+    const m = def.perRank;
+    if (!m.stat) continue;
+    const scaled = { stat: m.stat };
+    if (m.flat !== undefined) scaled.flat = m.flat * rank;
+    if (m.pct !== undefined) scaled.pct = m.pct * rank;
+    out.push(scaled);
   }
   return [...out, ...metaModifiers(save)];
 }

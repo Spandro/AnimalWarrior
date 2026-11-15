@@ -1,7 +1,6 @@
 // Hauptmenü mit Export und Import, Heldenauswahl, Modusauswahl und Rückfragen.
 import { el, formatTime, formatNumber } from './dom.js';
-import { ANIMALS } from '../data/animals.js';
-import { CLASSES } from '../data/classes.js';
+import { heroLineText } from './treeText.js';
 import { RUN_DURATION } from '../data/waves.js';
 import { MAX_HEROES } from '../save/schema.js';
 import { exportText } from '../save/store.js';
@@ -111,7 +110,7 @@ export function renderMain(c, props, app) {
 
 /** Zeile „Hase · Krieger“ eines Helden. */
 export function heroLine(hero) {
-  return `${ANIMALS[hero.animal].name} · ${CLASSES[hero.class].name}`;
+  return heroLineText(hero);
 }
 
 export function renderHeroes(c, props, app) {

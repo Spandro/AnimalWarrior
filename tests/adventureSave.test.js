@@ -1,4 +1,5 @@
 import { test, assertEqual, assertTrue } from './runner.js';
+import { pointsSpent } from '../src/core/adventureHero.js';
 import { defaultSave, migrate, validate, createStore, addHero, STORAGE_KEY, SAVE_VERSION, versionBackupKey } from '../src/save/store.js';
 import {
   newAdventure, repairSave, commitAdventure, equipItem, smithCost, upgradeItem, buyPotion, buyItem, sellItem, shopStock,
@@ -22,7 +23,7 @@ function v3() {
   return { ...s, version: 3 };
 }
 
-/** Version 4 mit Abenteuer für Hoppel. */
+/** Aktuelle Version mit Abenteuer für Hoppel. */
 function v4() {
   const s = repairSave(migrate(v3()));
   s.heroes[0].adventure = newAdventure(s.heroes[0]);
@@ -31,22 +32,22 @@ function v4() {
 
 const shared = (s) => ({ heroes: s.heroes.map((h) => [h.id, h.name, h.animal, h.class]), gold: s.gold, inventory: s.inventory, achievements: s.achievements });
 
-test('adventureSave: Version 4, Umwandlung 3 → 4 ohne Verlust', () => {
-  assertEqual(SAVE_VERSION, 4);
+test('adventureSave: Version 5, Umwandlung 3 → 5 ohne Verlust', () => {
+  assertEqual(SAVE_VERSION, 5);
   const before = v3();
   const after = repairSave(migrate(before));
-  assertEqual(after.version, 4);
+  assertEqual(after.version, 5);
   assertEqual(shared(after), shared(before));
   assertTrue(after.heroes.every((h) => h.adventure === null));
   assertEqual([after.itemLevels, after.materials, after.settings.buttonSide, after.stats.campfireRests], [{}, {}, 'right', 0]);
   assertTrue(validate(after).ok, validate(after).error);
 });
 
-test('adventureSave: Umwandlung 1 → 4 und 2 → 4 laden über den Speicher, Kopie liegt da', () => {
+test('adventureSave: Umwandlung 1 → 5 und 3 → 5 laden über den Speicher, Kopie liegt da', () => {
   const v1 = { version: 1, heroes: [], gold: 5, metaUpgrades: {}, settings: { volume: 70, quality: 'high' } };
   const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify(v1) });
   const r = createStore(storage).load();
-  assertEqual([r.status, r.data.version, r.data.gold], ['ok', 4, 5]);
+  assertEqual([r.status, r.data.version, r.data.gold], ['ok', 5, 5]);
   assertTrue(storage.getItem(versionBackupKey(1)) !== null);
   const s3 = memoryStorage({ [STORAGE_KEY]: JSON.stringify(v3()) });
   const r3 = createStore(s3).load();
@@ -61,6 +62,7 @@ test('adventureSave: neues Abenteuer', () => {
   assertEqual(a.buttons, [null, null, null]);
   assertEqual(a.equipment, { kopf: null, koerper: null, fuesse: null, waffe: null, schmuck: null });
   assertEqual([a.introSeen, a.chapterDone, a.unlocked, a.campfires], [false, [], [], ['dorf_platz']]);
+  assertEqual([a.subclass, a.passives], [null, {}]);
   assertTrue(validate(s).ok);
 });
 
@@ -183,4 +185,44 @@ test('adventureSave: Händler – Tränke bis 4, Angebot, Verkauf nur ohne Träg
   s.gold = 0;
   assertEqual(buyPotion(s, 'h2').reason, 'gold');
   assertTrue(validate(s).ok);
+});
+
+// ---------------------------------------------------------------- Etappe 2: Spielstand Version 5
+
+/** Stand der Version 4 mit ausgebautem Stamm (Level 12, Ordentlich Draufhauen auf Stufe 3). */
+function v4WithTrunk() {
+  const s = v4();
+  const a = s.heroes[0].adventure;
+  delete a.subclass; delete a.passives;
+  Object.assign(a, { level: 12, skillPoints: 9, abilities: { schwerthieb: 3, wirbelschlag: 2, schildstoss: 1 }, buttons: ['wirbelschlag', 'schildstoss', null] });
+  return { ...s, version: 4 };
+}
+
+test('adventureSave: Umwandlung 4 → 5 behält Stammstufen, keine Unterklasse', () => {
+  const before = v4WithTrunk();
+  const after = repairSave(migrate(structuredClone(before)));
+  const a = after.heroes[0].adventure;
+  assertEqual(after.version, 5);
+  assertEqual([a.subclass, a.passives, a.level, a.skillPoints], [null, {}, 12, 9]);
+  assertEqual(a.abilities, { schwerthieb: 3, wirbelschlag: 2, schildstoss: 1 });
+  assertEqual(a.buttons, ['wirbelschlag', 'schildstoss', null]);
+  assertEqual(after.heroes[1].adventure, null);
+  assertTrue(validate(after).ok, validate(after).error);
+  const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify(before) });
+  assertEqual(createStore(storage).load().data.version, 5);
+  assertEqual(storage.getItem(versionBackupKey(4)), JSON.stringify(before));
+});
+
+test('adventureSave: Ausbessern – fremde Unterklasse, Astfähigkeit ohne Unterklasse, Dauer-Bonus über 3, Wahl unter Level 10', () => {
+  const foreign = repaired((a) => { Object.assign(a, { level: 12, skillPoints: 11, subclass: 'wetterfrosch' }); });
+  assertEqual(foreign.subclass, null);
+  const orphan = repaired((a) => { Object.assign(a, { level: 12, skillPoints: 6, subclass: null, abilities: { schwerthieb: 1, breiteskreuz: 3 }, passives: { dickehaut: 2 } }); });
+  assertEqual([orphan.abilities, orphan.passives, orphan.skillPoints], [{ schwerthieb: 1 }, {}, 11]);
+  assertEqual(pointsSpent(orphan, 'krieger') + orphan.skillPoints, 11);
+  const over = repaired((a) => { Object.assign(a, { level: 12, skillPoints: 0, subclass: 'tuersteher', abilities: { schwerthieb: 1, breiteskreuz: 4 }, passives: { dickehaut: 7, wucht: 2 } }); });
+  assertEqual([over.subclass, over.abilities, over.passives, over.skillPoints], ['tuersteher', { schwerthieb: 1, breiteskreuz: 4 }, { dickehaut: 3 }, 6]);
+  const early = repaired((a) => { Object.assign(a, { level: 9, skillPoints: 6, subclass: 'tuersteher', abilities: { schwerthieb: 1, breiteskreuz: 1 }, passives: { dickehaut: 1 } }); });
+  assertEqual([early.subclass, early.abilities, early.passives, early.skillPoints], [null, { schwerthieb: 1 }, {}, 8]);
+  const kept = repaired((a) => { Object.assign(a, { level: 12, skillPoints: 0, subclass: 'tuersteher', abilities: { schwerthieb: 1, breiteskreuz: 5 }, buttons: ['breiteskreuz', null, null], passives: { dickehaut: 3 } }); });
+  assertEqual([kept.buttons[0], kept.passives.dickehaut], ['breiteskreuz', 3]);
 });

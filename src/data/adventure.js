@@ -146,3 +146,25 @@ export const ARENA_INSET = 2.5;
 
 /** Unterklassen (Etappe 2, Spec §4): Wahl ab Level, Kosten zum Freischalten einer Astfähigkeit (Punkte), Umlernen (Gold). */
 export const SUBCLASS_RULES = { chooseLevel: 10, unlockCost: 1, respecGold: 500 };
+
+/**
+ * Regeln der Besonderheiten (Spec §6), soweit sie nicht in den Fähigkeitswerten stehen: Raserei erreicht ihren vollen
+ * Bonus bei diesem Anteil Leben; Abstand (m), in dem Haustier und Wolke dem Helden folgen; Abstand der Beschwörungen
+ * von „Familientreffen“ zueinander (m).
+ */
+export const SIGNATURE_RULES = { rageFullAtHp: 0.25, followDistance: 1.5, summonSpread: 1.5 };
+
+/**
+ * Aussehen der Besonderheiten (Spec §7, einfache Formen statt Bilder): Farben, Größen (m), Höhen (m), Deckkraft;
+ * `stealthOpacity`: Deckkraft des unsichtbaren Helden.
+ */
+export const SIGNATURE_LOOK = {
+  shield: { color: 0x7ab8ff, radius: 0.95, opacity: 0.22 },
+  rage: { color: 0xff3a2a, radius: 0.85, opacity: 0.18 },
+  stealthOpacity: 0.35,
+  cloud: { color: 0x8a8f9a, radius: 0.55, height: 2.6, opacity: 0.85 },
+  pet: { color: 0xc49a5a, radius: 0.18, height: 0.45 },
+  trap: { color: 0x4a4a4a, edge: 0x9a9aa2, opacity: 0.8 },
+  mark: { color: 0xff3a3a, opacity: 0.85, pad: 0.25 },
+  pot: { color: 0x6a4a2a, radius: 0.45, height: 0.5 },
+};

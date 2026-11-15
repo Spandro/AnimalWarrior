@@ -37,7 +37,10 @@ import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
  *   `openedChests`: Kennungen der schon geöffneten Karten-Kisten (`chestInCell`); `terrain`: Geländequelle.
  *   Nur im Abenteuer gesetzt (src/modes/adventure.js): `drops: 'none'` (Besiegte lassen nichts fallen, der Modus
  *   verteilt Beute selbst), `abilityMods` (Faktoren für Fähigkeiten von Hand), `contactInterval` (statt
- *   CONTACT_INTERVAL); an Gegnern `passive` mit `home` (ruht an seinem Ort, keine Berührungstreffer), `packId`, `bossId`;
+ *   CONTACT_INTERVAL), `lifesteal` (Anteil jedes Treffers des Helden, der ihn heilt). Besonderheiten der Unterklassen
+ *   (Etappe 2, leer ohne Abenteuer-Fähigkeiten): `followers` (Wolke, Haustier), `traps`; am Helden `shield`,
+ *   `stealthUntil` (unsichtbar: Nicht-Bosse wandern, keine Berührungstreffer), `steal` (Klauen); an Gegnern
+ *   `markedUntil`/`markPct` (Markierung); Stärkungen mit `rage` (Raserei) oder `applause` (Verlängerung je Tötung); an Gegnern `passive` mit `home` (ruht an seinem Ort, keine Berührungstreffer), `packId`, `bossId`;
  *   an Aufsammelbarem `locked` (bleibt liegen) und `ref` (Kennung, kommt im Ereignis `pickup` mit).
  */
 
@@ -523,9 +526,10 @@ export function createWorld({ seed, animalId, classId, modifiers = [], terrain }
       x: 0, z: 0, facing: { x: 1, z: 0 },
       hp: stats.maxHp, stats, modifiers: [...modifiers],
       abilities: [{ id: CLASSES[classId].startAbility, level: 1, cooldownLeft: 0 }],
-      buffs: [], radius: HERO_RADIUS, invulnerableUntil: 0, poison: null, animalId, classId,
+      buffs: [], radius: HERO_RADIUS, invulnerableUntil: 0, poison: null, animalId, classId, shield: null, stealthUntil: 0, steal: null,
     },
     enemies: [], projectiles: [], enemyProjectiles: [], zones: [], orbitals: [], summons: [], pickups: [], events: [],
+    followers: [], traps: [],
     run: { level: 1, xp: 0, kills: 0, gold: 0, bonuses: {}, damageByAbility: {}, revivesLeft: 0 },
     openedChests: new Set(),
     terrain: terrain ?? seedTerrain(seed),
@@ -623,6 +627,7 @@ export function damageEnemy(world, enemy, hit, abilityId) {
   const index = world.enemies.indexOf(enemy);
   if (index < 0 || enemy.untargetable) return;
   let amount = enemy.behavior === 'curl' ? curlOnHit(world, enemy, hit.amount) : hit.amount;
+  if (enemy.markedUntil > world.time) amount = Math.round(amount * (1 + enemy.markPct));
   const armor = ENEMIES[enemy.type]?.armor;
   if (armor) amount = Math.max(1, amount - armor);
   world.events.push({ type: 'hit', x: enemy.x, z: enemy.z, amount, crit: hit.crit });
@@ -636,11 +641,30 @@ export function damageEnemy(world, enemy, hit, abilityId) {
   }
   enemy.hp -= amount;
   dbA[abilityId] = (dbA[abilityId] || 0) + amount;
+  if (world.lifesteal > 0) {
+    const hero = world.hero;
+    hero.hp = Math.min(hero.stats.maxHp, hero.hp + amount * world.lifesteal);
+  }
+  const steal = world.hero.steal;
+  const stealing = !!steal && world.time < steal.until;
+  if (stealing && steal.given < steal.cap && world.rng.chance(steal.chance)) {
+    const value = Math.min(world.rng.int(steal.min, steal.max), steal.cap - steal.given);
+    steal.given += value;
+    world.events.push({ type: 'stealGold', value, x: enemy.x, z: enemy.z });
+  }
   if (enemy.hp > 0) return;
 
   world.enemies.splice(index, 1);
   world.run.kills++;
-  world.events.push({ type: 'kill', enemyType: enemy.type, x: enemy.x, z: enemy.z, id: enemy.id, elite: enemy.elite, boss: enemy.boss, packId: enemy.packId ?? null, bossId: enemy.bossId ?? null });
+  const kill = { type: 'kill', enemyType: enemy.type, x: enemy.x, z: enemy.z, id: enemy.id, elite: enemy.elite, boss: enemy.boss, packId: enemy.packId ?? null, bossId: enemy.bossId ?? null };
+  if (stealing) kill.doubleLoot = true;
+  world.events.push(kill);
+  for (const b of world.hero.buffs) {
+    if (!b.applause) continue;
+    const add = Math.max(0, Math.min(b.applause.perKill, b.applause.max - b.applause.total));
+    b.timeLeft += add;
+    b.applause.total += add;
+  }
   if (world.drops === 'none') return;
   const def = ENEMIES[enemy.type];
   const drop = (kind, value) => world.pickups.push({ kind, x: enemy.x, z: enemy.z, value });
@@ -676,7 +700,7 @@ function startShadowFlee(world, enemy) {
 }
 
 /**
- * Schaden am Helden über Ausweichen und Rüstung.
+ * Schaden am Helden über Ausweichen und Rüstung; ein Schild (`hero.shield`, Abenteuer) fängt danach zuerst ab.
  * Gifttreffer (`poison`) tragen im Ereignis `heroHit` das Feld `poison: true`.
  * @param {World} world
  * @param {number} rawAmount
@@ -690,9 +714,28 @@ export function damageHero(world, rawAmount, { poison = false } = {}) {
     { baseDamage: rawAmount, damage: 1, critChance: 0, critDamage: 1 },
     { armor: hero.stats.armor, dodge: hero.stats.dodge });
   if (res.dodged) { world.events.push({ type: 'dodge' }); return false; }
-  hero.hp -= res.amount;
-  world.events.push(poison ? { type: 'heroHit', amount: res.amount, poison: true } : { type: 'heroHit', amount: res.amount });
+  let amount = res.amount;
+  if (hero.shield) {
+    const absorbed = Math.min(hero.shield.hp, amount);
+    hero.shield.hp -= absorbed;
+    amount -= absorbed;
+    world.events.push({ type: 'shieldHit', amount: absorbed });
+    if (hero.shield.hp <= 0) hero.shield = null;
+    if (amount <= 0) return true;
+  }
+  hero.hp -= amount;
+  world.events.push(poison ? { type: 'heroHit', amount, poison: true } : { type: 'heroHit', amount });
   return true;
+}
+
+/**
+ * Gibt dem Helden einen Schild (Abenteuer, Besonderheit „Breites Kreuz“). Ein neuer ersetzt den alten, er stapelt nie.
+ * @param {World} world
+ * @param {number} hp
+ * @param {number} duration
+ */
+export function giveShield(world, hp, duration) {
+  world.hero.shield = { hp, until: world.time + duration };
 }
 
 /** Ein durchgekommener Otterbiss vergiftet (oder frischt das Gift auf); der Tick-Takt eines laufenden Gifts bleibt. */
@@ -830,6 +873,8 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
   hero.buffs = hero.buffs.filter((b) => b.timeLeft > 0);
   if (hero.buffs.length !== before) recomputeHeroStats(world);
 
+  if (hero.shield && world.time >= hero.shield.until) hero.shield = null;
+
   // Regeneration
   if (!inert && hero.stats.hpRegen > 0) hero.hp = Math.min(hero.stats.maxHp, hero.hp + hero.stats.hpRegen * dt);
 
@@ -837,9 +882,11 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
   stepAbilities(world, dt, !inert);
 
   // Gegner bewegen
+  const hidden = hero.stealthUntil > world.time;
   for (const e of world.enemies) {
     if (e.passive) { stepPassive(world, e, dt); continue; }
     if (world.time < e.stunnedUntil) continue;
+    if (hidden && !e.boss && !e.shadow) { wander(world, e, dt); continue; }
     if (world.time < e.confusedUntil) wander(world, e, dt);
     else (BEHAVIORS[e.behavior] || BEHAVIORS.chase)(world, e, dt);
   }
@@ -850,7 +897,7 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
 
   // Berührungsschaden
   for (const e of world.enemies) {
-    if (world.time < e.stunnedUntil || !isTargetable(e) || e.passive) continue;
+    if (world.time < e.stunnedUntil || !isTargetable(e) || e.passive || (hidden && !e.boss && !e.shadow)) continue;
     const dx = e.x - hero.x, dz = e.z - hero.z;
     const min = e.radius + hero.radius + CONTACT_TOLERANCE;
     if (dx * dx + dz * dz <= min * min && world.time >= e.contactReadyAt) {

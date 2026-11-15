@@ -1,7 +1,7 @@
 // Ausrüstung (Spec §11.2): fünf Plätze, je Platz die passenden Stücke aus der Truhe mit Vergleich.
 import { el } from './dom.js';
 import { panel } from './adventureMenus.js';
-import { describeModifier } from './heroCreate.js';
+import { describeModifier } from './statText.js';
 import { ITEMS, RARITIES, SLOT_NAMES } from '../data/items.js';
 import { CLASS_WEAPON } from '../data/adventure.js';
 import { itemDelta } from '../core/adventureHero.js';

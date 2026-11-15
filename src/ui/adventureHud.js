@@ -78,6 +78,7 @@ export function createAdventureHud(uiLayer, h) {
         if (e.type === 'areaEnter') say(e.name, true);
         else if (e.type === 'levelUp') say(`Level ${e.level}!`);
         else if (e.type === 'abilityUnlocked') say(`Neue Fähigkeit: ${ABILITIES[e.abilityId].name}`);
+        else if (e.type === 'subclassAvailable') say('Wähle deine Unterklasse! (Pause → Fähigkeiten)');
         else if (e.type === 'questAccepted') say(`Neuer Auftrag: ${QUESTS[e.questId].title}`);
         else if (e.type === 'questCompleted') say(`Auftrag erledigt: ${QUESTS[e.questId].title}`);
         else if (e.type === 'bossStart') say(e.name);

@@ -1,4 +1,5 @@
 import { BOSS_POOL } from './waves.js';
+import { SUBCLASSES } from './subclasses.js';
 import { QUESTS } from './quests.js';
 
 /**
@@ -198,5 +199,18 @@ export const ACHIEVEMENTS = [
   {
     id: 'lagerfeuerromantik', title: 'Lagerfeuerromantik', condition: 'Raste 20-mal an einem Lagerfeuer',
     line: 'Marshmallows wären schön gewesen.', gold: 25, check: (c) => (c.stats.campfireRests ?? 0) >= 20,
+  },
+  {
+    id: 'spezialist', title: 'Spezialist', condition: 'Wähle im Abenteuer eine Unterklasse',
+    line: 'Allrounder war gestern.', gold: 25,
+    check: (c) => (c.save.heroes ?? []).some((h) => !!h.adventure?.subclass),
+  },
+  {
+    id: 'meister-seines-fachs', title: 'Meister seines Fachs', condition: 'Bringe alle vier Astfähigkeiten einer Unterklasse auf Stufe 5',
+    line: 'Mehr Fach geht nicht.', gold: 100,
+    check: (c) => (c.save.heroes ?? []).some((h) => {
+      const sub = h.adventure?.subclass ? SUBCLASSES[h.adventure.subclass] : null;
+      return !!sub && sub.abilities.every((id) => (h.adventure.abilities?.[id] ?? 0) >= 5);
+    }),
   },
 ];

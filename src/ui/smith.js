@@ -1,7 +1,7 @@
 // Schmied Grabowski (Spec §11.3): Stücke der Truhe verbessern (+1 bis +5) gegen Gold und Flussperlen.
 import { el, formatNumber } from './dom.js';
 import { panel } from './adventureMenus.js';
-import { describeModifier } from './heroCreate.js';
+import { describeModifier } from './statText.js';
 import { itemTitle, itemRow } from './equipment.js';
 import { lootIcon } from './tavern.js';
 import { ITEMS, RARITIES } from '../data/items.js';

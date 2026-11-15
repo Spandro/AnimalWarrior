@@ -2,7 +2,8 @@ import { CLASSES } from '../data/classes.js';
 import { ITEMS, RARITIES, SLOT_NAMES } from '../data/items.js';
 import { MAPS } from '../data/maps/index.js';
 import { QUESTS } from '../data/quests.js';
-import { MATERIALS, POTION, CLASS_WEAPON, SMITH, SHOP, MAX_ADVENTURE_LEVEL } from '../data/adventure.js';
+import { MATERIALS, POTION, CLASS_WEAPON, SMITH, SHOP, MAX_ADVENTURE_LEVEL, SUBCLASS_RULES } from '../data/adventure.js';
+import { SUBCLASSES, PASSIVES } from '../data/subclasses.js';
 
 /**
  * Spielstand-Funktionen des Abenteuers (Spec §12). Alle ändern den übergebenen Stand und melden das Ergebnis.
@@ -13,7 +14,8 @@ import { MATERIALS, POTION, CLASS_WEAPON, SMITH, SHOP, MAX_ADVENTURE_LEVEL } fro
  *   equipment: Record<import('../data/items.js').Slot, string|null>, potions: number, mapId: string, campfireId: string,
  *   campfires: string[], quests: QuestLog, trackedQuest: string|null, bosses: string[], chests: string[], found: string[],
  *   questItems: Record<string, number>, explored: Record<string, string>, introSeen: boolean, chapterDone: number[],
- *   unlocked: ('merchant'|'smith')[] }} AdventureRecord
+ *   unlocked: ('merchant'|'smith')[], subclass: string|null, passives: Record<string, number> }} AdventureRecord
+ *   `subclass`: gewählte Unterklasse (Etappe 2); `passives`: Dauer-Boni der Unterklasse mit Stufe 1 bis 3.
  * @typedef {{ gold: number, items: string[], materials: Record<string, number>, rests?: number }} Ledger
  *   Was ein laufendes Abenteuer seit dem letzten Speichern gemeinsam für alle Helden verdient hat (`rests`: Rasten
  *   für den Zähler `stats.campfireRests`).
@@ -21,6 +23,9 @@ import { MATERIALS, POTION, CLASS_WEAPON, SMITH, SHOP, MAX_ADVENTURE_LEVEL } fro
 
 const HOME = { mapId: 'dorf', campfireId: 'dorf_platz' };
 const UNLOCKABLE = ['merchant', 'smith'];
+
+/** Alle Astfähigkeiten der Unterklassen. */
+const ABILITY_IDS_BRANCH = new Set(Object.values(SUBCLASSES).flatMap((s) => s.abilities));
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const clampInt = (v, lo, hi, fallback) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.round(v))) : fallback);
@@ -54,6 +59,7 @@ export function newAdventure(hero) {
     campfires: [HOME.campfireId],
     quests: {}, trackedQuest: null, bosses: [], chests: [], found: [], questItems: {}, explored: {},
     introSeen: false, chapterDone: [], unlocked: [],
+    subclass: null, passives: {},
   };
 }
 
@@ -82,10 +88,28 @@ function repairAdventure(a, hero, save) {
   const fresh = newAdventure(hero);
   if (!isObject(a)) return fresh;
   const cls = CLASSES[hero.class];
-  const own = new Set([cls.startAbility, ...cls.abilityPool]);
+  const level = clampInt(a.level, 1, MAX_ADVENTURE_LEVEL, 1);
+  const sub = typeof a.subclass === 'string' && Object.hasOwn(SUBCLASSES, a.subclass) && SUBCLASSES[a.subclass].classId === hero.class
+    && level >= SUBCLASS_RULES.chooseLevel ? SUBCLASSES[a.subclass] : null;
+  const trunk = new Set([cls.startAbility, ...cls.abilityPool]);
+  const branch = new Set(sub ? sub.abilities : []);
   const abilities = {};
+  let refund = 0; // Punkte aus weggefallenen Astfähigkeiten und Dauer-Boni (Spec §8)
   if (isObject(a.abilities)) {
-    for (const [id, lvl] of Object.entries(a.abilities)) if (own.has(id)) abilities[id] = clampInt(lvl, 1, SMITH.maxLevel, 1);
+    for (const [id, lvl] of Object.entries(a.abilities)) {
+      if (trunk.has(id) || branch.has(id)) abilities[id] = clampInt(lvl, 1, SMITH.maxLevel, 1);
+      else if (ABILITY_IDS_BRANCH.has(id)) refund += clampInt(lvl, 1, SMITH.maxLevel, 1);
+    }
+  }
+  const passives = {};
+  if (isObject(a.passives)) {
+    for (const [id, rank] of Object.entries(a.passives)) {
+      if (!Object.hasOwn(PASSIVES, id)) continue;
+      const r = clampInt(rank, 0, 99, 0);
+      const keep = sub && PASSIVES[id].subclass === sub.id ? Math.min(r, PASSIVES[id].maxRank) : 0;
+      if (keep > 0) passives[id] = keep;
+      refund += r - keep;
+    }
   }
   abilities[cls.startAbility] ??= 1;
   const buttons = [0, 1, 2].map(() => null);
@@ -111,9 +135,9 @@ function repairAdventure(a, hero, save) {
   const explored = {};
   if (isObject(a.explored)) for (const [k, t] of Object.entries(a.explored)) if (Object.hasOwn(MAPS, k) && typeof t === 'string') explored[k] = t;
   return {
-    level: clampInt(a.level, 1, MAX_ADVENTURE_LEVEL, 1),
+    level,
     xp: typeof a.xp === 'number' && Number.isFinite(a.xp) && a.xp > 0 ? a.xp : 0,
-    skillPoints: clampInt(a.skillPoints, 0, MAX_ADVENTURE_LEVEL, 0),
+    skillPoints: Math.min(MAX_ADVENTURE_LEVEL, clampInt(a.skillPoints, 0, MAX_ADVENTURE_LEVEL, 0) + refund),
     abilities, buttons, equipment,
     potions: clampInt(a.potions, 0, POTION.max, fresh.potions),
     ...place, campfires, quests,
@@ -123,6 +147,8 @@ function repairAdventure(a, hero, save) {
     introSeen: a.introSeen === true,
     chapterDone: idList(a.chapterDone?.map?.(String), new Set(['1'])).map(Number),
     unlocked: idList(a.unlocked, new Set(UNLOCKABLE)),
+    subclass: sub ? sub.id : null,
+    passives,
   };
 }
 
@@ -283,5 +309,31 @@ export function sellItem(save, itemId) {
   save.seenItems = save.seenItems.filter((id) => id !== itemId);
   delete save.itemLevels[itemId];
   save.gold += RARITIES[ITEMS[itemId].rarity].resale;
+  return { ok: true };
+}
+
+/**
+ * Umlernen bei Oma Panzerla (Spec §4): kostet `respecGold`, nur ab Level 10 mit gewählter Unterklasse. Unterklasse,
+ * Astfähigkeiten und Dauer-Boni fallen weg, der Stamm geht auf Stufe 1, alle Punkte kommen zurück; Knöpfe mit
+ * Astfähigkeiten werden geleert.
+ * @param {Save} save
+ * @param {string} heroId
+ * @returns {{ ok: boolean, reason?: 'gold'|'level'|'none' }}
+ */
+export function respecAdventure(save, heroId) {
+  const a = save.heroes.find((h) => h.id === heroId)?.adventure;
+  if (!a) return { ok: false, reason: 'none' };
+  if (a.level < SUBCLASS_RULES.chooseLevel) return { ok: false, reason: 'level' };
+  if (!a.subclass) return { ok: false, reason: 'none' };
+  if (save.gold < SUBCLASS_RULES.respecGold) return { ok: false, reason: 'gold' };
+  save.gold -= SUBCLASS_RULES.respecGold;
+  for (const id of Object.keys(a.abilities)) {
+    if (ABILITY_IDS_BRANCH.has(id)) delete a.abilities[id];
+    else a.abilities[id] = 1;
+  }
+  a.buttons = a.buttons.map((id) => (id && ABILITY_IDS_BRANCH.has(id) ? null : id));
+  a.subclass = null;
+  a.passives = {};
+  a.skillPoints = a.level - 1;
   return { ok: true };
 }

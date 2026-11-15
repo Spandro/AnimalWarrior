@@ -2,7 +2,7 @@ import { createWorld, stepWorld, spawnEnemy, recomputeHeroStats } from '../core/
 import { castManual } from '../core/abilities.js';
 import { createRng } from '../core/rng.js';
 import { buildMapGrid, mapTerrain, decodeExplored, encodeExplored, markExplored } from '../core/mapGrid.js';
-import { gainXp, adventureModifiers, enemyMultipliers } from '../core/adventureHero.js';
+import { gainXp, adventureModifiers, enemyMultipliers, abilitySpecials, specialBonus } from '../core/adventureHero.js';
 import { talkTo, acceptQuest, questEvent } from '../core/quests.js';
 import { rollAdventureItem } from '../core/loot.js';
 import { MAPS } from '../data/maps/index.js';
@@ -11,6 +11,7 @@ import { CLASSES } from '../data/classes.js';
 import { ENEMIES, ELITE } from '../data/enemies.js';
 import {
   MANUAL, ADVENTURE_BALANCE, PACK, DEATH, POTION, LOOT, INTERACT_RANGE, EXPLORE_RADIUS, CAMPFIRE_OFFSET, ARENA_INSET,
+  SUBCLASS_RULES,
 } from '../data/adventure.js';
 
 /**
@@ -20,7 +21,8 @@ import {
  *
  * Ereignisse eines Schritts stehen in `run.events`: alle Welt-Ereignisse und `levelUp`, `abilityUnlocked`,
  * `questAccepted`, `questAdvanced`, `questCompleted`, `questItem`, `loot`, `areaEnter`, `bossStart`, `bossDefeated`,
- * `arenaClosed`, `arenaOpened`, `dying`, `wake`, `rested`, `travel`, `mapChange`, `potion`, `abilityFail`, `chapterDone`.
+ * `arenaClosed`, `arenaOpened`, `dying`, `wake`, `rested`, `travel`, `mapChange`, `potion`, `abilityFail`, `chapterDone`,
+ * `subclassAvailable` (Level 10 erreicht ohne Unterklasse). Gold aus `stealGold` geht ins Ledger.
  *
  * @typedef {import('../save/adventure.js').AdventureRecord} AdventureRecord
  * @typedef {import('../save/adventure.js').Ledger} Ledger
@@ -96,7 +98,6 @@ function enterMap(run, mapId, campfireId) {
     terrain: mapTerrain(map, run.grid, (id) => isGateClosed(run, id)),
   });
   world.drops = 'none';
-  world.abilityMods = MANUAL;
   world.contactInterval = ADVENTURE_BALANCE.contactInterval;
   run.world = world;
   run.worldSeen = 0;
@@ -110,6 +111,8 @@ function applyHeroSetup(run, full) {
   const world = run.world, h = world.hero, cls = CLASSES[run.hero.class];
   const cooldowns = new Map(h.abilities.map((a) => [a.id, a.cooldownLeft]));
   h.modifiers = adventureModifiers(run.save, { ...run.hero, adventure: run.record });
+  world.abilityMods = { ...MANUAL, specials: abilitySpecials(run.record) };
+  world.lifesteal = specialBonus(run.record, 'lifesteal');
   h.abilities = [
     { id: cls.startAbility, level: run.record.abilities[cls.startAbility] ?? 1, cooldownLeft: 0, gate: 'engage' },
     ...run.record.buttons.filter(Boolean).map((id) => ({ id, level: run.record.abilities[id], cooldownLeft: cooldowns.get(id) ?? 0, manual: true })),
@@ -124,6 +127,23 @@ function placeAtCampfire(run, campfireId) {
   const spots = [[CAMPFIRE_OFFSET, 0], [-CAMPFIRE_OFFSET, 0], [0, CAMPFIRE_OFFSET], [0, -CAMPFIRE_OFFSET]];
   const ok = spots.find(([dx, dz]) => run.world.terrain.walkable(fire.x + dx, fire.z + dz, 'walk')) ?? [0, 0];
   h.x = fire.x + ok[0]; h.z = fire.z + ok[1];
+}
+
+/**
+ * Beim Rasten verschwinden alle laufenden Besonderheiten (Fallen, Begleiter, Schild, Unsichtbarkeit, Klauen, Stärkungen).
+ * Tod und Kartenwechsel legen ohnehin eine neue Welt an.
+ */
+function clearSignatures(world) {
+  const h = world.hero;
+  world.traps = [];
+  world.followers = [];
+  world.zones = [];
+  world.summons = [];
+  h.shield = null;
+  h.stealthUntil = 0;
+  h.steal = null;
+  h.buffs = [];
+  recomputeHeroStats(world);
 }
 
 /** Alle Gruppen wieder da (Rasten, Tod, neue Karte); Bosskämpfe von vorn. */
@@ -220,15 +240,19 @@ function bankGold(run) {
 function handleWorldEvent(run, e) {
   if (e.type === 'kill') onKill(run, e);
   else if (e.type === 'pickup') onPickup(run, e);
+  else if (e.type === 'stealGold') { run.ledger.gold += e.value; run.dirty = true; }
 }
 
 function grantXp(run, amount) {
   if (amount > 0) run.dirty = true;
+  const before = run.record.level;
   const r = gainXp(run.record, amount * run.world.hero.stats.xpGain, run.hero.class);
   if (r.levels > 0) {
     applyHeroSetup(run, true);
     emit(run, { type: 'levelUp', level: run.record.level });
     for (const id of r.unlocked) emit(run, { type: 'abilityUnlocked', abilityId: id });
+    const at = SUBCLASS_RULES.chooseLevel;
+    if (!run.record.subclass && before < at && run.record.level >= at) emit(run, { type: 'subclassAvailable' });
     run.dirty = true;
   }
 }
@@ -257,7 +281,8 @@ function onKill(run, e) {
   if (bossDef) { onBossDefeated(run, bossDef, e); return; }
   if (run.rng.chance(LOOT.goldChance)) drop(run, e.x, e.z, 'gold', run.rng.int(LOOT.gold[0], LOOT.gold[1]));
   if (run.rng.chance(LOOT.potionChance)) drop(run, e.x, e.z, 'potion_item', 1);
-  if (run.rng.chance(e.elite ? LOOT.eliteChance : LOOT.enemyChance)) drop(run, e.x, e.z, 'item', 0, rollAdventureItem(run.rng, chapterSource(run)));
+  const itemChance = (e.elite ? LOOT.eliteChance : LOOT.enemyChance) * (e.doubleLoot ? 2 : 1) * (1 + specialBonus(run.record, 'lootChance'));
+  if (run.rng.chance(itemChance)) drop(run, e.x, e.z, 'item', 0, rollAdventureItem(run.rng, chapterSource(run)));
   if (e.elite && run.rng.chance(LOOT.elitePearlChance)) drop(run, e.x, e.z, 'material', 1, 'flussperle');
 }
 
@@ -519,6 +544,7 @@ export function rest(run, campfireId) {
   run.record.mapId = run.map.id;
   run.record.campfireId = campfireId;
   if (!run.record.campfires.includes(campfireId)) run.record.campfires.push(campfireId);
+  clearSignatures(run.world);
   run.world.hero.hp = run.world.hero.stats.maxHp;
   resetPacks(run);
   run.ledger.rests++;

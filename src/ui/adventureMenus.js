@@ -7,7 +7,12 @@ import { ABILITIES } from '../data/abilities.js';
 import { QUESTS } from '../data/quests.js';
 import { ADVENTURE_LEVEL, CAMPFIRE_NAMES } from '../data/adventure.js';
 import { ENV_SHEETS } from '../data/environment.js';
-import { spendPoint, setButton } from '../core/adventureHero.js';
+import { spendPoint, setButton, chooseSubclass, unlockBranch, spendPassive } from '../core/adventureHero.js';
+import { SUBCLASSES, subclassesFor } from '../data/subclasses.js';
+import { SUBCLASS_RULES } from '../data/adventure.js';
+import { confirmDialog } from './menus.js';
+import { respecAdventure } from '../save/adventure.js';
+import { heroLineText, passiveEffectText, branchStatus, treeHeader, respecLine } from './treeText.js';
 import { trackedQuest } from '../core/quests.js';
 
 /**
@@ -76,6 +81,7 @@ export async function openPauseMenu(ctx, pages) {
   // Die Unterseiten öffnen sich über dem Pausenmenü; danach geht es dort weiter.
   await panel(ctx.uiLayer, 'Pause', (body, api) => {
     const item = (label, fn) => el('button', { class: 'btn btn-large', type: 'button', onclick: fn }, label);
+    body.append(el('p', { class: 'adv-muted' }, el('strong', { text: ctx.run.hero.name }), ` – ${heroLineText({ ...ctx.run.hero, adventure: ctx.run.record })} · Level ${ctx.run.record.level}`));
     body.append(el('nav', { class: 'adv-menu' },
       item('Weiter', () => api.close()),
       item('Ausrüstung', () => page(pages.equipment)),
@@ -87,42 +93,120 @@ export async function openPauseMenu(ctx, pages) {
   return choice;
 }
 
-/** Fähigkeiten: Punkte verteilen, Knöpfe 1–3 belegen. */
+/**
+ * Fähigkeitenbaum (Spec §4): oben ggf. die Wahl der Unterklasse, dann Stamm (Klasse), Ast der Unterklasse und Dauer-Boni.
+ * Punkte verteilen, Astfähigkeiten freischalten, Knöpfe 1–3 belegen.
+ */
 export function openAbilities(ctx) {
   const cls = CLASSES[ctx.run.hero.class];
   return panel(ctx.uiLayer, 'Fähigkeiten', (body, api) => {
     const rec = ctx.run.record;
-    body.append(el('p', { class: 'adv-note', text: `Fähigkeitspunkte: ${rec.skillPoints}. Die Grundattacke schlägt von selbst zu; die anderen legst du auf die Knöpfe 1 bis 3.` }));
-    const ids = [cls.startAbility, ...cls.abilityPool];
-    for (const [i, id] of ids.entries()) {
+    const act = (fn) => { ctx.change((save, hero) => { fn(hero.adventure); }); api.refresh(); };
+    const slotButtons = (id, name) => [0, 1, 2].map((slot) => {
+      const on = rec.buttons[slot] === id;
+      return el('button', {
+        class: `btn adv-slot${on ? ' on' : ''}`, type: 'button', 'data-key': `slot-${id}-${slot}`, 'aria-pressed': on ? 'true' : 'false',
+        'aria-label': `${name} auf Knopf ${slot + 1}`, onclick: () => act((a) => setButton(a, slot, on ? null : id)),
+      }, String(slot + 1));
+    });
+    const upButton = (id, level) => el('button', {
+      class: 'btn', type: 'button', 'data-key': `up-${id}`, disabled: rec.skillPoints < 1 || level >= 5,
+      onclick: () => act((a) => spendPoint(a, id)),
+    }, '+1 Stufe');
+    const row = (locked, main, actions) => el('div', { class: `adv-row${locked ? ' locked' : ''}` },
+      el('div', { class: 'adv-row-main' }, ...main), el('div', { class: 'adv-row-actions' }, ...actions));
+
+    body.append(el('p', { class: 'adv-note', text: `${treeHeader(rec)}. Die Grundattacke schlägt von selbst zu; die anderen legst du auf die Knöpfe 1 bis 3.` }));
+
+    if (!rec.subclass && rec.level >= SUBCLASS_RULES.chooseLevel) {
+      body.append(el('h3', { class: 'adv-tree-head', text: 'Wähle deine Unterklasse!' }));
+      const cards = el('div', { class: 'adv-subclass-cards' });
+      for (const sub of subclassesFor(ctx.run.hero.class)) {
+        const sig = ABILITIES[sub.signature];
+        cards.append(el('div', { class: 'adv-subclass-card' },
+          el('strong', { text: sub.name }),
+          el('span', { class: 'adv-muted', text: `„${sub.line}“` }),
+          el('span', { text: `◆ ${sig.name}: ${sig.description}` }),
+          el('span', { class: 'adv-muted', text: `Fähigkeiten: ${sub.abilities.map((id) => ABILITIES[id].name).join(', ')}` }),
+          el('button', {
+            class: 'btn btn-primary', type: 'button', 'data-key': `choose-${sub.id}`,
+            onclick: async () => {
+              const ok = await confirmDialog({
+                title: `${sub.name} wählen?`,
+                message: `Alle verteilten Punkte kommen zurück und du verteilst sie neu. Später umlernen kostet ${SUBCLASS_RULES.respecGold} Gold bei Oma Panzerla.`,
+                confirmLabel: 'Wählen',
+              });
+              if (ok) act((a) => chooseSubclass(a, ctx.run.hero.class, sub.id));
+            },
+          }, 'Wählen')));
+      }
+      body.append(cards);
+    }
+
+    body.append(el('h3', { class: 'adv-tree-head', text: `Stamm: ${cls.name}` }));
+    for (const [i, id] of [cls.startAbility, ...cls.abilityPool].entries()) {
       const def = ABILITIES[id], level = rec.abilities[id];
       const start = i === 0;
-      const row = el('div', { class: `adv-row${level ? '' : ' locked'}` },
-        el('div', { class: 'adv-row-main' },
-          el('strong', { text: def.name }),
-          el('span', { class: 'adv-muted', text: level ? `${start ? 'Grundattacke · ' : ''}Stufe ${level} von 5` : `frei ab Level ${ADVENTURE_LEVEL.unlockAt[i - 1]}` }),
-          el('span', { class: 'adv-desc', text: def.description })));
-      const actions = el('div', { class: 'adv-row-actions' });
-      if (level) {
-        actions.append(el('button', {
-          class: 'btn', type: 'button', 'data-key': `up-${id}`, disabled: rec.skillPoints < 1 || level >= 5,
-          onclick: () => { ctx.change((save, hero) => { spendPoint(hero.adventure, id); }); api.refresh(); },
-        }, '+1 Stufe'));
-        if (!start) {
-          for (const slot of [0, 1, 2]) {
-            const on = rec.buttons[slot] === id;
-            actions.append(el('button', {
-              class: `btn adv-slot${on ? ' on' : ''}`, type: 'button', 'data-key': `slot-${id}-${slot}`, 'aria-pressed': on ? 'true' : 'false',
-              'aria-label': `${def.name} auf Knopf ${slot + 1}`,
-              onclick: () => { ctx.change((save, hero) => { setButton(hero.adventure, slot, on ? null : id); }); api.refresh(); },
-            }, String(slot + 1)));
-          }
-        }
-      }
-      row.append(actions);
-      body.append(row);
+      body.append(row(!level, [
+        el('strong', { text: def.name }),
+        el('span', { class: 'adv-muted', text: level ? `${start ? 'Grundattacke · ' : ''}Stufe ${level} von 5` : `frei ab Level ${ADVENTURE_LEVEL.unlockAt[i - 1]}` }),
+        el('span', { class: 'adv-desc', text: def.description }),
+      ], level ? [upButton(id, level), ...(start ? [] : slotButtons(id, def.name))] : []));
     }
+
+    const sub = rec.subclass ? SUBCLASSES[rec.subclass] : null;
+    if (!sub) return;
+    body.append(el('h3', { class: 'adv-tree-head', text: `Ast: ${sub.name}` }));
+    for (const id of sub.abilities) {
+      const def = ABILITIES[id], st = branchStatus(rec, id);
+      const signature = id === sub.signature;
+      body.append(row(!st.unlocked, [
+        el('strong', { text: `${signature ? '◆ ' : ''}${def.name}` }),
+        el('span', { class: 'adv-muted', text: `${signature ? 'Besonderheit · ' : ''}${st.label}` }),
+        el('span', { class: 'adv-desc', text: def.description }),
+      ], st.unlocked ? [upButton(id, st.level), ...slotButtons(id, def.name)] : [el('button', {
+        class: 'btn', type: 'button', 'data-key': `unlock-${id}`, disabled: rec.skillPoints < SUBCLASS_RULES.unlockCost,
+        onclick: () => act((a) => unlockBranch(a, id)),
+      }, 'Freischalten')]));
+    }
+    body.append(el('h3', { class: 'adv-tree-head', text: 'Dauer-Boni' }));
+    for (const def of sub.passives) {
+      const rank = rec.passives[def.id] ?? 0;
+      body.append(row(rank === 0, [
+        el('strong', { text: def.name }),
+        el('span', { class: 'adv-muted', text: `${passiveEffectText({ ...def, subclass: sub.id })} · Stufe ${rank} von ${def.maxRank}` }),
+      ], [el('button', {
+        class: 'btn', type: 'button', 'data-key': `passive-${def.id}`, disabled: rec.skillPoints < 1 || rank >= def.maxRank,
+        onclick: () => act((a) => spendPassive(a, def.id)),
+      }, '+1 Stufe')]));
+    }
+    body.append(el('p', { class: 'adv-muted', text: respecLine() }));
   });
+}
+
+/**
+ * Umlernen bei Oma Panzerla (nach dem Gespräch, ab Level 10 mit Unterklasse): Preis, Rückfrage, dann `respecAdventure`.
+ * @param {MenuCtx} ctx
+ */
+export function openRespec(ctx) {
+  return panel(ctx.uiLayer, 'Oma Panzerla', (body, api) => {
+    const sub = SUBCLASSES[ctx.run.record.subclass];
+    const gold = ctx.app.save.gold;
+    const price = SUBCLASS_RULES.respecGold;
+    if (!sub) { body.append(el('p', { class: 'adv-note', text: 'Du hast alles neu gelernt. Jetzt wähle mit Bedacht, Kind.' })); return; }
+    body.append(el('p', { class: 'adv-note', text: `„Du willst etwas anderes lernen als ${sub.name}? Das kostet dich ${price} Gold, Kind.“` }));
+    body.append(el('p', { class: 'adv-muted', text: `Alle Punkte aus Stamm, Ast und Dauer-Boni kommen zurück, die Unterklasse ist wieder offen. Du hast ${gold} Gold.` }));
+    body.append(el('button', {
+      class: 'btn btn-primary btn-large', type: 'button', 'data-key': 'respec', disabled: gold < price,
+      onclick: async () => {
+        const ok = await confirmDialog({ title: 'Umlernen?', message: `Umlernen kostet ${price} Gold. Alle Punkte kommen zurück, die Unterklasse ${sub.name} ist weg.`, confirmLabel: `Umlernen (${price} Gold)` });
+        if (!ok) return;
+        ctx.change((save) => { respecAdventure(save, ctx.heroId); });
+        api.refresh();
+      },
+    }, `Umlernen (${price} Gold)`));
+    if (gold < price) body.append(el('p', { class: 'adv-muted', text: 'Dafür reicht dein Gold noch nicht.' }));
+  }, { backLabel: 'Nein danke' });
 }
 
 /** Aufträge: laufende mit Schritt und Fortschritt (antippen = verfolgen), erledigte darunter. */
@@ -168,6 +252,10 @@ export async function openCampfire(ctx, fire) {
   let target = null;
   await panel(ctx.uiLayer, `Lagerfeuer: ${CAMPFIRE_NAMES[fire.id] ?? fire.id}`, (body, api) => {
     body.append(el('p', { class: 'adv-note', text: 'Du rastest. Leben voll, Spiel gespeichert. Die Gegner sind zurück.' }));
+    const rec = ctx.run.record;
+    if (!rec.subclass && rec.level >= SUBCLASS_RULES.chooseLevel) {
+      body.append(el('p', { class: 'adv-note adv-remind', text: 'Du kannst eine Unterklasse wählen: Pause → Fähigkeiten.' }));
+    }
     body.append(el('button', { class: 'btn btn-primary btn-large', type: 'button', onclick: () => api.close() }, 'Weiterziehen'));
     const others = fire.destinations.filter((id) => id !== fire.id);
     if (others.length) body.append(el('p', { class: 'adv-muted', text: 'Reisen zu:' }));
