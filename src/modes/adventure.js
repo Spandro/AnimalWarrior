@@ -73,6 +73,8 @@ export function createAdventureRun({ seed, save, heroId }) {
     world: null, map: null, grid: null, explored: null, queued: [], stepping: false, worldSeen: 0,
   };
   enterMap(run, run.record.mapId, run.record.campfireId);
+  // Helden aus Etappe 1, die schon Level 10 haben, erfahren so von der Wahl.
+  if (!run.record.subclass && run.record.level >= SUBCLASS_RULES.chooseLevel) emit(run, { type: 'subclassAvailable' });
   return run;
 }
 
@@ -146,6 +148,14 @@ function clearSignatures(world) {
   recomputeHeroStats(world);
 }
 
+/**
+ * Aktion für die Oberfläche: laufende Besonderheiten wegräumen (nach dem Umlernen).
+ * @param {AdventureRun} run
+ */
+export function clearSignaturesAction(run) {
+  clearSignatures(run.world);
+}
+
 /** Alle Gruppen wieder da (Rasten, Tod, neue Karte); Bosskämpfe von vorn. */
 function resetPacks(run) {
   run.world.enemies = [];
@@ -202,9 +212,10 @@ function stepPlaying(run, dt, input) {
   updatePacks(run);
   updateBosses(run);
   updateArea(run);
-  if (markExplored(run.explored, run.grid, world.hero.x, world.hero.z, EXPLORE_RADIUS)) run.exploredChanged = true;
+  if (markExplored(run.explored, run.grid, world.hero.x, world.hero.z, EXPLORE_RADIUS)) { run.exploredChanged = true; run.dirty = true; }
   run.interactable = findInteractable(run);
   if (world.hero.hp <= 0) {
+    clearSignatures(world);
     run.state = 'dying';
     run.dyingLeft = DEATH.seconds;
     emit(run, { type: 'dying' });
@@ -565,6 +576,7 @@ export function travel(run, campfireId) {
   run.record.mapId = map.id;
   run.record.campfireId = campfireId;
   run.state = 'playing';
+  run.ledger.rests++;
   emit(run, { type: 'travel', campfireId, map: map.id });
   run.dirty = true;
   return true;

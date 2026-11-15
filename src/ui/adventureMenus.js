@@ -12,6 +12,8 @@ import { SUBCLASSES, subclassesFor } from '../data/subclasses.js';
 import { SUBCLASS_RULES } from '../data/adventure.js';
 import { confirmDialog } from './menus.js';
 import { respecAdventure } from '../save/adventure.js';
+import { clearSignaturesAction } from '../modes/adventure.js';
+import { RESPEC_LINES } from '../data/dialogues.js';
 import { heroLineText, passiveEffectText, branchStatus, treeHeader, respecLine } from './treeText.js';
 import { trackedQuest } from '../core/quests.js';
 
@@ -193,8 +195,8 @@ export function openRespec(ctx) {
     const sub = SUBCLASSES[ctx.run.record.subclass];
     const gold = ctx.app.save.gold;
     const price = SUBCLASS_RULES.respecGold;
-    if (!sub) { body.append(el('p', { class: 'adv-note', text: 'Du hast alles neu gelernt. Jetzt wähle mit Bedacht, Kind.' })); return; }
-    body.append(el('p', { class: 'adv-note', text: `„Du willst etwas anderes lernen als ${sub.name}? Das kostet dich ${price} Gold, Kind.“` }));
+    if (!sub) { body.append(el('p', { class: 'adv-note', text: RESPEC_LINES.done })); return; }
+    body.append(el('p', { class: 'adv-note', text: RESPEC_LINES.offer(sub.name, price) }));
     body.append(el('p', { class: 'adv-muted', text: `Alle Punkte aus Stamm, Ast und Dauer-Boni kommen zurück, die Unterklasse ist wieder offen. Du hast ${gold} Gold.` }));
     body.append(el('button', {
       class: 'btn btn-primary btn-large', type: 'button', 'data-key': 'respec', disabled: gold < price,
@@ -202,10 +204,11 @@ export function openRespec(ctx) {
         const ok = await confirmDialog({ title: 'Umlernen?', message: `Umlernen kostet ${price} Gold. Alle Punkte kommen zurück, die Unterklasse ${sub.name} ist weg.`, confirmLabel: `Umlernen (${price} Gold)` });
         if (!ok) return;
         ctx.change((save) => { respecAdventure(save, ctx.heroId); });
+        clearSignaturesAction(ctx.run);
         api.refresh();
       },
     }, `Umlernen (${price} Gold)`));
-    if (gold < price) body.append(el('p', { class: 'adv-muted', text: 'Dafür reicht dein Gold noch nicht.' }));
+    if (gold < price) body.append(el('p', { class: 'adv-muted', text: RESPEC_LINES.broke }));
   }, { backLabel: 'Nein danke', focusBack: true });
 }
 

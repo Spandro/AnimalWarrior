@@ -1,7 +1,7 @@
 import { test, assertEqual, assertTrue, assertClose } from './runner.js';
 import {
   createAdventureRun, stepAdventure, useAbility, drinkPotion, interact, endTalk, setPaused, rest, travel, snapshot, clearLedger, acceptOffer,
-  isGateClosed,
+  isGateClosed, clearSignaturesAction,
 } from '../src/modes/adventure.js';
 import { damageEnemy, spawnEnemy } from '../src/core/world.js';
 import { defaultSave, addHero } from '../src/save/store.js';
@@ -353,3 +353,52 @@ function spawnEnemyAt(run, type, hpMul = 1) {
   e.passive = true;
   return e;
 }
+
+// ---------------------------------------------------------------- Kleinigkeiten nach Etappe 2
+
+test('adventure: in der Sterbephase sind Besonderheiten sofort weg (Heiltopf hebt das Leben nicht über 0)', () => {
+  const run = setup();
+  const w = run.world;
+  w.zones.push({ abilityId: 'eintopf', x: w.hero.x, z: w.hero.z, radius: 3, delayLeft: 0, timeLeft: 9, landed: true, damage: 0, tickDamage: 0, tickInterval: 0.5, tickLeft: 0, confuse: 0, healPct: 0.5 });
+  w.followers.push({ kind: 'pet', abilityId: 'erdmaennchen', x: 0, z: 0, until: 99 });
+  w.hero.hp = -100;
+  step(run, 3);
+  assertEqual(run.state, 'dying');
+  assertEqual([w.zones.length, w.followers.length], [0, 0]);
+  assertTrue(w.hero.hp <= 0);
+});
+
+test('adventure: clearSignaturesAction räumt laufende Besonderheiten (nach dem Umlernen)', () => {
+  const run = setup();
+  run.world.traps.push({ abilityId: 'baerenfalle', x: 0, z: 0, radius: 1, damage: 1, stun: 1, until: 99 });
+  run.world.hero.shield = { hp: 5, until: 99 };
+  clearSignaturesAction(run);
+  assertEqual([run.world.traps.length, run.world.hero.shield], [0, null]);
+});
+
+test('adventure: Held ab Level 10 ohne Unterklasse bekommt beim Start einmal die Meldung', () => {
+  const run = setup({ mutate: (a) => { a.level = 12; a.skillPoints = 11; } });
+  step(run, 1);
+  const all = [...run.events];
+  step(run, 1);
+  all.push(...run.events);
+  assertEqual(all.filter((e) => e.type === 'subclassAvailable').length, 1);
+  const chosen = setup({ mutate: (a) => { a.level = 12; a.skillPoints = 11; a.subclass = 'tuersteher'; } });
+  step(chosen, 1);
+  assertEqual(chosen.events.filter((e) => e.type === 'subclassAvailable').length, 0);
+});
+
+test('adventure: neue Erkundung markiert den Lauf zum Speichern', () => {
+  const run = setup();
+  run.dirty = false;
+  put(run, run.world.hero.x + 30, run.world.hero.z);
+  step(run, 1);
+  assertTrue(run.dirty);
+});
+
+test('adventure: Reisen zählt als Rasten', () => {
+  const run = setup({ mutate: (a) => { a.campfires.push('k1_bruecke'); } });
+  const before = run.ledger.rests;
+  assertTrue(travel(run, 'k1_bruecke'));
+  assertEqual(run.ledger.rests, before + 1);
+});

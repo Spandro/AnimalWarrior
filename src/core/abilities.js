@@ -137,6 +137,8 @@ export function stepAbilities(world, dt, fire = true) {
     const def = ABILITIES[a.id];
     if (def.trigger !== 'auto') continue;
     if (a.manual) { a.cooldownLeft = Math.max(0, a.cooldownLeft - dt); continue; }
+    // Unsichtbar wartet die Grundattacke, damit der erste Treffer ein gewollter Hinterhalt ist.
+    if (a.gate === 'engage' && world.hero.stealthUntil > world.time) { a.cooldownLeft = Math.max(0, a.cooldownLeft - dt); continue; }
     if (a.gate === 'engage' && a.cooldownLeft <= dt) {
       const p = abilityParams(a.id, a.level, world.hero.stats);
       if (!nearestEnemy(ctx, world.hero.x, world.hero.z, engageRange(def, p))) { a.cooldownLeft = Math.max(0, a.cooldownLeft - dt); continue; }
@@ -239,6 +241,11 @@ function strikeWithEffects(world, enemy, p, abilityId) {
 function explode(ctx, abilityId, x, z, radius, damage) {
   ctx.world.events.push({ type: 'explosion', abilityId, x, z, radius });
   for (const e of enemiesInCircle(ctx, x, z, radius)) strike(ctx.world, e, damage, abilityId);
+}
+
+/** Begehbar für Wesen am Boden (ohne Kartenraster immer). */
+function walkableAt(world, x, z) {
+  return !world.terrain.walkable || world.terrain.walkable(x, z, 'walk');
 }
 
 /** Entfernt Elemente in place (Renderer dürfen die Arrays behalten). */
@@ -398,8 +405,10 @@ const SHAPES = {
     const n = Math.max(1, Math.round(p.count ?? 1));
     for (let i = 0; i < n; i++) {
       const a = (i / n) * 2 * Math.PI, r = n > 1 ? SIGNATURE_RULES.summonSpread : 0;
+      let x = t.x + Math.cos(a) * r, z = t.z + Math.sin(a) * r;
+      if (!walkableAt(ctx.world, x, z)) { x = t.x; z = t.z; }
       ctx.world.summons.push({
-        abilityId: id, x: t.x + Math.cos(a) * r, z: t.z + Math.sin(a) * r, timeLeft: p.duration, lureRadius: p.lureRadius,
+        abilityId: id, x, z, timeLeft: p.duration, lureRadius: p.lureRadius,
         explodeDamage: p.explodeDamage, explodeRadius: p.explodeRadius,
       });
     }
@@ -667,7 +676,11 @@ function updateFollowers(ctx, dt) {
     const goal = e ?? h;
     const dx = goal.x - f.x, dz = goal.z - f.z, d = Math.hypot(dx, dz);
     const stop = e ? e.radius + f.reach * 0.8 : near;
-    if (d > stop) { const step = Math.min(d - stop, f.speed * dt); f.x += (dx / d) * step; f.z += (dz / d) * step; }
+    if (d > stop) {
+      const step = Math.min(d - stop, f.speed * dt);
+      const nx = f.x + (dx / d) * step, nz = f.z + (dz / d) * step;
+      if (walkableAt(w, nx, nz)) { f.x = nx; f.z = nz; }
+    }
     if (e && w.time >= f.nextAt && Math.hypot(e.x - f.x, e.z - f.z) <= e.radius + f.reach) {
       f.nextAt = w.time + f.interval;
       strike(w, e, f.damage, f.abilityId);

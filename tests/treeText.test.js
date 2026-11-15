@@ -16,6 +16,7 @@ test('treeText: Dauer-Boni in Worten, besondere mit Name der Besonderheit', () =
   assertEqual(passiveEffectText(PASSIVES.langerschatten), 'Dauer +0,5 s je Stufe (Hier war niemand)');
   assertEqual(passiveEffectText(PASSIVES.vorgekocht), 'Abklingzeit −4 % je Stufe');
   assertEqual(passiveEffectText(PASSIVES.zugabe), 'Dauer von Stärkungen +1 s je Stufe');
+  assertEqual(passiveEffectText(PASSIVES.zornesfalte), 'kritischer Schaden +10 % je Stufe');
 });
 
 test('treeText: Astzeile gesperrt oder mit Stufe, Kopfzeile und Umlernen', () => {

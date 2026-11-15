@@ -1,4 +1,7 @@
 import { SIGNATURE_LOOK } from '../data/adventure.js';
+
+/** Beschwörungen, die als Erdmännchen erscheinen statt als dunkle Heldenkopie. */
+const FAMILY_SUMMONS = new Set(['grossfamilie', 'familientreffen']);
 import * as THREE from '../../vendor/three.module.min.js';
 import { buildCharacter, animateCharacter, buildMeerkat, animateMeerkat } from './character.js';
 import { createTracker } from './enemies.js';
@@ -125,7 +128,7 @@ export function createHeroView(scene, animalId, classId, { sprites, camera, redu
     ring.position.set(position.x, 0.03, position.z);
     // Großfamilie: statt der dunklen Heldenkopie drei Erdmännchen um die Lockstelle; andere Beschwörungen bleiben Klone.
     clonesNow.length = 0; familyNow.length = 0;
-    for (const s of world.summons) (s.abilityId === 'grossfamilie' ? familyNow : clonesNow).push(s);
+    for (const s of world.summons) (FAMILY_SUMMONS.has(s.abilityId) ? familyNow : clonesNow).push(s);
     body.updateClones(clonesNow, t);
     family.update(familyNow, t);
   }

@@ -278,3 +278,52 @@ test('signatures: Erdmännchen sucht Ziele nur in Reichweite des Helden und kehr
   assertEqual(far.hp, far.maxHp, 'Gegner 20 m vom Helden bleibt unberührt');
   assertTrue(Math.hypot(w.followers[0].x, w.followers[0].z) < 3, 'kehrt zum Helden zurück');
 });
+
+// ---------------------------------------------------------------- Kleinigkeiten nach Etappe 2
+
+test('signatures: Lebensraub zählt nur den Schaden bis zum restlichen Leben des Gegners', () => {
+  const w = world();
+  w.lifesteal = 0.1;
+  w.hero.hp = 50;
+  const rat = spawnEnemy(w, 'ratte', 3, 0);
+  damageEnemy(w, rat, { amount: 200, crit: false }, 'x');
+  assertClose(w.hero.hp, 50 + rat.maxHp * 0.1);
+});
+
+test('signatures: ganz vom Schild geschluckter Otterbiss vergiftet nicht', () => {
+  const w = world();
+  w.hero.shield = { hp: 1000, until: 99 };
+  const otter = spawnEnemy(w, 'kreuzotter', 0.6, 0);
+  otter.damage = 5;
+  for (let i = 0; i < 20; i++) stepWorld(w, 0.05, NONE);
+  assertEqual(w.hero.poison, null);
+});
+
+test('signatures: Erdmännchen läuft nicht durch gesperrte Fläche', () => {
+  const w = world('hochstapler', 'giraffe');
+  w.terrain = { obstaclesNear: () => [], walkable: (x) => x < 2 };
+  const e = dummy(w, 1.5, 6);
+  castAbility(w, 'erdmaennchen', 1);
+  w.followers[0].x = 1; w.followers[0].z = 0;
+  e.x = 6; e.z = 0;
+  for (let i = 0; i < 20; i++) stepWorld(w, 0.1, NONE);
+  assertTrue(w.followers[0].x < 2, `Erdmännchen bei x=${w.followers[0].x}`);
+});
+
+test('signatures: Familientreffen setzt Verwandte nur auf begehbare Stellen', () => {
+  const w = world('hochstapler', 'giraffe');
+  w.terrain = { obstaclesNear: () => [], walkable: (x) => x <= 0.5 };
+  castAbility(w, 'familientreffen', 1);
+  assertEqual(w.summons.length, 3);
+  assertTrue(w.summons.every((s) => s.x <= 0.5));
+});
+
+test('signatures: unsichtbar schlägt die Grundattacke nicht von selbst zu', () => {
+  const w = world('dieb');
+  w.hero.abilities = [{ id: 'wurfdolche', level: 1, cooldownLeft: 0, gate: 'engage' }];
+  dummy(w, 3, 0);
+  castAbility(w, 'hierwarniemand', 1);
+  for (let i = 0; i < 10; i++) stepWorld(w, 0.1, NONE);
+  assertTrue(w.hero.stealthUntil > w.time, 'noch unsichtbar');
+  assertEqual(w.projectiles.length, 0);
+});

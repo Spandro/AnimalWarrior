@@ -21,7 +21,7 @@ export function describeModifier(m) {
   if (m.flat) {
     const v = Math.abs(m.flat);
     if (m.stat === 'critChance') parts.push(signed(`${formatNumber(v * 100)} Prozentpunkte`, m.flat));
-    else if (m.stat === 'dodge') parts.push(signed(`${formatNumber(v * 100)} %`, m.flat));
+    else if (m.stat === 'dodge' || m.stat === 'critDamage') parts.push(signed(`${formatNumber(Math.round(v * 100))} %`, m.flat));
     else if (m.stat === 'hpRegen') parts.push(signed(`${formatNumber(v, Number.isInteger(v) ? 0 : 1)}/s`, m.flat));
     else parts.push(signed(formatNumber(v, Number.isInteger(v) ? 0 : 2), m.flat));
   }

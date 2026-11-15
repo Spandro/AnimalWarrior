@@ -83,3 +83,10 @@ export const DIALOGUES = {
     idle: [],
   },
 };
+
+/** Omas Sätze beim Umlernen (Etappe 2): Angebot (mit Name der Unterklasse und Preis), danach. */
+export const RESPEC_LINES = {
+  offer: (subclass, price) => `„Du willst etwas anderes lernen als ${subclass}? Das kostet dich ${price} Gold, Kind.“`,
+  done: '„Du hast alles neu gelernt. Jetzt wähle mit Bedacht, Kind.“ Die neue Unterklasse wählst du unter Pause → Fähigkeiten.',
+  broke: 'Dafür reicht dein Gold noch nicht.',
+};

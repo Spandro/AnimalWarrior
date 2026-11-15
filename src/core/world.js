@@ -639,11 +639,12 @@ export function damageEnemy(world, enemy, hit, abilityId) {
     if (enemy.hp <= 1) startShadowFlee(world, enemy);
     return;
   }
+  const landed = Math.min(amount, Math.max(0, enemy.hp));
   enemy.hp -= amount;
   dbA[abilityId] = (dbA[abilityId] || 0) + amount;
   if (world.lifesteal > 0) {
     const hero = world.hero;
-    hero.hp = Math.min(hero.stats.maxHp, hero.hp + amount * world.lifesteal);
+    hero.hp = Math.min(hero.stats.maxHp, hero.hp + landed * world.lifesteal);
   }
   const steal = world.hero.steal;
   const stealing = !!steal && world.time < steal.until;
@@ -721,7 +722,7 @@ export function damageHero(world, rawAmount, { poison = false } = {}) {
     amount -= absorbed;
     world.events.push({ type: 'shieldHit', amount: absorbed });
     if (hero.shield.hp <= 0) hero.shield = null;
-    if (amount <= 0) return true;
+    if (amount <= 0) return false; // ganz geschluckt: kein Schaden, kein Gift, kein Wegstoßen
   }
   hero.hp -= amount;
   world.events.push(poison ? { type: 'heroHit', amount, poison: true } : { type: 'heroHit', amount });
