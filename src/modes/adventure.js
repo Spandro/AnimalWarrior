@@ -7,6 +7,7 @@ import { gainXp, adventureModifiers, enemyMultipliers, abilitySpecials, specialB
 import { talkTo, acceptQuest, questEvent } from '../core/quests.js';
 import { rollAdventureItem } from '../core/loot.js';
 import { MAPS } from '../data/maps/index.js';
+import { ITEMS } from '../data/items.js';
 import { QUESTS, QUEST_DROP, CHAPTER_START_QUEST } from '../data/quests.js';
 import { CLASSES } from '../data/classes.js';
 import { ENEMIES, ELITE } from '../data/enemies.js';
@@ -166,6 +167,7 @@ export function clearSignaturesAction(run) {
 
 /** Alle Gruppen wieder da (Rasten, Tod, neue Karte); Bosskämpfe von vorn. */
 function resetPacks(run) {
+  run.world.flowTurned = null;
   run.world.enemies = [];
   run.world.enemyProjectiles = [];
   run.packs = run.map.packs.map((def) => ({ def, state: 'idle', ids: new Set(), spawned: false }));
@@ -466,8 +468,12 @@ function onKill(run, e) {
   if (e.elite && run.rng.chance(LOOT.elitePearlChance)) drop(run, e.x, e.z, 'material', 1, 'flussperle');
 }
 
+/** Beutequelle der Karte: ihr Kapitel; hat es (noch) keine Gegenstände, das nächste darunter, das welche hat. */
 function chapterSource(run) {
-  return `kapitel${Math.max(1, run.map.chapter)}`;
+  for (let ch = Math.max(1, run.map.chapter); ch > 1; ch--) {
+    if (Object.values(ITEMS).some((i) => i.source === `kapitel${ch}`)) return `kapitel${ch}`;
+  }
+  return 'kapitel1';
 }
 
 function onPickup(run, e) {
@@ -481,6 +487,7 @@ function onPickup(run, e) {
 function onBossDefeated(run, bossDef, e) {
   run.record.bosses.push(bossDef.id);
   run.activeBoss = null;
+  run.world.flowTurned = null;
   emit(run, { type: 'bossDefeated', bossId: bossDef.id, name: ENEMIES[bossDef.type].name }, { type: 'arenaOpened', gate: bossDef.gate });
   // Sichere Bossbeute direkt gutschreiben: ein liegengelassener Gegenstand wäre nach Tod oder Reise für immer weg.
   const item = rollAdventureItem(run.rng, chapterSource(run), LOOT.bossMinRarity);
@@ -638,10 +645,19 @@ function spotUseful(run, spot) {
   });
 }
 
+/**
+ * Ist ein Bewohner da? Einer mit `requires` (z. B. Nagezahn nach seinem Seitenwechsel) erst, wenn die Bedingung erfüllt ist.
+ * @param {AdventureRun} run
+ * @param {MapDef['npcs'][number]} npc
+ */
+export function npcVisible(run, npc) {
+  return !npc.requires || conditionMet(run, npc.requires);
+}
+
 function findInteractable(run) {
   const h = run.world.hero, m = run.map;
   const all = [
-    ...m.npcs.map((n) => ({ kind: 'npc', id: n.id, x: n.x, z: n.z })),
+    ...m.npcs.filter((n) => npcVisible(run, n)).map((n) => ({ kind: 'npc', id: n.id, x: n.x, z: n.z })),
     ...m.campfires.map((c) => ({ kind: 'campfire', id: c.id, x: c.x, z: c.z })),
     ...m.spots.filter((s) => spotUseful(run, s)).map((s) => ({ kind: 'spot', id: s.id, x: s.x, z: s.z })),
     ...m.chests.filter((c) => !run.record.chests.includes(c.id)).map((c) => ({ kind: 'chest', id: c.id, x: c.x, z: c.z })),

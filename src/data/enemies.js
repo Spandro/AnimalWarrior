@@ -1,14 +1,16 @@
 /**
  * @typedef {{ id: string, name: string, hp: number, speed: number, damage: number, radius: number, xp: number, behavior: string,
  *   flying?: boolean, venom?: boolean, armor?: number, pounceMul?: number, adventureOnly?: boolean, mudproof?: boolean,
- *   pounceRange?: number, leech?: { slow: number, seconds: number, healPct: number }, swimmer?: { speedMul: number } }} EnemyDef
+ *   pounceRange?: number, leech?: { slow: number, seconds: number, healPct: number }, swimmer?: { speedMul: number },
+ *   shock?: { range: number, warn: number, radius: number, damageMul: number, cooldown: number } }} EnemyDef
  *   name: Anzeigename (Bossanzeige); venom: Berührungstreffer vergiftet (siehe VENOM); armor: zieht flach von jedem
  *   Treffer ab (mindestens 1 Schaden bleibt); pounceMul: Sprungschaden statt POUNCE.damageMul.
  *   adventureOnly: nur im Abenteuer (nicht in `unlockMinute`, `weights` und `BOSS_POOL`).
  *   mudproof: Schlamm bremst ihn nicht (Gelände, Kapitel 2). pounceRange: Sprungweite statt POUNCE.engageRange.
  *   leech: ein durchgekommener Berührungstreffer bremst den Helden `seconds` s um den Anteil `slow` und heilt den Gegner
  *   um `healPct` seines höchsten Lebens (Blutegel). swimmer: auf Strömung `speedMul`-fach schneller und nicht von ihr
- *   geschoben (Kapitel 3).
+ *   geschoben (Kapitel 3). shock (Aal): steht der Held höchstens `range` entfernt, bleibt er stehen und kündigt einen
+ *   Stromschlag im Kreis `radius` um sich an; nach `warn` s trifft er mit `damageMul`, danach `cooldown` s Pause.
  */
 
 /** @type {Record<string, EnemyDef>} */
@@ -37,6 +39,18 @@ export const ENEMIES = {
   kaulquappe: { id: 'kaulquappe', adventureOnly: true, name: 'Kaulquappe', hp: 6, speed: 3.6, damage: 3, radius: 0.3, xp: 1, behavior: 'chase' },
   hofmarschall_quak: { id: 'hofmarschall_quak', adventureOnly: true, name: 'Hofmarschall Quak', hp: 800, speed: 3.0, damage: 15, radius: 1.3, xp: 220, behavior: 'boss' },
   hecht_haudrauf: { id: 'hecht_haudrauf', adventureOnly: true, name: 'Hecht Haudrauf', hp: 1200, speed: 3.2, damage: 18, radius: 1.5, xp: 400, behavior: 'boss', mudproof: true },
+  // Kapitel 3 „Der Biberdamm“
+  aal: {
+    id: 'aal', adventureOnly: true, name: 'Aal', hp: 30, speed: 3.6, damage: 7, radius: 0.45, xp: 6, behavior: 'slither',
+    swimmer: { speedMul: 1.6 }, shock: { range: 3.5, warn: 1.0, radius: 2.6, damageMul: 1.4, cooldown: 4 },
+  },
+  bisam: { id: 'bisam', adventureOnly: true, name: 'Bisam', hp: 34, speed: 3.2, damage: 7, radius: 0.45, xp: 6, behavior: 'burrow' },
+  helmhecht: { id: 'helmhecht', adventureOnly: true, name: 'Helmhecht', hp: 28, speed: 3.4, damage: 8, radius: 0.55, xp: 6, behavior: 'charge', armor: 2 },
+  bauleiter_nagezahn: { id: 'bauleiter_nagezahn', adventureOnly: true, name: 'Bauleiter Nagezahn', hp: 1000, speed: 3.0, damage: 18, radius: 1.4, xp: 450, behavior: 'boss', armor: 2 },
+  admiral_flossenbart: {
+    id: 'admiral_flossenbart', adventureOnly: true, name: 'Admiral Flossenbart', hp: 1500, speed: 3.0, damage: 20, radius: 1.7, xp: 600,
+    behavior: 'boss', swimmer: { speedMul: 1.3 },
+  },
   hauptmann_graete: { id: 'hauptmann_graete', adventureOnly: true, name: 'Hauptmann Gräte', hp: 600, speed: 3.4, damage: 14, radius: 1.1, xp: 150, behavior: 'boss' },
   kommandant_zwickzwack: { id: 'kommandant_zwickzwack', adventureOnly: true, name: 'Kommandant Zwickzwack', hp: 900, speed: 2.6, damage: 18, radius: 1.5, xp: 300, behavior: 'boss', armor: 3 },
 };
@@ -71,6 +85,13 @@ export const CHARGE = { interval: 4, windup: 0.6, duration: 1, speedMul: 3 };
 
 /** Krähe: nähert sich mit seitlichem Versatz (Anteil `lateral` je Vorwärtseinheit), Seitenwechsel alle `switchInterval` s. */
 export const STRAFE = { lateral: 0.6, switchInterval: 1.5 };
+
+/**
+ * Bisam (`behavior: 'burrow'`, Kapitel 3): verfolgt; ist der Held höchstens `range` entfernt, gräbt er sich ein (nicht
+ * treffbar, unsichtbar), kündigt an einem Punkt `offset` neben dem Helden einen Kreis `radius` an und taucht nach `time` s
+ * dort auf; steht der Held im Kreis, trifft er mit `damageMul`. Danach `cooldown` s normales Verfolgen.
+ */
+export const BURROW = { range: 8, time: 1.4, radius: 1.4, offset: 1.0, cooldown: 4, damageMul: 1.2 };
 
 /** Kreuzotter: wie STRAFE, aber enger gewunden. */
 export const SLITHER = { lateral: 0.8, switchInterval: 0.6 };
@@ -132,6 +153,8 @@ export const BOSS = {
  * - `ring`: Kreis um den Boss (Radius = Boss-Radius + `reach`); ein Treffer stößt den Helden `push` weit weg
  * - `dash`: Streifen (`length` × `width`) ab dem Boss Richtung Held; der Boss rennt ihn in `dashTime` s ab und trifft
  *   höchstens einmal je Ansturm; `count` Anstürme, dazwischen `gap` s, jeder neu ausgerichtet und angekündigt
+ * - `logs`: `count` Holzstämme in Bahnen nebeneinander (Abstand `lane`) Richtung Held; nach `windup` rollen sie als breite
+ *   Geschosse (`radius`, `speed`) los und treffen jeder höchstens einmal; Wasser und Tore halten sie auf (Bauleiter Nagezahn)
  * - `bubbles`: `count` Moorblasen (Kreise mit `radius`), die erste am Helden, die übrigen im Umkreis `spread` um ihn;
  *   nach `windup` trifft es den Helden, wenn er in einem der Kreise steht (Hecht Haudrauf)
  * Schaden: Bossschaden × `damageMul`.
@@ -140,9 +163,13 @@ export const BOSS = {
  *   | { kind: 'ring', reach: number, windup: number, damageMul: number, push: number }
  *   | { kind: 'dash', length: number, width: number, windup: number, dashTime: number, damageMul: number,
  *       count: number, gap: number }
- *   | { kind: 'bubbles', count: number, spread: number, radius: number, windup: number, damageMul: number }} BossAttack
+ *   | { kind: 'bubbles', count: number, spread: number, radius: number, windup: number, damageMul: number }
+ *   | { kind: 'logs', count: number, lane: number, length: number, radius: number, speed: number, windup: number, damageMul: number }} BossAttack
  * @typedef {{ chaseTime: number, recover: number, triggerRange: number, near: BossAttack, far: BossAttack,
- *   summon?: { every: number, type: string, count: number, radius: number } }} BossMoves
+ *   summon?: { every: number, type: string, count: number, radius: number },
+ *   turnFlow?: { every: number, warn: number, radius: number } }} BossMoves
+ *   `turnFlow` (Admiral Flossenbart): alle `every` s dreht sich die Strömung im Kreis `radius` um seinen Platz (`home`)
+ *   um bzw. zurück; `warn` s vorher kommt die Ankündigung (`bossTelegraph` mit `kind: 'flow'`), danach `flowTurned`.
  *   `summon` (nur Abenteuer): alle `every` s erscheinen `count` Gegner `type` im Abstand `radius` um den Boss,
  *   unabhängig vom Angriffsablauf (Ereignis `bossSummon` mit ihren `ids`).
  * @type {Record<string, BossMoves>}
@@ -184,6 +211,17 @@ export const BOSS_MOVES = {
     near: { kind: 'leap', radius: 3, windup: 0.9, damageMul: 1.2 },
     far: { kind: 'leap', radius: 3.5, windup: 1.2, damageMul: 1.6 },
     summon: { every: 20, type: 'kaulquappe', count: 4, radius: 3 },
+  },
+  bauleiter_nagezahn: {
+    chaseTime: 2.5, recover: 0.8, triggerRange: 3.5,
+    near: { kind: 'swipe', reach: 3, halfAngle: Math.PI / 2.5, windup: 0.7, damageMul: 1.2 },
+    far: { kind: 'logs', count: 3, lane: 3, length: 18, radius: 1.1, speed: 9, windup: 1.1, damageMul: 1.2 },
+  },
+  admiral_flossenbart: {
+    chaseTime: 2.5, recover: 0.8, triggerRange: 4,
+    near: { kind: 'ring', reach: 3.5, windup: 1.0, damageMul: 1.2, push: 4 },
+    far: { kind: 'dash', length: 14, width: 3, windup: 0.9, dashTime: 0.7, damageMul: 1.3, count: 1, gap: 0.5 },
+    turnFlow: { every: 12, warn: 2, radius: 20 },
   },
   hecht_haudrauf: {
     chaseTime: 2.5, recover: 0.8, triggerRange: 4,

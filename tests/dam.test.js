@@ -1,8 +1,8 @@
 import { test, assertEqual, assertTrue, assertClose } from './runner.js';
-import { createWorld, stepWorld, spawnEnemy, enemySpeed, flowAt } from '../src/core/world.js';
+import { createWorld, stepWorld, spawnEnemy, enemySpeed, flowAt, damageEnemy } from '../src/core/world.js';
 import { buildMapGrid, mapTerrain, cellAt, CELL } from '../src/core/mapGrid.js';
 import { TERRAIN } from '../src/data/adventure.js';
-import { ENEMIES } from '../src/data/enemies.js';
+import { ENEMIES, BOSS_MOVES, BURROW } from '../src/data/enemies.js';
 
 const still = { moveX: 0, moveZ: 0 };
 
@@ -136,7 +136,9 @@ const DAMM = {
     { id: 'td_biber', name: 'Biberschleuse', start: 'closed', strips: [{ points: [[70, -7], [70, 7]], width: 4 }], open: 'walk', closed: 'water', opensOn: { quest: 'ruf_aus_dem_sumpf', step: 1 } },
   ],
   areas: [{ id: 'schilfrand', name: 'Testdamm', x: 40, z: 0, r: 80 }],
-  campfires: [{ id: 'testdamm_feuer', x: 5, z: 0 }], npcs: [], spots: [], chests: [], packs: [], bosses: [],
+  campfires: [{ id: 'testdamm_feuer', x: 5, z: 0 }], npcs: [{ id: 'nagezahn', x: 20, z: 4, faceX: -1, requires: { boss: 'td_boss' } }],
+  spots: [], chests: [], packs: [],
+  bosses: [{ id: 'td_boss', type: 'admiral_flossenbart', level: 20, x: 85, z: 0, arena: { x: 85, z: 0, r: 4 }, gate: 'td_tor' }],
   exits: [], props: [], start: { campfire: 'testdamm_feuer' },
 };
 
@@ -288,4 +290,159 @@ test('dam: Auftragsschritt „Hebel umlegen“ mit Zielzustand, sofort erfüllt,
     acceptOffer(wrong, '__hebel');
     assertEqual(wrong.record.quests.__hebel.state, 'done', 'zu ist schon der Ausgangszustand');
   } finally { delete QUESTS.__hebel; }
+}));
+
+// ---------------------------------------------------------------- Gegner und Bosse (Task 4)
+
+const NEW3 = ['aal', 'bisam', 'helmhecht', 'bauleiter_nagezahn', 'admiral_flossenbart'];
+
+/** Welt ohne Gelände; Held bei (0,0), ohne Fähigkeiten, weicht nie aus. */
+function plainWorld(seed = 5, walkable = () => true) {
+  const w = createWorld({ seed, animalId: 'hase', classId: 'krieger' });
+  w.terrain = { obstaclesNear: () => [], walkable };
+  w.hero.abilities = [];
+  w.hero.stats.dodge = 0;
+  w.hero.stats.armor = 0;
+  return w;
+}
+const run = (w, seconds, input = still) => { for (let i = 0; i < Math.round(seconds * 60); i++) stepWorld(w, 1 / 60, input); };
+const telegraphs = (w, seconds, look) => {
+  const out = [];
+  for (let i = 0; i < Math.round(seconds * 60); i++) {
+    stepWorld(w, 1 / 60, still);
+    for (const e of w.events) if (e.type === 'bossTelegraph' && (!look || e.look === look || e.kind === look)) out.push(e);
+  }
+  return out;
+};
+
+test('dam: neue Gegner und Bosse gibt es nur im Abenteuer, mit ihren Eigenheiten', async () => {
+  const { unlockMinute, BOSS_POOL } = await import('../src/data/waves.js');
+  for (const id of NEW3) {
+    assertTrue(!!ENEMIES[id], id);
+    assertTrue(ENEMIES[id].adventureOnly === true, id);
+    assertTrue(!Object.hasOwn(unlockMinute, id) && !BOSS_POOL.includes(id), id);
+  }
+  assertEqual(ENEMIES.aal.behavior, 'slither');
+  assertTrue(ENEMIES.aal.swimmer.speedMul > 1);
+  assertEqual(ENEMIES.bisam.behavior, 'burrow');
+  assertEqual([ENEMIES.helmhecht.behavior, ENEMIES.helmhecht.armor], ['charge', 2]);
+  assertTrue(ENEMIES.helmhecht.hp >= 2 * ENEMIES.helmfisch.hp);
+  assertEqual(BOSS_MOVES.bauleiter_nagezahn.near.kind, 'swipe');
+  assertEqual(BOSS_MOVES.bauleiter_nagezahn.far.kind, 'logs');
+  assertEqual(BOSS_MOVES.admiral_flossenbart.near.kind, 'ring');
+  assertTrue(!!BOSS_MOVES.admiral_flossenbart.turnFlow && !!ENEMIES.admiral_flossenbart.swimmer);
+});
+
+test('dam: Aal kündigt seinen Stromschlag an, bleibt stehen und trifft nur im Kreis', () => {
+  const w = plainWorld();
+  const aal = spawnEnemy(w, 'aal', 2, 0);
+  const s = ENEMIES.aal.shock;
+  const t = telegraphs(w, 1 / 60, 'shock');
+  assertEqual(t.length, 1);
+  assertEqual([t[0].kind, t[0].radius, t[0].delay], ['ring', s.radius, s.warn]);
+  const hp = w.hero.hp, x = aal.x;
+  run(w, s.warn * 0.5);
+  assertClose(aal.x, x);
+  run(w, s.warn * 0.6);
+  assertTrue(w.hero.hp < hp, 'getroffen');
+  const v = plainWorld();
+  spawnEnemy(v, 'aal', 2, 0);
+  telegraphs(v, 1 / 60);
+  v.hero.x = -s.radius - 1;
+  const hp2 = v.hero.hp;
+  v.hero.invulnerableUntil = 0;
+  run(v, s.warn * 1.1);
+  assertEqual(v.hero.hp, hp2);
+});
+
+test('dam: Bisam gräbt sich ein (nicht treffbar, unsichtbar), kündigt das Auftauchen neben dem Helden an', () => {
+  const w = plainWorld();
+  const b = spawnEnemy(w, 'bisam', 5, 0);
+  const t = telegraphs(w, 1 / 60, 'burrow');
+  assertEqual(t.length, 1);
+  assertTrue(b.untargetable && b.hidden);
+  assertClose(Math.hypot(t[0].x, t[0].z), BURROW.offset, 1e-6);
+  assertEqual(t[0].delay, BURROW.time);
+  damageEnemy(w, b, { amount: 999, crit: false }, 'schwerthieb');
+  assertEqual(b.hp, b.maxHp);
+  const hp = w.hero.hp;
+  run(w, BURROW.time + 0.05);
+  assertTrue(!b.untargetable && !b.hidden);
+  assertTrue(Math.hypot(b.x - t[0].x, b.z - t[0].z) < 0.3, "taucht am angekündigten Punkt auf");
+  assertTrue(w.hero.hp < hp, 'Held stand im Kreis');
+  // Wird die Gruppe ruhig, während er gräbt, taucht er sofort wieder auf.
+  const v = plainWorld();
+  const c = spawnEnemy(v, 'bisam', 5, 0);
+  telegraphs(v, 1 / 60);
+  c.passive = true; c.home = { x: 5, z: 0, r: 4 };
+  run(v, 0.1);
+  assertTrue(!c.untargetable && !c.hidden);
+});
+
+test('dam: Nagezahn wirft drei Stämme nebeneinander, jeder trifft höchstens einmal und rollt nicht ins Wasser', () => {
+  const w = plainWorld(4);
+  const boss = spawnEnemy(w, 'bauleiter_nagezahn', 0, 0);
+  w.hero.x = 14; w.hero.z = 0;
+  const mv = BOSS_MOVES.bauleiter_nagezahn;
+  const t = telegraphs(w, mv.chaseTime + 0.1, 'logs');
+  assertEqual(t.length, 1);
+  assertEqual(t[0].lanes.length, mv.far.count);
+  w.hero.x = boss.x + 12; w.hero.z = boss.z;
+  run(w, mv.far.windup);
+  const logs = w.enemyProjectiles.filter((p) => p.kind === 'log');
+  assertEqual(logs.length, mv.far.count);
+  const hp = w.hero.hp;
+  w.hero.invulnerableUntil = 0;
+  let hits = 0;
+  for (let i = 0; i < 180; i++) { stepWorld(w, 1 / 60, still); hits += w.events.filter((e) => e.type === 'heroHit').length; }
+  assertEqual(hits, 1);
+  assertTrue(w.hero.hp < hp);
+  // Wasser ab x = 6 (zu Fuß gesperrt, für Geschosse frei): Stämme hören dort auf.
+  const v = plainWorld(4, (x, z, mode) => mode !== 'walk' || x < 6);
+  v.enemyProjectiles.push({ kind: 'log', ground: true, x: 0, z: 0, dirX: 1, dirZ: 0, speed: 9, radius: 1.1, damage: 5, timeLeft: 2 });
+  run(v, 1);
+  assertEqual(v.enemyProjectiles.length, 0);
+});
+
+test('dam: Flossenbart dreht die Strömung nach Ankündigung um seinen Platz, Sieg und Rasten heben die Drehung auf', withDam(async () => {
+  const w = plainWorld(6);
+  const boss = spawnEnemy(w, 'admiral_flossenbart', 0, 0);
+  boss.home = { x: 0, z: 0, r: 1 };
+  w.hero.x = 30;
+  const f = BOSS_MOVES.admiral_flossenbart.turnFlow;
+  const t = telegraphs(w, f.every - f.warn + 0.05, 'flow');
+  assertEqual(t.length, 1);
+  assertEqual([t[0].radius, w.flowTurned], [f.radius, undefined]);
+  run(w, f.warn);
+  assertEqual(w.flowTurned, { x: 0, z: 0, r: f.radius });
+  run(w, f.every);
+  assertEqual(w.flowTurned, null);
+  // Regelschicht
+  const { stepAdventure, rest } = await import('../src/modes/adventure.js');
+  const { run: r } = await damRun();
+  r.world.flowTurned = { x: 85, z: 0, r: 20 };
+  rest(r, 'testdamm_feuer');
+  assertEqual(r.world.flowTurned, null);
+  r.state = 'playing';
+  const b = spawnEnemy(r.world, 'admiral_flossenbart', 85, 0);
+  b.bossId = 'td_boss';
+  r.world.flowTurned = { x: 85, z: 0, r: 20 };
+  damageEnemy(r.world, b, { amount: 1e9, crit: false }, 'schwerthieb');
+  stepAdventure(r, 1 / 60, still);
+  assertTrue(r.record.bosses.includes('td_boss'));
+  assertEqual(r.world.flowTurned, null);
+}));
+
+test('dam: ein Bewohner mit requires erscheint erst nach seiner Bedingung (Nagezahn wechselt die Seite)', withDam(async () => {
+  const { stepAdventure, npcVisible } = await import('../src/modes/adventure.js');
+  const { run: r } = await damRun();
+  const npc = DAMM.npcs[0];
+  assertEqual(npcVisible(r, npc), false);
+  r.world.hero.x = 20; r.world.hero.z = 3;
+  stepAdventure(r, 1 / 60, still);
+  assertEqual(r.interactable, null);
+  r.record.bosses.push('td_boss');
+  assertEqual(npcVisible(r, npc), true);
+  stepAdventure(r, 1 / 60, still);
+  assertEqual([r.interactable?.kind, r.interactable?.id], ['npc', 'nagezahn']);
 }));

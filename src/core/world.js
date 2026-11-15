@@ -7,7 +7,7 @@ import { stepAbilities } from './abilities.js';
 import { CLASSES } from '../data/classes.js';
 import { bonusModifiers } from '../data/bonuses.js';
 import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, CONTACT_TOLERANCE, HERO_RADIUS, SEPARATION_CELL, MAX_ENEMIES,
-  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS_MOVES, CURL, SLITHER, VENOM, POUNCE } from '../data/enemies.js';
+  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS_MOVES, CURL, SLITHER, VENOM, POUNCE, BURROW } from '../data/enemies.js';
 import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
 import { TERRAIN } from '../data/adventure.js';
 
@@ -136,9 +136,35 @@ const BEHAVIORS = {
     approachSideways(world, enemy, dt, STRAFE);
   },
 
-  /** Kreuzotter: wie strafe, nur enger gewunden. */
+  /** Kreuzotter: wie strafe, nur enger gewunden. Der Aal (`shock`) bleibt in Reichweite stehen und teilt einen Stromschlag aus. */
   slither(world, enemy, dt) {
+    const shock = ENEMIES[enemy.type]?.shock;
+    if (shock && stepShock(world, enemy, shock)) return;
     approachSideways(world, enemy, dt, SLITHER);
+  },
+
+  /** Bisam: verfolgt; in Reichweite gräbt er sich ein und taucht angekündigt neben dem Helden auf (siehe BURROW). */
+  burrow(world, enemy, dt) {
+    const ai = enemy.ai, t = world.time, b = BURROW;
+    if (ai.phase === 'under') {
+      if (t < ai.until) return;
+      surface(enemy);
+      if (Math.hypot(world.hero.x - enemy.x, world.hero.z - enemy.z) <= b.radius) damageHero(world, enemy.damage * b.damageMul);
+      ai.readyAt = t + b.cooldown;
+      return;
+    }
+    const target = enemyTarget(world, enemy);
+    const to = towards(enemy, target);
+    if (t >= (ai.readyAt ?? 0) && to.d <= b.range) {
+      const a = world.rng.range(0, Math.PI * 2);
+      let tx = target.x + Math.cos(a) * b.offset, tz = target.z + Math.sin(a) * b.offset;
+      if (world.terrain.walkable && !world.terrain.walkable(tx, tz, 'walk')) { tx = enemy.x; tz = enemy.z; }
+      ai.phase = 'under'; ai.until = t + b.time; ai.tx = tx; ai.tz = tz;
+      enemy.untargetable = true; enemy.hidden = true;
+      world.events.push({ type: 'bossTelegraph', kind: 'leap', look: 'burrow', x: tx, z: tz, radius: b.radius, delay: b.time, dirX: to.x, dirZ: to.z, damageMul: b.damageMul });
+      return;
+    }
+    BEHAVIORS.chase(world, enemy, dt);
   },
 
   /** Hält Abstand und schießt auf den Helden. */
@@ -160,6 +186,7 @@ const BEHAVIORS = {
     const ai = enemy.ai, t = world.time;
     if (!ai.phase) { ai.phase = 'chase'; ai.until = t + mv.chaseTime; }
     if (mv.summon) summonHelpers(world, enemy, mv.summon);
+    if (mv.turnFlow) turnFlow(world, enemy, mv.turnFlow);
     if (ai.phase === 'chase') {
       if (t < ai.until) { BEHAVIORS.chase(world, enemy, dt); return; }
       startBossAttack(world, enemy, mv);
@@ -194,6 +221,50 @@ const BEHAVIORS = {
     }
   },
 };
+
+/**
+ * Stromschlag des Aals: in Reichweite stehen bleiben, Kreis um sich ankündigen, nach `s.warn` treffen, wenn der Held darin
+ * steht. Betäubung oder Verwirrung brechen ab. Liefert, ob der Aal diesen Schritt damit beschäftigt ist.
+ */
+function stepShock(world, enemy, s) {
+  const ai = enemy.ai, t = world.time, hero = world.hero;
+  if (ai.phase === 'shock') {
+    if (enemy.stunnedUntil > ai.shockStart || enemy.confusedUntil > ai.shockStart) { ai.phase = null; ai.shockReady = t + s.cooldown; return false; }
+    if (t < ai.until) return true;
+    if (Math.hypot(hero.x - enemy.x, hero.z - enemy.z) <= s.radius) damageHero(world, enemy.damage * s.damageMul);
+    ai.phase = null; ai.shockReady = t + s.cooldown;
+    return true;
+  }
+  if (t < (ai.shockReady ?? 0) || Math.hypot(hero.x - enemy.x, hero.z - enemy.z) > s.range) return false;
+  ai.phase = 'shock'; ai.shockStart = t; ai.until = t + s.warn;
+  world.events.push({ type: 'bossTelegraph', kind: 'ring', look: 'shock', x: enemy.x, z: enemy.z, radius: s.radius, delay: s.warn, dirX: 0, dirZ: 0, damageMul: s.damageMul });
+  return true;
+}
+
+/** Ein eingegrabener Bisam taucht an seinem Ziel auf (oder, ruhig gestellt, an seiner Stelle). */
+function surface(enemy) {
+  const ai = enemy.ai;
+  if (ai.tx !== undefined) { enemy.x = ai.tx; enemy.z = ai.tz; }
+  ai.phase = null; ai.tx = undefined; ai.tz = undefined;
+  enemy.untargetable = false; enemy.hidden = false;
+}
+
+/**
+ * Admiral Flossenbart: alle `f.every` s dreht sich die Strömung im Kreis um seinen Platz um (bzw. zurück); `f.warn` s vorher
+ * die Ankündigung.
+ */
+function turnFlow(world, enemy, f) {
+  const ai = enemy.ai, t = world.time, c = enemy.home ?? enemy;
+  ai.nextTurn ??= t + f.every;
+  if (!ai.turnWarned && t >= ai.nextTurn - f.warn) {
+    ai.turnWarned = true;
+    world.events.push({ type: 'bossTelegraph', kind: 'flow', x: c.x, z: c.z, radius: f.radius, delay: ai.nextTurn - t, turned: !world.flowTurned, dirX: 0, dirZ: 0 });
+  }
+  if (t < ai.nextTurn) return;
+  ai.nextTurn = t + f.every; ai.turnWarned = false;
+  world.flowTurned = world.flowTurned ? null : { x: c.x, z: c.z, r: f.radius };
+  world.events.push({ type: 'flowTurned', on: !!world.flowTurned, x: c.x, z: c.z, radius: f.radius });
+}
 
 /** Nähert sich mit seitlichem Versatz (Anteil `c.lateral`), Seitenwechsel alle `c.switchInterval` s. */
 function approachSideways(world, enemy, dt, c) {
@@ -324,6 +395,18 @@ function startBossAttack(world, enemy, mv) {
     });
     return;
   }
+  if (a.kind === 'logs') {
+    const lanes = [];
+    for (let i = 0; i < a.count; i++) {
+      const off = (i - (a.count - 1) / 2) * a.lane;
+      lanes.push({ x: enemy.x - to.z * off, z: enemy.z + to.x * off });
+    }
+    telegraph(world, enemy, {
+      kind: 'logs', x: enemy.x, z: enemy.z, lanes, dirX: to.x, dirZ: to.z, length: a.length, width: 2 * a.radius,
+      radius: a.radius, speed: a.speed, delay: a.windup, damageMul: a.damageMul,
+    });
+    return;
+  }
   if (a.kind === 'ring') {
     telegraph(world, enemy, {
       kind: 'ring', x: enemy.x, z: enemy.z, radius: enemy.radius + a.reach, delay: a.windup,
@@ -397,6 +480,16 @@ function resolveAttack(world, enemy, recover) {
   const ai = enemy.ai, a = ai.attack, hero = world.hero;
   if (a.kind === 'bubbles') {
     if (a.points.some((p) => Math.hypot(hero.x - p.x, hero.z - p.z) <= a.radius)) damageHero(world, enemy.damage * a.damageMul);
+    ai.phase = 'recover'; ai.until = world.time + recover; ai.attack = null;
+    return;
+  }
+  if (a.kind === 'logs') {
+    for (const l of a.lanes) {
+      world.enemyProjectiles.push({
+        kind: 'log', ground: true, x: l.x, z: l.z, dirX: a.dirX, dirZ: a.dirZ, speed: a.speed, radius: a.radius,
+        damage: enemy.damage * a.damageMul, timeLeft: a.length / a.speed,
+      });
+    }
     ai.phase = 'recover'; ai.until = world.time + recover; ai.attack = null;
     return;
   }
@@ -498,7 +591,7 @@ function pushHeroByFlow(world, dt) {
 /** Strömung schiebt Gegner am Boden (nicht Flieger, nicht Schwimmer, nicht den Schatten) mit vollem Schub. */
 function pushEnemiesByFlow(world, dt) {
   for (const e of world.enemies) {
-    if (e.flying || e.shadow || ENEMIES[e.type]?.swimmer) continue;
+    if (e.flying || e.shadow || e.hidden || ENEMIES[e.type]?.swimmer) continue;
     const f = flowAt(world, e.x, e.z);
     if (f) { e.x += f.x * dt; e.z += f.z * dt; }
   }
@@ -569,6 +662,7 @@ export function pushHero(world, dirX, dirZ, distance) {
  * zurück, wenn er weiter weg ist.
  */
 function stepPassive(world, enemy, dt) {
+  if (enemy.ai.phase === 'under') surface(enemy);
   const h = enemy.home;
   if (!h) return;
   const to = towards(enemy, h);
@@ -908,7 +1002,7 @@ function stepEnemyProjectiles(world, dt) {
     p.z += p.dirZ * p.speed * dt;
     p.timeLeft -= dt;
     if (p.timeLeft <= 0 || world.terrain.obstaclesNear(p.x, p.z, p.radius).length > 0) return false;
-    if (world.terrain.walkable && !world.terrain.walkable(p.x, p.z, 'shot')) return false;
+    if (world.terrain.walkable && !world.terrain.walkable(p.x, p.z, p.ground ? 'walk' : 'shot')) return false;
     const min = p.radius + hero.radius;
     if ((p.x - hero.x) ** 2 + (p.z - hero.z) ** 2 >= min * min) return true;
     damageHero(world, p.damage);
