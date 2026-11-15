@@ -45,7 +45,7 @@ export const KAPITEL3 = {
   boardwalks: [],
   sluices: [
     {
-      id: 'schleuse_nord', name: 'Mühlgraben-Schleuse', lever: { x: 436, z: -24 }, start: 'open',
+      id: 'schleuse_nord', name: 'Mühlgraben-Schleuse', lever: { x: 446.5, z: -19 }, start: 'open',
       strips: [{ points: [[450, -60], [455, 40]], width: 8 }], open: 'current', closed: 'mud',
     },
     {

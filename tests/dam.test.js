@@ -3,6 +3,10 @@ import { createWorld, stepWorld, spawnEnemy, enemySpeed, flowAt, damageEnemy } f
 import { buildMapGrid, mapTerrain, cellAt, CELL } from '../src/core/mapGrid.js';
 import { TERRAIN } from '../src/data/adventure.js';
 import { ENEMIES, BOSS_MOVES, BURROW } from '../src/data/enemies.js';
+import { MAPS } from '../src/data/maps/index.js';
+import { INTERACT_RANGE } from '../src/data/adventure.js';
+import { inSluice } from '../src/core/mapGrid.js';
+const MAPS3 = () => MAPS.kapitel3;
 
 const still = { moveX: 0, moveZ: 0 };
 
@@ -134,6 +138,7 @@ const DAMM = {
     { id: 'td_schleuse', name: 'Testschleuse', lever: { x: 10, z: -4 }, start: 'closed', strips: [{ points: [[30, -6], [30, 6]], width: 10 }], open: 'water', closed: 'walk' },
     { id: 'td_strom', name: 'Strömungsschleuse', lever: { x: 60, z: -4 }, start: 'open', strips: [{ points: [[50, -7], [50, 7]], width: 6 }], open: 'current', closed: 'mud' },
     { id: 'td_biber', name: 'Biberschleuse', start: 'closed', strips: [{ points: [[70, -7], [70, 7]], width: 4 }], open: 'walk', closed: 'water', opensOn: { quest: 'ruf_aus_dem_sumpf', step: 1 } },
+    { id: 'td_flut', name: 'Flutschleuse', start: 'closed', strips: [{ points: [[40, -7], [40, 7]], width: 4 }], open: 'water', closed: 'walk', opensOn: { quest: 'egelplage', step: 1 } },
   ],
   areas: [{ id: 'schilfrand', name: 'Testdamm', x: 40, z: 0, r: 80 }],
   campfires: [{ id: 'testdamm_feuer', x: 5, z: 0 }], npcs: [{ id: 'nagezahn', x: 20, z: 4, faceX: -1, requires: { boss: 'td_boss' } }],
@@ -463,8 +468,8 @@ test('dam: auf der echten Karte öffnet das Gespräch, das die Dammwache abschli
   const run = createAdventureRun({ seed: 3, save, heroId: 'h1' });
   assertEqual(cellAt(run.grid, 1090, -22), CELL.water);
   // Hebel Nord (am Mühlgraben) und Süd (vor der Baustelle) umlegen
-  for (const [x, z] of [[436, -24], [528, 12]]) {
-    run.world.hero.x = x + 1; run.world.hero.z = z;
+  for (const [x, z] of [[MAPS3().sluices[0].lever.x, MAPS3().sluices[0].lever.z], [528, 12]]) {
+    run.world.hero.x = x + 0.5; run.world.hero.z = z;
     stepAdventure(run, 1 / 60, still);
     assertEqual(run.interactable?.kind, 'lever');
     interact(run);
@@ -480,3 +485,61 @@ test('dam: auf der echten Karte öffnet das Gespräch, das die Dammwache abschli
   assertEqual(cellAt(run.grid, 1090, -22), CELL.walk);
   assertEqual(run.record.quests.admiral?.state, undefined, 'Admiral bietet Nagezahn erst im nächsten Gespräch an');
 });
+
+// ---------------------------------------------------------------- Gesamtprüfung
+
+test('dam: am Mühlgraben-Hebel kann der Held in der Schleusenfläche stehen; Öffnen spült ihn ans Ufer', async () => {
+  const { defaultSave, addHero } = await import('../src/save/store.js');
+  const { newAdventure } = await import('../src/save/adventure.js');
+  const { createAdventureRun, stepAdventure, interact } = await import('../src/modes/adventure.js');
+  const k3 = MAPS.kapitel3, lever = k3.sluices.find((x) => x.id === 'schleuse_nord').lever;
+  let spot = null;
+  for (let r = 0.3; r < INTERACT_RANGE && !spot; r += 0.1) {
+    for (let a = 0; a < 64 && !spot; a++) {
+      const x = lever.x + Math.cos(a / 64 * Math.PI * 2) * r, z = lever.z + Math.sin(a / 64 * Math.PI * 2) * r;
+      if (inSluice(k3, x, z)) spot = { x, z };
+    }
+  }
+  assertTrue(!!spot, 'Hebel steht direkt an seiner Fläche');
+  const save = defaultSave();
+  const h = addHero(save, { name: 'Damm', animal: 'hase', class: 'krieger' }, { now: 1, id: 'h1' });
+  const ad = h.adventure = newAdventure(h);
+  Object.assign(ad, { mapId: 'kapitel3', campfireId: 'k3_muehle', introSeen: true, chapterDone: [1, 2], switches: { schleuse_nord: 'closed' } });
+  ad.campfires.push('k3_muehle');
+  const run = createAdventureRun({ seed: 3, save, heroId: 'h1' });
+  run.world.hero.x = spot.x; run.world.hero.z = spot.z;
+  stepAdventure(run, 1 / 60, still);
+  assertEqual(run.interactable?.id, 'schleuse_nord');
+  interact(run);
+  assertEqual(run.sluices.schleuse_nord, 'open');
+  assertTrue(!inSluice(k3, run.world.hero.x, run.world.hero.z), 'Held am Ufer');
+  assertTrue(run.events.some((e) => e.type === 'heroWashed'));
+});
+
+test('dam: Tötungen durchs Fluten zählen genau einmal – ob die Schleuse zwischen zwei Schritten oder im Schritt aufgeht', withDam(async () => {
+  const { stepAdventure } = await import('../src/modes/adventure.js');
+  const setup = (rec) => {
+    rec.quests.egelplage = { state: 'active', step: 0, progress: 7 };
+    rec.quests.nasse_pfoten = { state: 'active', step: 0, progress: 0 };
+  };
+  // zwischen zwei Schritten (Fähigkeit von Hand)
+  const { run: a } = await damRun(setup);
+  const fish = spawnEnemy(a.world, 'helmfisch', 40, 0); fish.passive = true; fish.hp = 1;
+  const egel = spawnEnemy(a.world, 'blutegel', 20, 3); egel.passive = true;
+  a.world.hero.x = 10; a.world.hero.z = 0;
+  damageEnemy(a.world, egel, { amount: 1e9, crit: false }, 'schwerthieb');
+  for (let i = 0; i < 3; i++) stepAdventure(a, 1 / 60, still);
+  assertEqual(a.record.quests.egelplage.step, 1);
+  assertTrue(!a.world.enemies.includes(fish));
+  assertEqual(a.record.quests.nasse_pfoten.progress, 1, 'zwischen zwei Schritten');
+  // im Schritt (der Held trifft den Egel selbst)
+  const { run: b } = await damRun(setup);
+  const fish2 = spawnEnemy(b.world, 'helmfisch', 40, 0); fish2.passive = true; fish2.hp = 1;
+  b.world.hero.x = 10; b.world.hero.z = 0;
+  const egel2 = spawnEnemy(b.world, 'blutegel', 10.9, 0); egel2.hp = 0.01;
+  for (let i = 0; i < 240 && b.world.enemies.includes(egel2); i++) { b.world.hero.x = 10; b.world.hero.z = 0; stepAdventure(b, 1 / 60, still); }
+  assertTrue(!b.world.enemies.includes(egel2), 'Held trifft den Egel');
+  for (let i = 0; i < 3; i++) stepAdventure(b, 1 / 60, still);
+  assertTrue(!b.world.enemies.includes(fish2));
+  assertEqual(b.record.quests.nasse_pfoten.progress, 1, 'im Schritt');
+}));

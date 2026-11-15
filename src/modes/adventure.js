@@ -54,10 +54,13 @@ function emit(run, ...events) {
 
 /** Welt-Ereignisse, die seit dem letzten Schritt durch Aktionen entstanden sind (Treffer einer Fähigkeit von Hand). */
 function absorbWorldEvents(run) {
-  const fresh = run.world.events.slice(run.worldSeen);
-  run.worldSeen = run.world.events.length;
-  run.events.push(...fresh);
-  for (const e of fresh) handleWorldEvent(run, e);
+  // Nach Index über die lebende Liste: Was beim Verarbeiten dazukommt (z. B. Tötung durchs Fluten), kommt mit dran.
+  const events = run.world.events;
+  while (run.worldSeen < events.length) {
+    const e = events[run.worldSeen++];
+    run.events.push(e);
+    handleWorldEvent(run, e);
+  }
 }
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
@@ -360,9 +363,8 @@ function stepPlaying(run, dt, input) {
   for (const p of world.pickups) if (p.kind === 'potion_item') p.locked = full;
   stepWorld(world, dt, input);
   if (run.bubbles) stepBubbles(world, run.bubbles, bubbleRules(run), dt);
-  run.worldSeen = world.events.length;
-  run.events.push(...world.events);
-  for (const e of world.events) handleWorldEvent(run, e);
+  run.worldSeen = 0;
+  absorbWorldEvents(run);
   bankGold(run);
   updatePacks(run);
   updateBosses(run);
