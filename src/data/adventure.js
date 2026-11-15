@@ -4,8 +4,19 @@
 /** Kantenlänge einer Rasterzelle der Karte in Metern. */
 export const MAP_CELL = 1;
 
-/** Gelände (Etappe 3, Spec §4.1): Tempo-Faktor auf Schlamm für Laufende (nicht fliegend, nicht `mudproof`). */
-export const TERRAIN = { mudSpeed: 0.65 };
+/**
+ * Gelände (Etappe 3, Spec §4.1, §4.2, §14.1): Tempo-Faktor auf Schlamm für Laufende (nicht fliegend, nicht `mudproof`);
+ * Strömung schiebt Laufende mit `currentSpeed` m/s in Flussrichtung (nicht Flieger, nicht `swimmer`); gegen die Strömung
+ * kommt der Held immer mit mindestens `heroHeadway` m/s voran (sein Schub ist höchstens wirksames Tempo − `heroHeadway`).
+ */
+export const TERRAIN = { mudSpeed: 0.65, currentSpeed: 2.5, heroHeadway: 1 };
+
+/**
+ * Wegspülen beim Fluten einer Schleusenfläche (Spec §4.2): Gegner verlieren `enemyPct` ihres höchsten Lebens (Bosse
+ * höchstens `bossMaxPct`) und werden auf Strömung `push` m in Flussrichtung geschoben, aus Wasser an die nächste begehbare
+ * Stelle; der Held kommt ohne Schaden ans nächste Ufer im Umkreis `searchRadius`, sonst ans Lagerfeuer.
+ */
+export const WASH = { enemyPct: 0.35, bossMaxPct: 0.05, push: 6, searchRadius: 40 };
 
 /**
  * Moorblasen (Spec §4.1, §14.1): nächste Blase nach `minInterval`–`maxInterval` s, Ort im Umkreis `range` (m) um den
@@ -43,7 +54,7 @@ export const LOOT = {
   bossMinRarity: 'selten',
   potionChance: 0.03,
   elitePearlChance: 0.05,
-  bossPearls: { graete: 2, zwickzwack: 3, quak: 3, haudrauf: 4 },
+  bossPearls: { graete: 2, zwickzwack: 3, quak: 3, haudrauf: 4, nagezahn: 4, flossenbart: 5 },
   goldChance: 0.25,
   gold: [1, 4],
 };
@@ -74,6 +85,7 @@ export const SHOP = {
   stockByChapter: {
     1: ['eimerhelm', 'regenponcho', 'gummistiefel', 'paddel', 'treibholzstab', 'angel'],
     2: ['schilfhelm', 'moorstiefel', 'unkenamulett', 'rohrkolbenstab'],
+    3: ['bauhelm', 'watstiefel', 'schwimmweste', 'zollstock'],
   },
 };
 
@@ -155,6 +167,8 @@ export const MAP_LOOK = {
   npcs: {
     panzerla: 0x6f8a4a, kruemel: 0xd29a5a, grabowski: 0x4a4048, nussa: 0xc0622e, pieps: 0x9a7a5a, amsel: 0x2a2a2a,
     quappe: 0x6a5a3a,
+    rinde: 0x7a5232,
+    nagezahn: 0x8a6440,
   },
 };
 
@@ -164,13 +178,14 @@ export const MAP_LOOK = {
  */
 export const MINIMAP = {
   size: 112, radius: 45, block: EXPLORE_BLOCK,
-  colors: { blocked: '#2e3b25', walk: '#b8a77a', water: '#4d86a6', bridge: '#8a6a45', mud: '#6e6a3c' },
+  colors: { blocked: '#2e3b25', walk: '#b8a77a', water: '#4d86a6', bridge: '#8a6a45', mud: '#6e6a3c', current: '#5fa8d0' },
 };
 
 /** Namen der Lagerfeuer für das Reisen. */
 export const CAMPFIRE_NAMES = {
   dorf_platz: 'Bachwinkel', k1_ufer: 'Bachufer', k1_bruecke: 'Alte Brücke', k1_wald: 'Tiefer Wald', k1_quelle: 'Quellteich',
   k2_rand: 'Sumpfrand', k2_froschhof: 'Froschhof', k2_nebel: 'Nebelmoor', k2_hecht: 'Hechtloch',
+  k3_ufer: 'Dammufer', k3_muehle: 'Mühlgraben', k3_auwald: 'Auwald', k3_stausee: 'Stausee',
 };
 
 /** Sprüche am Ladentisch und in der Schmiede. */

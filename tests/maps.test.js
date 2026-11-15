@@ -1,7 +1,7 @@
 import { test, assertEqual, assertTrue } from './runner.js';
 import { MAPS } from '../src/data/maps/index.js';
 import { ENEMIES } from '../src/data/enemies.js';
-import { buildMapGrid, mapTerrain } from '../src/core/mapGrid.js';
+import { buildMapGrid, mapTerrain, inSluice, cellAt, CELL } from '../src/core/mapGrid.js';
 
 const KINDS = ['campfires', 'npcs', 'spots', 'chests', 'packs', 'bosses', 'exits', 'gates', 'areas'];
 const grids = Object.fromEntries(Object.values(MAPS).map((m) => [m.id, buildMapGrid(m)]));
@@ -13,8 +13,8 @@ function stripLength(points) {
 }
 
 /** Breitensuche über begehbare Zellen; liefert eine Funktion „erreichbar?“. */
-function reachable(map, from, closed) {
-  const grid = grids[map.id], terrain = mapTerrain(map, grid, closed);
+function reachable(map, from, closed, grid = grids[map.id]) {
+  const terrain = mapTerrain(map, grid, closed);
   const seen = new Uint8Array(grid.cols * grid.rows);
   const toCell = (x, z) => [Math.floor((x - grid.minX) / grid.cell), Math.floor((z - grid.minZ) / grid.cell)];
   const [c0, r0] = toCell(from.x, from.z);
@@ -32,15 +32,15 @@ function reachable(map, from, closed) {
   return (p) => { const [c, r] = toCell(p.x, p.z); return seen[r * grid.cols + c] === 1; };
 }
 
-test('maps: Dorf, Kapitel 1 und 2, Kennungen je Art eindeutig (auch über alle Karten)', () => {
-  assertEqual(Object.keys(MAPS), ['dorf', 'kapitel1', 'kapitel2']);
-  for (const kind of ['campfires', 'spots', 'chests', 'bosses', 'packs']) {
+test('maps: Dorf, Kapitel 1 bis 3, Kennungen je Art eindeutig (auch über alle Karten)', () => {
+  assertEqual(Object.keys(MAPS), ['dorf', 'kapitel1', 'kapitel2', 'kapitel3']);
+  for (const kind of ['campfires', 'spots', 'chests', 'bosses', 'packs', 'sluices']) {
     const ids = Object.values(MAPS).flatMap((m) => (m[kind] || []).map((e) => e.id));
     assertEqual(new Set(ids).size, ids.length, kind);
   }
   for (const [key, map] of Object.entries(MAPS)) {
     assertEqual(map.id, key);
-    for (const kind of KINDS) {
+    for (const kind of [...KINDS, 'sluices']) {
       const ids = (map[kind] || []).map((e) => e.id);
       assertEqual(new Set(ids).size, ids.length, `${key}.${kind}`);
     }
@@ -56,15 +56,37 @@ test('maps: Feuer, Leute, Fundorte, Kisten, Gruppen und Bosse liegen auf begehba
   }
 });
 
-test('maps: mit offenen Toren ist von jedem Lagerfeuer aus alles erreichbar, mit Barrikade nicht die Quelle', () => {
+/** Alle Kombinationen der Hebel-Schleusen einer Karte; Schleusen ohne Hebel (Biber) offen wie nach ihrer Bedingung. */
+function sluiceCombos(map) {
+  const levers = (map.sluices ?? []).filter((s) => s.lever), fixed = (map.sluices ?? []).filter((s) => !s.lever);
+  const out = [];
+  for (let bits = 0; bits < 1 << levers.length; bits++) {
+    const sw = Object.fromEntries(fixed.map((s) => [s.id, 'open']));
+    levers.forEach((s, i) => { sw[s.id] = bits & (1 << i) ? 'open' : 'closed'; });
+    out.push(sw);
+  }
+  return out;
+}
+
+test('maps: in jedem Schleusenzustand ist mit offenen Toren von jedem Lagerfeuer aus alles Nötige erreichbar; Kisten und Gruppen in mindestens einem', () => {
   for (const map of Object.values(MAPS)) {
-    for (const fire of map.campfires) {
-      const can = reachable(map, fire, () => false);
-      for (const kind of ['campfires', 'npcs', 'spots', 'chests', 'packs', 'bosses', 'exits']) {
-        for (const e of map[kind] || []) assertTrue(can(e), `${map.id} ab ${fire.id}: ${kind}.${e.id}`);
+    const someChest = new Set(), somePack = new Set();
+    for (const sw of sluiceCombos(map)) {
+      const grid = buildMapGrid(map, sw);
+      for (const fire of map.campfires) {
+        const can = reachable(map, fire, () => false, grid);
+        const tag = `${map.id} ${JSON.stringify(sw)} ab ${fire.id}`;
+        for (const kind of ['campfires', 'npcs', 'spots', 'bosses', 'exits']) {
+          for (const e of map[kind] || []) assertTrue(can(e), `${tag}: ${kind}.${e.id}`);
+        }
+        for (const b of map.bosses) assertTrue(can(b.arena), `${tag}: Arena ${b.id}`);
+        for (const sl of map.sluices ?? []) if (sl.lever) assertTrue(can(sl.lever), `${tag}: Hebel ${sl.id}`);
+        for (const c of map.chests) if (can(c)) someChest.add(c.id);
+        for (const p of map.packs) if (can(p)) somePack.add(p.id);
       }
-      for (const b of map.bosses) assertTrue(can(b.arena), `${map.id} ab ${fire.id}: Arena ${b.id}`);
     }
+    for (const c of map.chests) assertTrue(someChest.has(c.id), `${map.id}: Kiste ${c.id} nie erreichbar`);
+    for (const p of map.packs) assertTrue(somePack.has(p.id), `${map.id}: Gruppe ${p.id} nie erreichbar`);
   }
   const k1 = MAPS.kapitel1;
   const start = k1.campfires.find((c) => c.id === k1.start.campfire);
@@ -85,7 +107,7 @@ test('maps: Gruppen mit bekannten Gegnern, 3 bis 8 Tiere, Stufe 1 bis 10; Ausgä
     for (const p of map.packs) {
       const n = Object.values(p.enemies).reduce((a, b) => a + b, 0);
       assertTrue(n >= 3 && n <= 8, p.id);
-      const [lo, hi] = map.id === 'kapitel2' ? [10, 16] : [1, 10];
+      const [lo, hi] = { kapitel2: [10, 16], kapitel3: [16, 22] }[map.id] ?? [1, 10];
       assertTrue(p.level >= lo && p.level <= hi, p.id);
       for (const type of Object.keys(p.enemies)) assertTrue(Object.hasOwn(ENEMIES, type), `${p.id}: ${type}`);
       if (p.elite) assertTrue(Object.hasOwn(p.enemies, p.elite), p.id);
@@ -167,4 +189,90 @@ test('maps: jede Bossarena ist mit geschlossenem Tor dicht – kein Lagerfeuer v
       for (const x of map.exits) assertTrue(!inside(x), `${map.id}: Arena ${b.id} erreicht ${x.id}`);
     }
   }
+});
+
+// ---------------------------------------------------------------- Kapitel 3
+
+test('maps: Kapitel 3 „Der Biberdamm“ hat die vereinbarten Orte, Gelände, Schleusen und Bosse', () => {
+  const k3 = MAPS.kapitel3, ids = (kind) => k3[kind].map((e) => e.id);
+  assertEqual([k3.name, k3.chapter], ['Der Biberdamm', 3]);
+  assertEqual(ids('campfires'), ['k3_ufer', 'k3_muehle', 'k3_auwald', 'k3_stausee']);
+  assertEqual(ids('bosses'), ['nagezahn', 'flossenbart']);
+  const [nz, fb] = k3.bosses;
+  assertEqual([nz.type, fb.type], ['bauleiter_nagezahn', 'admiral_flossenbart']);
+  assertTrue(nz.level >= 18 && nz.level <= 20 && fb.level >= 21 && fb.level <= 22);
+  for (const area of ['dammufer', 'baustelle', 'stausee']) assertTrue(ids('areas').includes(area), area);
+  assertEqual(ids('npcs'), ['rinde', 'nagezahn']);
+  assertEqual(k3.npcs[1].requires, { boss: 'nagezahn' });
+  assertEqual(ids('sluices'), ['schleuse_nord', 'schleuse_sued', 'schleuse_altarm', 'biberschleuse']);
+  const sl = Object.fromEntries(k3.sluices.map((x) => [x.id, x]));
+  assertEqual([sl.schleuse_nord.open, sl.schleuse_nord.closed], ['current', 'mud']);
+  assertEqual([sl.schleuse_sued.open, sl.schleuse_sued.closed], ['water', 'walk']);
+  assertEqual([sl.schleuse_altarm.open, sl.schleuse_altarm.closed], ['water', 'mud']);
+  assertEqual([sl.biberschleuse.lever, sl.biberschleuse.closed, sl.biberschleuse.open, sl.biberschleuse.opensOn], [undefined, 'water', 'walk', { quest: 'dammwache', step: 3 }]);
+  assertTrue(k3.mud.length >= 1 && k3.currents.length >= 2);
+  assertTrue(k3.gates.some((g) => g.kind === 'barrier' && g.opensOn?.boss === 'nagezahn'));
+  for (const b of k3.bosses) assertTrue(k3.gates.some((g) => g.id === b.gate && g.kind === 'arena'), b.id);
+  const len = stripLength(k3.paths[0].points);
+  assertTrue(len >= 1100 && len <= 1600, `Länge ${Math.round(len)}`);
+  assertTrue(k3.paths.length >= 3 && k3.areas.length >= 5);
+  const kinds = new Set(k3.packs.flatMap((p) => Object.keys(p.enemies)));
+  for (const t of ['aal', 'bisam', 'helmhecht', 'helmfisch', 'krebs', 'ochsenfrosch']) assertTrue(kinds.has(t), t);
+  assertEqual(k3.exits.map((x) => x.to), [{ map: 'dorf', campfire: 'dorf_platz' }]);
+  const dorfExit = MAPS.dorf.exits.find((x) => x.id === 'nach_kapitel3');
+  assertEqual([dorfExit.requires, dorfExit.to], [{ chapterDone: 2 }, { map: 'kapitel3', campfire: 'k3_ufer' }]);
+});
+
+test('maps: Kapitel 3 – Strömung auf dem Hauptweg; Flossenbarts Arena hat Strömung und trockene Ufer, Nagezahns keine', () => {
+  const k3 = MAPS.kapitel3, grid = grids.kapitel3;
+  const main = k3.paths[0].points;
+  let ford = 0;
+  for (let i = 0; i + 1 < main.length; i++) {
+    for (let k = 0; k <= 20; k++) {
+      const x = main[i][0] + (main[i + 1][0] - main[i][0]) * k / 20, z = main[i][1] + (main[i + 1][1] - main[i][1]) * k / 20;
+      if (cellAt(grid, x, z) === CELL.current) ford++;
+    }
+  }
+  assertTrue(ford >= 10, `${ford} Proben auf Strömung`);
+  const cells = (b) => {
+    const n = { current: 0, dry: 0 };
+    for (let x = b.arena.x - b.arena.r; x <= b.arena.x + b.arena.r; x++) for (let z = b.arena.z - b.arena.r; z <= b.arena.z + b.arena.r; z++) {
+      if (Math.hypot(x - b.arena.x, z - b.arena.z) > b.arena.r - 1) continue;
+      const c = cellAt(grid, x, z);
+      if (c === CELL.current) n.current++; else if (c === CELL.walk) n.dry++;
+    }
+    return n;
+  };
+  const [nz, fb] = k3.bosses;
+  assertEqual(cells(nz).current, 0);
+  const f = cells(fb);
+  assertTrue(f.current >= 60 && f.dry >= 300, JSON.stringify(f));
+});
+
+test('maps: Kapitel 3 – Feuer, Hebel, Leute, Fundorte, Ausgänge, Arenen und Gruppenmitten liegen in keiner Schleusenfläche', () => {
+  for (const map of Object.values(MAPS)) {
+    for (const kind of ['campfires', 'npcs', 'spots', 'exits', 'packs', 'bosses']) {
+      for (const e of map[kind] || []) assertTrue(!inSluice(map, e.x, e.z), `${map.id}.${kind}.${e.id}`);
+    }
+    for (const b of map.bosses) {
+      for (let a = 0; a < 16; a++) {
+        const x = b.arena.x + Math.cos(a / 16 * Math.PI * 2) * b.arena.r, z = b.arena.z + Math.sin(a / 16 * Math.PI * 2) * b.arena.r;
+        assertTrue(!inSluice(map, x, z) && !inSluice(map, b.arena.x, b.arena.z), `${map.id}: Arena ${b.id}`);
+      }
+    }
+    for (const sl of map.sluices ?? []) if (sl.lever) assertTrue(!inSluice(map, sl.lever.x, sl.lever.z), `${map.id}: Hebel ${sl.id}`);
+  }
+});
+
+test('maps: Kapitel 3 – ohne die Biber kommt man nicht zum Stausee; geschlossene Seitenschleusen sperren ihre Kisten', () => {
+  const k3 = MAPS.kapitel3;
+  const fire = (id) => k3.campfires.find((c) => c.id === id);
+  const chest = (id) => k3.chests.find((c) => c.id === id);
+  const start = { schleuse_nord: 'open', schleuse_sued: 'open', schleuse_altarm: 'open', biberschleuse: 'closed' };
+  const can = reachable(k3, fire('k3_ufer'), () => false, buildMapGrid(k3, start));
+  assertTrue(can(fire('k3_auwald')));
+  assertTrue(!can(fire('k3_stausee')));
+  assertTrue(!can(chest('k3_kiste_wiese')) && !can(chest('k3_kiste_altarm')));
+  const dry = reachable(k3, fire('k3_ufer'), () => false, buildMapGrid(k3, { ...start, schleuse_sued: 'closed', schleuse_altarm: 'closed' }));
+  assertTrue(dry(chest('k3_kiste_wiese')) && dry(chest('k3_kiste_altarm')));
 });

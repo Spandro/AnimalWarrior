@@ -32,22 +32,23 @@ function v4() {
 
 const shared = (s) => ({ heroes: s.heroes.map((h) => [h.id, h.name, h.animal, h.class]), gold: s.gold, inventory: s.inventory, achievements: s.achievements });
 
-test('adventureSave: Version 5, Umwandlung 3 → 5 ohne Verlust', () => {
-  assertEqual(SAVE_VERSION, 5);
+test('adventureSave: Version 6, Umwandlung 3 → 6 ohne Verlust', () => {
+  assertEqual(SAVE_VERSION, 6);
   const before = v3();
   const after = repairSave(migrate(before));
-  assertEqual(after.version, 5);
+  assertEqual(after.version, 6);
+  assertEqual(after.stats.bubbleKills, 0);
   assertEqual(shared(after), shared(before));
   assertTrue(after.heroes.every((h) => h.adventure === null));
   assertEqual([after.itemLevels, after.materials, after.settings.buttonSide, after.stats.campfireRests], [{}, {}, 'right', 0]);
   assertTrue(validate(after).ok, validate(after).error);
 });
 
-test('adventureSave: Umwandlung 1 → 5 und 3 → 5 laden über den Speicher, Kopie liegt da', () => {
+test('adventureSave: Umwandlung 1 → 6 und 3 → 6 laden über den Speicher, Kopie liegt da', () => {
   const v1 = { version: 1, heroes: [], gold: 5, metaUpgrades: {}, settings: { volume: 70, quality: 'high' } };
   const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify(v1) });
   const r = createStore(storage).load();
-  assertEqual([r.status, r.data.version, r.data.gold], ['ok', 5, 5]);
+  assertEqual([r.status, r.data.version, r.data.gold], ['ok', 6, 5]);
   assertTrue(storage.getItem(versionBackupKey(1)) !== null);
   const s3 = memoryStorage({ [STORAGE_KEY]: JSON.stringify(v3()) });
   const r3 = createStore(s3).load();
@@ -62,7 +63,7 @@ test('adventureSave: neues Abenteuer', () => {
   assertEqual(a.buttons, [null, null, null]);
   assertEqual(a.equipment, { kopf: null, koerper: null, fuesse: null, waffe: null, schmuck: null });
   assertEqual([a.introSeen, a.chapterDone, a.unlocked, a.campfires], [false, [], [], ['dorf_platz']]);
-  assertEqual([a.subclass, a.passives], [null, {}]);
+  assertEqual([a.subclass, a.passives, a.switches], [null, {}, {}]);
   assertTrue(validate(s).ok);
 });
 
@@ -180,6 +181,9 @@ test('adventureSave: Händler – Tränke bis 4, Angebot, Verkauf nur ohne Träg
   assertEqual(buyItem(s, swamp, 'h1'), { ok: false, reason: 'unknown' });
   adv.chapterDone = [1];
   assertEqual(shopStock(adv), [...SHOP.stockByChapter[1], ...SHOP.stockByChapter[2]]);
+  adv.chapterDone = [1, 2];
+  assertEqual(shopStock(adv), [...SHOP.stockByChapter[1], ...SHOP.stockByChapter[2], ...SHOP.stockByChapter[3]]);
+  adv.chapterDone = [1];
   assertEqual(buyItem(s, id, 'h1'), { ok: true });
   assertEqual(buyItem(s, id, 'h1'), { ok: false, reason: 'owned' });
   assertEqual(buyItem(s, swamp, 'h1'), { ok: true });
@@ -210,14 +214,14 @@ test('adventureSave: Umwandlung 4 → 5 behält Stammstufen, keine Unterklasse',
   const before = v4WithTrunk();
   const after = repairSave(migrate(structuredClone(before)));
   const a = after.heroes[0].adventure;
-  assertEqual(after.version, 5);
+  assertEqual(after.version, 6);
   assertEqual([a.subclass, a.passives, a.level, a.skillPoints], [null, {}, 12, 9]);
   assertEqual(a.abilities, { schwerthieb: 3, wirbelschlag: 2, schildstoss: 1 });
   assertEqual(a.buttons, ['wirbelschlag', 'schildstoss', null]);
   assertEqual(after.heroes[1].adventure, null);
   assertTrue(validate(after).ok, validate(after).error);
   const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify(before) });
-  assertEqual(createStore(storage).load().data.version, 5);
+  assertEqual(createStore(storage).load().data.version, 6);
   assertEqual(storage.getItem(versionBackupKey(4)), JSON.stringify(before));
 });
 
@@ -250,4 +254,66 @@ test('adventureSave: Ausbessern behält Lagerfeuer, Bosse, Kisten, Fundorte und 
   assertEqual(a.chests, ['k2_kiste_teich']);
   assertEqual(a.found, ['k2_seerose_1']);
   assertEqual(a.chapterDone, [1, 2]);
+});
+
+// ---------------------------------------------------------------- Kapitel 3: Spielstand 6
+
+test('adventureSave: Umwandlung 5 → 6 gibt leere Schleusen und Blasen-Zähler, sonst bleibt alles; Kopie v5', () => {
+  const s5 = v4();
+  const a5 = s5.heroes[0].adventure;
+  Object.assign(a5, { level: 17, chapterDone: [1, 2], bosses: ['graete'], potions: 3 });
+  delete a5.switches;
+  delete s5.stats.bubbleKills;
+  const before = { ...s5, version: 5 };
+  const after = repairSave(migrate(structuredClone(before)));
+  assertEqual(after.version, 6);
+  const a = after.heroes[0].adventure;
+  assertEqual(a.switches, {});
+  assertEqual([a.level, a.chapterDone, a.bosses, a.potions], [17, [1, 2], ['graete'], 3]);
+  assertEqual(after.heroes[1].adventure, null);
+  assertEqual(after.stats.bubbleKills, 0);
+  assertEqual(shared(after), shared(before));
+  assertTrue(validate(after).ok, validate(after).error);
+  const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify(before) });
+  assertEqual(createStore(storage).load().data.version, 6);
+  assertEqual(storage.getItem(versionBackupKey(5)), JSON.stringify(before));
+});
+
+test('adventureSave: Ausbessern – Schleusen: unbekannte und ungültige Zustände fallen weg', async () => {
+  const { MAPS } = await import('../src/data/maps/index.js');
+  MAPS.__schleusen = {
+    id: '__schleusen', chapter: 3, campfires: [], bosses: [], chests: [], spots: [],
+    sluices: [{ id: 'sl_a', lever: { x: 0, z: 0 } }, { id: 'sl_b', lever: { x: 1, z: 0 } }, { id: 'sl_c', lever: { x: 2, z: 0 } }, { id: 'sl_biber' }],
+  };
+  try {
+    const a = repaired((ad) => { ad.switches = { sl_a: 'open', sl_b: 'halb', sl_c: 3, unbekannt: 'closed', sl_biber: 'open' }; });
+    assertEqual(a.switches, { sl_a: 'open' });
+    const b = repaired((ad) => { ad.switches = 'kaputt'; });
+    assertEqual(b.switches, {});
+  } finally { delete MAPS.__schleusen; }
+});
+
+test('adventureSave: commitAdventure zählt Blasen-Tötungen in stats.bubbleKills', () => {
+  const s = v4();
+  commitAdventure(s, 'h1', { record: s.heroes[0].adventure, ledger: { gold: 0, items: [], materials: {}, bubbleKills: 3 } });
+  commitAdventure(s, 'h1', { record: s.heroes[0].adventure, ledger: { gold: 0, items: [], materials: {} } });
+  assertEqual(s.stats.bubbleKills, 3);
+  const broken = v4();
+  broken.stats.bubbleKills = -2;
+  assertEqual(repairSave(broken).stats.bubbleKills, 0);
+});
+
+test('adventureSave: Ausbessern behält Lagerfeuer, Bosse, Kisten, Fundorte und Schleusen von Kapitel 3', () => {
+  const s = defaultSave();
+  const h = addHero(s, { name: 'Damm', animal: 'hase', class: 'dieb' }, { now: 1, id: 'h1' });
+  h.adventure = newAdventure(h);
+  Object.assign(h.adventure, {
+    mapId: 'kapitel3', campfireId: 'k3_auwald', campfires: ['dorf_platz', 'k3_ufer', 'k3_auwald'],
+    bosses: ['nagezahn'], chests: ['k3_kiste_altarm'], found: ['k3_treibholz_1'], chapterDone: [1, 2],
+    switches: { schleuse_nord: 'closed', schleuse_sued: 'open', schleuse_altarm: 'halb', biberschleuse: 'open' },
+  });
+  const a = repairSave(s).heroes[0].adventure;
+  assertEqual([a.mapId, a.campfireId, a.campfires], ['kapitel3', 'k3_auwald', ['dorf_platz', 'k3_ufer', 'k3_auwald']]);
+  assertEqual([a.bosses, a.chests, a.found], [['nagezahn'], ['k3_kiste_altarm'], ['k3_treibholz_1']]);
+  assertEqual(a.switches, { schleuse_nord: 'closed', schleuse_sued: 'open' });
 });

@@ -160,7 +160,7 @@ Die kleinen Befunde stehen unten in Abschnitt 8.
   - **Laden:** erst wenn der Held den Sumpf betritt oder Kapitel 1 abgeschlossen hat (`CHAPTER_SHEETS`, `CHAPTER_TILES`, `src/render/chapterImages.js`); Start im Sumpf wartet darauf, sonst Hintergrund und danach Neuaufbau von Karte und Gegnern (`requestChapterImages`).
   - **Ersatz:** ohne `kapitel2.webp` die bisherigen Stellvertreter (`ADVENTURE_SPRITE_FALLBACK`, `adventureSpriteDef`), sonst wie vorher.
   - Größen angepasst: Ochsenfrosch 1,25 m, Blutegel 0,8 m, Quak 2,6 m (schreitet jetzt `lumber`), Haudrauf 3,0 m.
-  - Geprüft im Browser bei 390 × 844 und am PC: Schlamm und Stege, Kulissen (Moorbaum blendet vor dem Helden aus), Ochsenfrösche, Libellen, Blutegel, Quak, Frau Quappe, Krönungsschild, Porträt und alle acht Symbole, Nachladen beim Reisen aus dem Dorf in den Sumpf, keine Fehler in der Konsole. Nicht von Hand angesehen: Haudrauf und Kaulquappen im Spiel (nur der freigestellte Bogen), echtes Handy. Teststand: **667 Tests grün** (`tests.html`).
+  - Geprüft im Browser bei 390 × 844 und am PC: Schlamm und Stege, Kulissen (Moorbaum blendet vor dem Helden aus), Ochsenfrösche, Libellen, Blutegel, Quak, Frau Quappe, Krönungsschild, Porträt und alle acht Symbole, Nachladen beim Reisen aus dem Dorf in den Sumpf, keine Fehler in der Konsole. Nicht von Hand angesehen: Haudrauf und Kaulquappen im Spiel (nur der freigestellte Bogen), echtes Handy. Teststand: **667 Tests grün**, nach dem Zusammenführen mit Kapitel 3 **705** (`tests.html`).
 
 ## 2. Was noch fehlt (vom Auftraggeber gewünschte Pakete und offene Wünsche)
 

@@ -351,8 +351,14 @@ test('hero: die Figur dreht sich beim Zielen in die Zielrichtung, sonst in die L
 test('sprites: Abenteuer-Gegner liegen im ausgeschnittenen Bogen ihres Kapitels, Stellvertreter und Aufsammelbares sind bekannt', async () => {
   const { ADVENTURE_SPRITE_STANDIN, PICKUP_STANDIN, CUT_LAYOUTS } = await import('../src/data/sprites.js');
   for (const [type, d] of Object.entries(ADVENTURE_ENEMY_SPRITES)) {
-    const { width: W, height: H } = CUT_LAYOUTS[d.sheet];
-    assertTrue(d.x >= 0 && d.y >= 0 && d.x + d.w <= W && d.y + d.h <= H, type);
+    if (!CUT_LAYOUTS[d.sheet]) {
+      // Stellvertreter aus einem Bogen des Wellen-Modus: dasselbe Rechteck wie dort.
+      const w = ENEMY_SPRITES[d.cell];
+      assertEqual([d.sheet, d.x, d.y, d.w, d.h], [w.sheet, w.x, w.y, w.w, w.h], type);
+    } else {
+      const { width: W, height: H } = CUT_LAYOUTS[d.sheet];
+      assertTrue(d.x >= 0 && d.y >= 0 && d.x + d.w <= W && d.y + d.h <= H, type);
+    }
     if (type !== 'flossian') assertTrue(Object.hasOwn(ENEMY_SPRITES, ADVENTURE_SPRITE_STANDIN[type]), type);
   }
   assertEqual(Object.values(PICKUP_STANDIN).sort(), ['chest', 'potion', 'xp']);

@@ -14,9 +14,15 @@ export const STORY = {
       { scene: 4, lines: ['Flossian hat den Fröschen ein Königreich versprochen.', 'Mit Krone. Und einem Thron aus Seerosen.'] },
       { scene: 0, lines: ['Nur eine macht nicht mit: die Unke Frau Quappe.', 'Sie wartet am Unkenteich. Und sie ist schlecht gelaunt.'] },
     ],
+    3: [
+      { scene: 3, lines: ['Der Biberdamm. Wasser rauscht, Holz knarrt, überall wird genagt.', 'Die Biber bauen Tag und Nacht. Für wen eigentlich?'] },
+      { scene: 1, lines: ['Flossian hat ihnen den Damm als Geschenk an alle verkauft.', 'In Wahrheit will er ihn brechen. Dann ist das ganze Land ein See.'] },
+      { scene: 0, lines: ['Biberin Rinde glaubt ihm kein Wort.', 'Sie wartet am Biberbau. Mit einem sehr skeptischen Blick.'] },
+    ],
   },
   chapterEnd: {
     1: { scene: 1, lines: ['Kapitel 1 geschafft! Der Bach ist wieder ein Bach.', 'Aber im Sumpf quaken die Frösche lauter als sonst …', 'Der Weg in den Sumpf beginnt am Westrand von Bachwinkel.'] },
-    2: { scene: 5, lines: ['Kapitel 2 geschafft! Im Sumpf quakt es wieder normal.', 'Doch flussaufwärts nagen die Biber an einem riesigen Damm …', 'Fortsetzung folgt.'] },
+    2: { scene: 5, lines: ['Kapitel 2 geschafft! Im Sumpf quakt es wieder normal.', 'Doch flussaufwärts nagen die Biber an einem riesigen Damm …', 'Der Weg zum Damm beginnt am Nordrand von Bachwinkel.'] },
+    3: { scene: 3, lines: ['Kapitel 3 geschafft! Der Damm hält, und die Biber sind Freunde.', 'Flossian tobt in seinem Schloss mitten im See …', 'Fortsetzung folgt.'] },
   },
 };

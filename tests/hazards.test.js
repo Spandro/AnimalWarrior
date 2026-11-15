@@ -1,6 +1,6 @@
 import { test, assertEqual, assertTrue, assertClose } from './runner.js';
 import { createBubbles, stepBubbles } from '../src/core/hazards.js';
-import { createWorld, stepWorld, spawnEnemy } from '../src/core/world.js';
+import { createWorld, stepWorld, spawnEnemy, damageEnemy } from '../src/core/world.js';
 import { createAdventureRun, stepAdventure, rest, travel } from '../src/modes/adventure.js';
 import { defaultSave, addHero } from '../src/save/store.js';
 import { newAdventure } from '../src/save/adventure.js';
@@ -208,6 +208,7 @@ test('hazards: Gegner-Schaden der Regelschicht = 2/3 Ochsenfrosch der Kartenstuf
   for (let i = 0; i < 5; i++) { run.world.hero.x = 20; run.world.hero.z = 0; stepAdventure(run, 1 / 30, still); }
   assertTrue(!run.world.enemies.includes(e));
   assertEqual(run.record.quests.nasse_pfoten.progress, 1);
+  assertEqual(run.ledger.bubbleKills, 1);
   assertTrue(run.record.xp > xp || run.record.level > 1);
 }));
 
@@ -251,4 +252,13 @@ test('hazards: Blasen-Schaden zählt nicht als Treffer des Helden – kein Leben
   assertTrue(world.hero.hp <= hp, `kein Lebensraub: ${world.hero.hp} > ${hp}`);
   assertTrue(!stole, 'kein Klauen');
   assertClose(boss.hp, boss.maxHp * (1 - BUBBLES.bossMaxPct), 1e-6);
+});
+
+test('hazards: Tötung durch Gelände trägt ihre Quelle, eine Fähigkeit nicht und zählt nicht als Blasen-Tötung', () => {
+  const w = bubbleWorld();
+  const a = spawnEnemy(w, 'helmfisch', 3, 0), b = spawnEnemy(w, 'helmfisch', 6, 0);
+  damageEnemy(w, a, { amount: 999, crit: false }, 'moorblase', { environment: true });
+  damageEnemy(w, b, { amount: 999, crit: false }, 'schwerthieb');
+  const kills = w.events.filter((e) => e.type === 'kill');
+  assertEqual(kills.map((k) => k.source), ['moorblase', undefined]);
 });

@@ -58,8 +58,14 @@ test('abenteuer-bilder: cutLayout füllt Reihe um Reihe bis zur Höchstbreite', 
 test('abenteuer-bilder: Figuren, Leute und Kulissen zeigen auf ihre Zelle im ausgeschnittenen Bogen', () => {
   const check = (defs, sheets) => {
     for (const [name, d] of Object.entries(defs)) {
-      assertTrue(sheets.includes(d.sheet), `${name}: Bogen ${d.sheet}`);
       assertTrue(d.heightM > 0 && d.footOffset >= 0 && d.footOffset < d.heightM, `${name} Maße`);
+      if (defs === ADVENTURE_ENEMY_SPRITES && ENEMY_SPRITES[d.cell]?.sheet === d.sheet) {
+        // Stellvertreter aus einem Bogen des Wellen-Modus (Kapitel 3, bis Bilder kommen): dasselbe Rechteck wie dort.
+        const w = ENEMY_SPRITES[d.cell];
+        assertEqual({ x: d.x, y: d.y, w: d.w, h: d.h }, { x: w.x, y: w.y, w: w.w, h: w.h }, name);
+        continue;
+      }
+      assertTrue(sheets.includes(d.sheet), `${name}: Bogen ${d.sheet}`);
       if (!SHEET_CUTS[d.sheet]) {
         // Nicht ausgeschnitten (Frau Quappe): Rechteck direkt im gelieferten Bild.
         const [W, H] = DELIVERED[SHEETS[d.sheet]];
@@ -82,12 +88,13 @@ test('abenteuer-bilder: Figuren, Leute und Kulissen zeigen auf ihre Zelle im aus
     const src = d.sheet === 'kapitel1' ? CUT_LAYOUTS.kapitel1.cells[d.cell] : ENEMY_SPRITES[d.cell];
     assertEqual({ x: d.x, y: d.y, w: d.w, h: d.h }, { x: src.x, y: src.y, w: src.w, h: src.h }, name);
   }
-  // Jede Person und jede Art von Kleinkram auf den Karten hat ein Bild, eine Ersatzfarbe und ein Porträt.
+  // Jede Person hat eine Ersatzfarbe für die 3D-Figur, jede mit Bild auch ein Porträt (Leute späterer Kapitel ohne Bild:
+  // 3D-Figur und Kreis mit Buchstaben); Kapitel 1 und 2 haben für alle ein Bild. Jede Art von Kleinkram hat ein Bild.
   for (const map of Object.values(MAPS)) {
     for (const n of map.npcs) {
-      assertTrue(!!NPC_SPRITES[n.id], `Bild ${n.id}`);
       assertTrue(!!MAP_LOOK.npcs[n.id], `Ersatzfarbe ${n.id}`);
-      assertTrue(!!NPC_PORTRAITS.rects[n.id], `Porträt ${n.id}`);
+      if (map.chapter <= 2) assertTrue(!!NPC_SPRITES[n.id], `Bild ${n.id}`);
+      if (NPC_SPRITES[n.id]) assertTrue(!!NPC_PORTRAITS.rects[n.id], `Porträt ${n.id}`);
     }
     for (const p of map.props) assertTrue(!!PROP_SPRITES[p.kind], p.kind);
   }

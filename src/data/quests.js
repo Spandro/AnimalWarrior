@@ -1,8 +1,9 @@
-// Aufträge von Kapitel 1 (Spec §10.4) und Kapitel 2 (Etappe 3, Spec §5.4). Kennungen werden nie umbenannt; neue Schritte nur hinten anfügen.
+// Aufträge von Kapitel 1 (Spec §10.4), Kapitel 2 und Kapitel 3 (Etappe 3, Spec §5.4). Kennungen werden nie umbenannt; neue Schritte nur hinten anfügen.
 
 /**
- * @typedef {{ type: 'talk'|'reach'|'kill'|'collect'|'boss', target: string, count?: number, map?: string, text: string,
- *   from?: 'spot'|string[] }} StepDef
+ * @typedef {{ type: 'talk'|'reach'|'kill'|'collect'|'boss'|'lever', target: string, count?: number, map?: string, text: string,
+ *   from?: 'spot'|string[], state?: 'open'|'closed' }} StepDef
+ *   `lever`: Schleuse `target` in den Zustand `state` umlegen (steht sie schon so, gilt der Schritt sofort).
  *   `collect`: `from: 'spot'` = Fundorte dieser Art („Untersuchen“), sonst Gegnerarten, deren Besiegen mit Chance
  *   `QUEST_DROP` ein Stück gibt.
  * @typedef {{ id: string, kind: 'main'|'side', title: string, giver: string, requires: string[], steps: StepDef[],
@@ -14,7 +15,7 @@
 /** Anzeigenamen der Auftragsstücke (Meldung „Gefunden: …“). */
 export const QUEST_THING_NAMES = {
   hammer: 'Grabowskis Hammer', nuss: 'Nussversteck', flugblatt: 'Flugblatt', krebsschere: 'Krebsschere',
-  einladung: 'Einladung zur Krönung', irrlicht: 'Irrlicht', seerose: 'Seerose',
+  einladung: 'Einladung zur Krönung', irrlicht: 'Irrlicht', seerose: 'Seerose', bauplan: 'Flossians Bauplan', treibholz: 'Treibholz',
 };
 
 /** Chance, dass ein passender Gegner ein Auftragsstück (Flugblatt, Krebsschere) fallen lässt. */
@@ -159,10 +160,80 @@ export const QUESTS = {
     ],
     reward: { xp: 100, gold: 90, potions: 1 },
   },
+
+  // ---------------------------------------------------------------- Kapitel 3 „Der Biberdamm“
+  ruf_vom_damm: {
+    id: 'ruf_vom_damm', chapter: 3, kind: 'main', title: 'Ruf vom Damm', giver: 'panzerla', requires: ['hecht_haudrauf'],
+    steps: [
+      { type: 'reach', target: 'dammufer', map: 'kapitel3', text: 'Geh zum Damm nördlich von Bachwinkel' },
+      { type: 'talk', target: 'rinde', text: 'Sprich mit Biberin Rinde am Biberbau' },
+    ],
+    reward: { xp: 80, gold: 120, potions: 1 },
+  },
+  flossians_geschenk: {
+    id: 'flossians_geschenk', chapter: 3, kind: 'main', title: 'Flossians Geschenk', giver: 'rinde', requires: ['ruf_vom_damm'],
+    steps: [
+      { type: 'kill', target: 'aal', count: 6, map: 'kapitel3', text: 'Vertreibe Aale am Dammufer' },
+      { type: 'collect', target: 'bauplan', from: ['helmhecht', 'bisam'], count: 4, map: 'kapitel3', text: 'Nimm Helmhechten und Bisamen Flossians Baupläne ab' },
+      { type: 'talk', target: 'rinde', text: 'Zeig Rinde die Baupläne' },
+    ],
+    reward: { xp: 110, gold: 140 },
+  },
+  bauleiter: {
+    id: 'bauleiter', chapter: 3, kind: 'main', title: 'Der Bauleiter', giver: 'rinde', requires: ['flossians_geschenk'],
+    steps: [
+      { type: 'reach', target: 'baustelle', map: 'kapitel3', text: 'Geh zur Baustelle' },
+      { type: 'boss', target: 'nagezahn', map: 'kapitel3', text: 'Besiege Bauleiter Nagezahn' },
+      { type: 'talk', target: 'nagezahn', text: 'Zeig Nagezahn die echten Baupläne' },
+    ],
+    reward: { xp: 150, gold: 180, potions: 1 },
+  },
+  dammwache: {
+    id: 'dammwache', chapter: 3, kind: 'main', title: 'Dammwache', giver: 'nagezahn', requires: ['bauleiter'],
+    steps: [
+      { type: 'lever', target: 'schleuse_nord', state: 'closed', map: 'kapitel3', text: 'Schließ die Mühlgraben-Schleuse' },
+      { type: 'lever', target: 'schleuse_sued', state: 'closed', map: 'kapitel3', text: 'Schließ die Wiesen-Schleuse' },
+      { type: 'talk', target: 'nagezahn', text: 'Sag Nagezahn Bescheid' },
+    ],
+    reward: { xp: 170, gold: 200 },
+  },
+  admiral: {
+    id: 'admiral', chapter: 3, kind: 'main', title: 'Admiral Flossenbart', giver: 'nagezahn', requires: ['dammwache'],
+    steps: [
+      { type: 'reach', target: 'stausee', map: 'kapitel3', text: 'Geh durch die Biberschleuse zum Stausee' },
+      { type: 'boss', target: 'flossenbart', map: 'kapitel3', text: 'Besiege Admiral Flossenbart' },
+      { type: 'talk', target: 'panzerla', text: 'Erzähl Oma Panzerla vom Damm' },
+    ],
+    reward: { xp: 260, gold: 320 }, endsChapter: 3,
+  },
+  bisamplage: {
+    id: 'bisamplage', chapter: 3, kind: 'side', title: 'Bisamplage', giver: 'rinde', requires: ['ruf_vom_damm'],
+    steps: [
+      { type: 'kill', target: 'bisam', count: 8, map: 'kapitel3', text: 'Vertreibe Bisamratten' },
+      { type: 'talk', target: 'rinde', text: 'Sag Rinde Bescheid' },
+    ],
+    reward: { xp: 70, gold: 110, item: 'aalhaut' },
+  },
+  treibholz: {
+    id: 'treibholz', chapter: 3, kind: 'side', title: 'Treibholz', giver: 'rinde', requires: ['ruf_vom_damm'],
+    steps: [
+      { type: 'collect', target: 'treibholz', from: 'spot', count: 4, map: 'kapitel3', text: 'Sammle vier Stück Treibholz' },
+      { type: 'talk', target: 'rinde', text: 'Bring Rinde das Treibholz' },
+    ],
+    reward: { xp: 70, gold: 110, item: 'kieselschleuder' },
+  },
+  altarm: {
+    id: 'altarm', chapter: 3, kind: 'side', title: 'Der Altarm', giver: 'nagezahn', requires: ['bauleiter'],
+    steps: [
+      { type: 'lever', target: 'schleuse_altarm', state: 'closed', map: 'kapitel3', text: 'Leg den Hebel am Altarm um' },
+      { type: 'talk', target: 'nagezahn', text: 'Erzähl Nagezahn, was im Altarm lag' },
+    ],
+    reward: { xp: 90, gold: 130, potions: 1 },
+  },
 };
 
 /**
  * Erster Auftrag je Kapitel ab 2: Solange er noch beim ersten Schritt steht, läuft beim Betreten der Karte die
  * Einstiegsgeschichte des Kapitels (kein eigenes Feld im Spielstand).
  */
-export const CHAPTER_START_QUEST = { 2: 'ruf_aus_dem_sumpf' };
+export const CHAPTER_START_QUEST = { 2: 'ruf_aus_dem_sumpf', 3: 'ruf_vom_damm' };

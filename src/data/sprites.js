@@ -324,6 +324,12 @@ export const ADVENTURE_ENEMY_SPRITES = {
   kaulquappe: { sheet: 'kapitel2', ...K2.kaulquappe, heightM: 0.5, motion: 'scurry', footOffset: 0.03 },
   hofmarschall_quak: { sheet: 'kapitel2', ...K2.hofmarschall_quak, heightM: 2.6, motion: 'lumber', footOffset: 0.12 },
   hecht_haudrauf: { sheet: 'kapitel2', ...K2.hecht_haudrauf, heightM: 3.0, motion: 'trot', footOffset: 0.12 },
+  // Kapitel 3: Stellvertreter, bis eigene Bilder kommen.
+  aal: { ...ENEMY_SPRITES.kreuzotter, cell: 'kreuzotter', heightM: 0.6, footOffset: 0.03 },
+  bisam: { ...ENEMY_SPRITES.ratte, cell: 'ratte', heightM: 0.7 },
+  helmhecht: { sheet: 'kapitel1', ...K1.helmfisch, cell: 'helmfisch', heightM: 1.15, motion: 'scurry', footOffset: 0.05 },
+  bauleiter_nagezahn: { ...ENEMY_SPRITES.dachs, cell: 'dachs', heightM: 2.5 },
+  admiral_flossenbart: { sheet: 'kapitel1', ...K1.hauptmann_graete, cell: 'hauptmann_graete', heightM: 3.1, motion: 'lumber', footOffset: 0.12 },
   hauptmann_graete: { sheet: 'kapitel1', ...K1.hauptmann_graete, heightM: 2.6, motion: 'trot', footOffset: 0.1 },
   kommandant_zwickzwack: { sheet: 'kapitel1', ...K1.kommandant_zwickzwack, heightM: 2.8, motion: 'lumber', footOffset: 0.12 },
   flossian: { sheet: 'kapitel1', ...K1.flossian, heightM: 1.6, motion: 'lumber', footOffset: 0.08 },
@@ -449,6 +455,7 @@ export const ADVENTURE_SPRITE_STANDIN = {
   helmfisch: 'ratte', krebs: 'igel', frosch: 'giftkroete', hauptmann_graete: 'wolf', kommandant_zwickzwack: 'dachs',
   ochsenfrosch: 'giftkroete', kaulquappe: 'giftkroete', hofmarschall_quak: 'giftkroete', hecht_haudrauf: 'wolf',
   libelle: 'kraehe', blutegel: 'kreuzotter',
+  aal: 'kreuzotter', bisam: 'ratte', helmhecht: 'ratte', bauleiter_nagezahn: 'dachs', admiral_flossenbart: 'wolf',
 };
 
 /** Aufsammelbares des Abenteuers, gezeichnet wie: Trank, Truhe (Gegenstand), Kristall (Flussperle). */

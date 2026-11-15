@@ -14,11 +14,13 @@ import { SUBCLASSES, PASSIVES } from '../data/subclasses.js';
  *   equipment: Record<import('../data/items.js').Slot, string|null>, potions: number, mapId: string, campfireId: string,
  *   campfires: string[], quests: QuestLog, trackedQuest: string|null, bosses: string[], chests: string[], found: string[],
  *   questItems: Record<string, number>, explored: Record<string, string>, introSeen: boolean, chapterDone: number[],
- *   unlocked: ('merchant'|'smith')[], subclass: string|null, passives: Record<string, number> }} AdventureRecord
- *   `subclass`: gewählte Unterklasse (Etappe 2); `passives`: Dauer-Boni der Unterklasse mit Stufe 1 bis 3.
- * @typedef {{ gold: number, items: string[], materials: Record<string, number>, rests?: number }} Ledger
+ *   unlocked: ('merchant'|'smith')[], subclass: string|null, passives: Record<string, number>,
+ *   switches: Record<string, 'open'|'closed'> }} AdventureRecord
+ *   `subclass`: gewählte Unterklasse (Etappe 2); `passives`: Dauer-Boni der Unterklasse mit Stufe 1 bis 3;
+ *   `switches`: umgelegte Schleusen (Kapitel 3; fehlt eine, gilt der Ausgangszustand der Karte).
+ * @typedef {{ gold: number, items: string[], materials: Record<string, number>, rests?: number, bubbleKills?: number }} Ledger
  *   Was ein laufendes Abenteuer seit dem letzten Speichern gemeinsam für alle Helden verdient hat (`rests`: Rasten
- *   für den Zähler `stats.campfireRests`).
+ *   für den Zähler `stats.campfireRests`; `bubbleKills`: Tötungen durch Moorblasen für `stats.bubbleKills`).
  */
 
 const HOME = { mapId: 'dorf', campfireId: 'dorf_platz' };
@@ -35,6 +37,8 @@ const ALL = (kind) => new Set(Object.values(MAPS).flatMap((m) => m[kind].map((e)
 const KNOWN = { campfires: ALL('campfires'), bosses: ALL('bosses'), chests: ALL('chests'), spots: ALL('spots') };
 /** Kapitel, die es als Karte gibt (für `chapterDone`). */
 const CHAPTERS = new Set(Object.values(MAPS).filter((m) => m.chapter > 0).map((m) => String(m.chapter)));
+/** Schleusen mit Hebel (nur ihr Zustand wird gespeichert); bei jedem Ausbessern neu aus den Karten. */
+const leverSluices = () => new Set(Object.values(MAPS).flatMap((m) => (m.sluices ?? []).filter((s) => s.lever).map((s) => s.id)));
 const QUEST_THINGS = new Set(Object.values(QUESTS).flatMap((q) => q.steps.filter((s) => s.type === 'collect').map((s) => s.target)));
 
 /** Ob ein Gegenstand an diesen Platz und zu dieser Klasse passt. */
@@ -61,7 +65,7 @@ export function newAdventure(hero) {
     campfires: [HOME.campfireId],
     quests: {}, trackedQuest: null, bosses: [], chests: [], found: [], questItems: {}, explored: {},
     introSeen: false, chapterDone: [], unlocked: [],
-    subclass: null, passives: {},
+    subclass: null, passives: {}, switches: {},
   };
 }
 
@@ -151,7 +155,17 @@ function repairAdventure(a, hero, save) {
     unlocked: idList(a.unlocked, new Set(UNLOCKABLE)),
     subclass: sub ? sub.id : null,
     passives,
+    switches: repairSwitches(a.switches),
   };
+}
+
+/** Schleusen-Zustände: nur bekannte Schleusen mit Hebel und nur 'open' oder 'closed'. */
+function repairSwitches(v) {
+  const out = {};
+  if (!isObject(v)) return out;
+  const known = leverSluices();
+  for (const [id, state] of Object.entries(v)) if (known.has(id) && (state === 'open' || state === 'closed')) out[id] = state;
+  return out;
 }
 
 /**
@@ -172,7 +186,9 @@ export function repairSave(data) {
   if (isObject(data.materials)) for (const id of Object.keys(MATERIALS)) if (data.materials[id] !== undefined) materials[id] = clampInt(data.materials[id], 0, 1e9, 0);
   data.materials = materials;
   if (isObject(data.settings) && data.settings.buttonSide !== 'left' && data.settings.buttonSide !== 'right') data.settings.buttonSide = 'right';
-  if (isObject(data.stats) && !(Number.isInteger(data.stats.campfireRests) && data.stats.campfireRests >= 0)) data.stats.campfireRests = 0;
+  for (const key of ['campfireRests', 'bubbleKills']) {
+    if (isObject(data.stats) && !(Number.isInteger(data.stats[key]) && data.stats[key] >= 0)) data.stats[key] = 0;
+  }
   if (Array.isArray(data.heroes)) {
     for (const h of data.heroes) {
       if (!isObject(h) || !Object.hasOwn(CLASSES, h.class)) continue;
@@ -209,6 +225,7 @@ export function commitAdventure(save, heroId, { record, ledger }) {
     if (Object.hasOwn(MATERIALS, id)) save.materials[id] = (save.materials[id] ?? 0) + n;
   }
   if (ledger.rests) save.stats.campfireRests += ledger.rests;
+  if (ledger.bubbleKills) save.stats.bubbleKills += ledger.bubbleKills;
   return { sold };
 }
 

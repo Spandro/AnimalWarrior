@@ -7,8 +7,9 @@ import { stepAbilities } from './abilities.js';
 import { CLASSES } from '../data/classes.js';
 import { bonusModifiers } from '../data/bonuses.js';
 import { ENEMIES, ELITE, DROPS, CONTACT_INTERVAL, CONTACT_TOLERANCE, HERO_RADIUS, SEPARATION_CELL, MAX_ENEMIES,
-  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS_MOVES, CURL, SLITHER, VENOM, POUNCE } from '../data/enemies.js';
+  CONFUSE_REROLL, BOSS_SLOW_FACTOR, KNOCKBACK_SUBSTEP, CHARGE, STRAFE, RANGED, CIRCLE, BOSS_MOVES, CURL, SLITHER, VENOM, POUNCE, BURROW } from '../data/enemies.js';
 import { SHADOW, SHADOW_LINES } from '../data/shadow.js';
+import { TERRAIN } from '../data/adventure.js';
 
 /**
  * @typedef {import('./stats.js').Stats} Stats
@@ -135,9 +136,35 @@ const BEHAVIORS = {
     approachSideways(world, enemy, dt, STRAFE);
   },
 
-  /** Kreuzotter: wie strafe, nur enger gewunden. */
+  /** Kreuzotter: wie strafe, nur enger gewunden. Der Aal (`shock`) bleibt in Reichweite stehen und teilt einen Stromschlag aus. */
   slither(world, enemy, dt) {
+    const shock = ENEMIES[enemy.type]?.shock;
+    if (shock && stepShock(world, enemy, shock)) return;
     approachSideways(world, enemy, dt, SLITHER);
+  },
+
+  /** Bisam: verfolgt; in Reichweite gräbt er sich ein und taucht angekündigt neben dem Helden auf (siehe BURROW). */
+  burrow(world, enemy, dt) {
+    const ai = enemy.ai, t = world.time, b = BURROW;
+    if (ai.phase === 'under') {
+      if (t < ai.until) return;
+      surface(enemy);
+      if (Math.hypot(world.hero.x - enemy.x, world.hero.z - enemy.z) <= b.radius) damageHero(world, enemy.damage * b.damageMul);
+      ai.readyAt = t + b.cooldown;
+      return;
+    }
+    const target = enemyTarget(world, enemy);
+    const to = towards(enemy, target);
+    if (t >= (ai.readyAt ?? 0) && to.d <= b.range) {
+      const a = world.rng.range(0, Math.PI * 2);
+      let tx = target.x + Math.cos(a) * b.offset, tz = target.z + Math.sin(a) * b.offset;
+      if (world.terrain.walkable && !world.terrain.walkable(tx, tz, 'walk')) { tx = enemy.x; tz = enemy.z; }
+      ai.phase = 'under'; ai.until = t + b.time; ai.tx = tx; ai.tz = tz;
+      enemy.untargetable = true; enemy.hidden = true;
+      world.events.push({ type: 'bossTelegraph', kind: 'leap', look: 'burrow', x: tx, z: tz, radius: b.radius, delay: b.time, dirX: to.x, dirZ: to.z, damageMul: b.damageMul });
+      return;
+    }
+    BEHAVIORS.chase(world, enemy, dt);
   },
 
   /** Hält Abstand und schießt auf den Helden. */
@@ -159,6 +186,7 @@ const BEHAVIORS = {
     const ai = enemy.ai, t = world.time;
     if (!ai.phase) { ai.phase = 'chase'; ai.until = t + mv.chaseTime; }
     if (mv.summon) summonHelpers(world, enemy, mv.summon);
+    if (mv.turnFlow) turnFlow(world, enemy, mv.turnFlow);
     if (ai.phase === 'chase') {
       if (t < ai.until) { BEHAVIORS.chase(world, enemy, dt); return; }
       startBossAttack(world, enemy, mv);
@@ -193,6 +221,50 @@ const BEHAVIORS = {
     }
   },
 };
+
+/**
+ * Stromschlag des Aals: in Reichweite stehen bleiben, Kreis um sich ankündigen, nach `s.warn` treffen, wenn der Held darin
+ * steht. Betäubung oder Verwirrung brechen ab. Liefert, ob der Aal diesen Schritt damit beschäftigt ist.
+ */
+function stepShock(world, enemy, s) {
+  const ai = enemy.ai, t = world.time, hero = world.hero;
+  if (ai.phase === 'shock') {
+    if (enemy.stunnedUntil > ai.shockStart || enemy.confusedUntil > ai.shockStart) { ai.phase = null; ai.shockReady = t + s.cooldown; return false; }
+    if (t < ai.until) return true;
+    if (Math.hypot(hero.x - enemy.x, hero.z - enemy.z) <= s.radius) damageHero(world, enemy.damage * s.damageMul);
+    ai.phase = null; ai.shockReady = t + s.cooldown;
+    return true;
+  }
+  if (t < (ai.shockReady ?? 0) || Math.hypot(hero.x - enemy.x, hero.z - enemy.z) > s.range) return false;
+  ai.phase = 'shock'; ai.shockStart = t; ai.until = t + s.warn;
+  world.events.push({ type: 'bossTelegraph', kind: 'ring', look: 'shock', x: enemy.x, z: enemy.z, radius: s.radius, delay: s.warn, dirX: 0, dirZ: 0, damageMul: s.damageMul });
+  return true;
+}
+
+/** Ein eingegrabener Bisam taucht an seinem Ziel auf (oder, ruhig gestellt, an seiner Stelle). */
+function surface(enemy) {
+  const ai = enemy.ai;
+  if (ai.tx !== undefined) { enemy.x = ai.tx; enemy.z = ai.tz; }
+  ai.phase = null; ai.tx = undefined; ai.tz = undefined;
+  enemy.untargetable = false; enemy.hidden = false;
+}
+
+/**
+ * Admiral Flossenbart: alle `f.every` s dreht sich die Strömung im Kreis um seinen Platz um (bzw. zurück); `f.warn` s vorher
+ * die Ankündigung.
+ */
+function turnFlow(world, enemy, f) {
+  const ai = enemy.ai, t = world.time, c = enemy.home ?? enemy;
+  ai.nextTurn ??= t + f.every;
+  if (!ai.turnWarned && t >= ai.nextTurn - f.warn) {
+    ai.turnWarned = true;
+    world.events.push({ type: 'bossTelegraph', kind: 'flow', x: c.x, z: c.z, radius: f.radius, delay: ai.nextTurn - t, turned: !world.flowTurned, dirX: 0, dirZ: 0 });
+  }
+  if (t < ai.nextTurn) return;
+  ai.nextTurn = t + f.every; ai.turnWarned = false;
+  world.flowTurned = world.flowTurned ? null : { x: c.x, z: c.z, r: f.radius };
+  world.events.push({ type: 'flowTurned', on: !!world.flowTurned, x: c.x, z: c.z, radius: f.radius });
+}
 
 /** Nähert sich mit seitlichem Versatz (Anteil `c.lateral`), Seitenwechsel alle `c.switchInterval` s. */
 function approachSideways(world, enemy, dt, c) {
@@ -323,6 +395,18 @@ function startBossAttack(world, enemy, mv) {
     });
     return;
   }
+  if (a.kind === 'logs') {
+    const lanes = [];
+    for (let i = 0; i < a.count; i++) {
+      const off = (i - (a.count - 1) / 2) * a.lane;
+      lanes.push({ x: enemy.x - to.z * off, z: enemy.z + to.x * off });
+    }
+    telegraph(world, enemy, {
+      kind: 'logs', x: enemy.x, z: enemy.z, lanes, dirX: to.x, dirZ: to.z, length: a.length, width: 2 * a.radius,
+      radius: a.radius, speed: a.speed, delay: a.windup, damageMul: a.damageMul,
+    });
+    return;
+  }
   if (a.kind === 'ring') {
     telegraph(world, enemy, {
       kind: 'ring', x: enemy.x, z: enemy.z, radius: enemy.radius + a.reach, delay: a.windup,
@@ -399,6 +483,16 @@ function resolveAttack(world, enemy, recover) {
     ai.phase = 'recover'; ai.until = world.time + recover; ai.attack = null;
     return;
   }
+  if (a.kind === 'logs') {
+    for (const l of a.lanes) {
+      world.enemyProjectiles.push({
+        kind: 'log', ground: true, x: l.x, z: l.z, dirX: a.dirX, dirZ: a.dirZ, speed: a.speed, radius: a.radius,
+        damage: enemy.damage * a.damageMul, timeLeft: a.length / a.speed,
+      });
+    }
+    ai.phase = 'recover'; ai.until = world.time + recover; ai.attack = null;
+    return;
+  }
   if (a.kind === 'leap') { enemy.x = a.x; enemy.z = a.z; }
   const dx = hero.x - a.x, dz = hero.z - a.z;
   const d = Math.hypot(dx, dz);
@@ -444,7 +538,9 @@ export function enemyTarget(world, enemy) {
  * @param {Enemy} enemy
  */
 export function enemySpeed(world, enemy) {
-  const base = world.time < enemy.slowUntil ? enemy.speed * (1 - enemy.slowFactor) : enemy.speed;
+  let base = world.time < enemy.slowUntil ? enemy.speed * (1 - enemy.slowFactor) : enemy.speed;
+  const swim = ENEMIES[enemy.type]?.swimmer;
+  if (swim && flowAt(world, enemy.x, enemy.z)) base *= swim.speedMul;
   if (enemy.flying || ENEMIES[enemy.type]?.mudproof) return base;
   return base * terrainFactor(world, enemy.x, enemy.z, 'walk');
 }
@@ -458,6 +554,47 @@ export function enemySpeed(world, enemy) {
  */
 export function terrainFactor(world, x, z, mode) {
   return world.terrain.speedFactor ? world.terrain.speedFactor(x, z, mode) : 1;
+}
+
+/**
+ * Schub der Strömung an (x,z) in m/s, im Kreis `world.flowTurned` (Admiral Flossenbart) gegenläufig; null ohne Strömung
+ * oder wenn die Geländequelle keine meldet (Wellen-Modus).
+ * @param {World} world
+ * @param {number} x
+ * @param {number} z
+ * @returns {{ x: number, z: number } | null}
+ */
+export function flowAt(world, x, z) {
+  const f = world.terrain.flowAt ? world.terrain.flowAt(x, z) : null;
+  if (!f) return null;
+  const t = world.flowTurned;
+  if (t && (x - t.x) ** 2 + (z - t.z) ** 2 <= t.r * t.r) return { x: -f.x, z: -f.z };
+  return f;
+}
+
+/**
+ * Strömung schiebt den Helden: eigener Schub zum Laufen dazu, aber höchstens so stark, dass er gegen sie mit mindestens
+ * `TERRAIN.heroHeadway` m/s vorankommt (wirksames Tempo − heroHeadway, nie negativ; Spec §14.1).
+ */
+function pushHeroByFlow(world, dt) {
+  const hero = world.hero;
+  const flow = flowAt(world, hero.x, hero.z);
+  if (!flow) return;
+  const own = hero.stats.moveSpeed * (hero.slowUntil > world.time ? 1 - hero.slowFactor : 1) * terrainFactor(world, hero.x, hero.z, 'walk');
+  const v = Math.hypot(flow.x, flow.z);
+  const k = Math.min(v, Math.max(0, own - TERRAIN.heroHeadway)) / v;
+  hero.x += flow.x * k * dt;
+  hero.z += flow.z * k * dt;
+  pushOutOfObstacles(world, hero);
+}
+
+/** Strömung schiebt Gegner am Boden (nicht Flieger, nicht Schwimmer, nicht den Schatten) mit vollem Schub. */
+function pushEnemiesByFlow(world, dt) {
+  for (const e of world.enemies) {
+    if (e.flying || e.shadow || e.hidden || ENEMIES[e.type]?.swimmer) continue;
+    const f = flowAt(world, e.x, e.z);
+    if (f) { e.x += f.x * dt; e.z += f.z * dt; }
+  }
 }
 
 /**
@@ -525,6 +662,7 @@ export function pushHero(world, dirX, dirZ, distance) {
  * zurück, wenn er weiter weg ist.
  */
 function stepPassive(world, enemy, dt) {
+  if (enemy.ai.phase === 'under') surface(enemy);
   const h = enemy.home;
   if (!h) return;
   const to = towards(enemy, h);
@@ -693,6 +831,7 @@ export function damageEnemy(world, enemy, hit, abilityId, { environment = false 
   world.run.kills++;
   const kill = { type: 'kill', enemyType: enemy.type, x: enemy.x, z: enemy.z, id: enemy.id, elite: enemy.elite, boss: enemy.boss, packId: enemy.packId ?? null, bossId: enemy.bossId ?? null };
   if (stealing) kill.doubleLoot = true;
+  if (environment) kill.source = abilityId;
   world.events.push(kill);
   for (const b of world.hero.buffs) {
     if (!b.applause) continue;
@@ -863,7 +1002,7 @@ function stepEnemyProjectiles(world, dt) {
     p.z += p.dirZ * p.speed * dt;
     p.timeLeft -= dt;
     if (p.timeLeft <= 0 || world.terrain.obstaclesNear(p.x, p.z, p.radius).length > 0) return false;
-    if (world.terrain.walkable && !world.terrain.walkable(p.x, p.z, 'shot')) return false;
+    if (world.terrain.walkable && !world.terrain.walkable(p.x, p.z, p.ground ? 'walk' : 'shot')) return false;
     const min = p.radius + hero.radius;
     if ((p.x - hero.x) ** 2 + (p.z - hero.z) ** 2 >= min * min) return true;
     damageHero(world, p.damage);
@@ -915,6 +1054,7 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
     hero.z += dz * hero.stats.moveSpeed * f * dt;
     pushOutOfObstacles(world, hero);
   }
+  if (!inert && world.terrain.flowAt) pushHeroByFlow(world, dt);
 
   // Stärkungen ablaufen lassen
   const before = hero.buffs.length;
@@ -939,6 +1079,7 @@ export function stepWorld(world, dt, input, { inert = false } = {}) {
     if (world.time < e.confusedUntil) wander(world, e, dt);
     else (BEHAVIORS[e.behavior] || BEHAVIORS.chase)(world, e, dt);
   }
+  if (world.terrain.flowAt) pushEnemiesByFlow(world, dt);
   separateEnemies(world);
   for (const e of world.enemies) if (!e.flying) pushOutOfObstacles(world, e);
   pushEnemiesOutOfHero(world);
