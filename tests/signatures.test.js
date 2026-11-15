@@ -248,3 +248,33 @@ test('signatures: Hockerwurf stößt zurück, Glatteis bremst, Familientreffen r
 
 import { createRng } from '../src/core/rng.js';
 function createRngFor(seed) { return createRng(seed); }
+
+// ---------------------------------------------------------------- Gesamtprüfung: Befunde
+
+import { computeStats } from '../src/core/stats.js';
+import { SUBCLASSES, PASSIVES } from '../src/data/subclasses.js';
+import { ABILITIES } from '../src/data/abilities.js';
+import { MANUAL } from '../src/data/adventure.js';
+
+test('signatures: Schutz-Besonderheiten auf Stufe 5 mit vollen Dauer-Boni haben Abklingzeit ≥ 1,25 × Dauer', () => {
+  for (const sub of Object.values(SUBCLASSES)) {
+    const def = ABILITIES[sub.signature];
+    if (!['shield', 'stealth', 'healzone'].includes(def.shape)) continue;
+    const mods = sub.passives.filter((p) => p.perRank.stat).map((p) => ({ stat: p.perRank.stat, flat: p.perRank.flat && p.perRank.flat * 3, pct: p.perRank.pct && p.perRank.pct * 3 }));
+    const animal = sub.classId === 'hochstapler' ? 'giraffe' : 'hase';
+    const stats = computeStats(animal, sub.classId, mods);
+    const specials = sub.passives.filter((p) => p.perRank.special).map((p) => ({ ...p.perRank, value: p.perRank.value * 3 }));
+    const p = abilityParams(def.id, 5, stats, { ...MANUAL, specials });
+    assertTrue(p.cooldown >= 1.25 * p.duration, `${def.id}: Abklingzeit ${p.cooldown.toFixed(2)} s, Dauer ${p.duration} s`);
+  }
+});
+
+test('signatures: Erdmännchen sucht Ziele nur in Reichweite des Helden und kehrt sonst zurück', () => {
+  const w = world('hochstapler', 'giraffe');
+  const far = dummy(w, 20, 0);
+  castAbility(w, 'erdmaennchen', 1);
+  w.followers[0].x = 10;
+  for (let i = 0; i < 20; i++) stepWorld(w, 0.1, NONE);
+  assertEqual(far.hp, far.maxHp, 'Gegner 20 m vom Helden bleibt unberührt');
+  assertTrue(Math.hypot(w.followers[0].x, w.followers[0].z) < 3, 'kehrt zum Helden zurück');
+});

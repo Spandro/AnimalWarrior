@@ -3,8 +3,7 @@ import { ANIMALS } from '../data/animals.js';
 import { CLASSES } from '../data/classes.js';
 import { ABILITIES } from '../data/abilities.js';
 import { SUBCLASSES, SPECIAL_TEXT, PASSIVE_LABELS } from '../data/subclasses.js';
-import { SUBCLASS_RULES } from '../data/adventure.js';
-import { SMITH } from '../data/adventure.js';
+import { SUBCLASS_RULES, SMITH } from '../data/adventure.js';
 import { describeModifier } from './statText.js';
 import { formatNumber } from './dom.js';
 
@@ -57,4 +56,15 @@ export function treeHeader(record) {
 /** Hinweis auf das Umlernen. */
 export function respecLine() {
   return `Umlernen bei Oma Panzerla: ${formatNumber(SUBCLASS_RULES.respecGold)} Gold, alle Punkte zurück, Unterklasse neu wählen.`;
+}
+
+/**
+ * Ob nach einem Gespräch die Tafel „Umlernen“ aufgeht: nur bei Oma Panzerla, ab Level 10 mit gewählter Unterklasse und
+ * nur nach einem Gespräch ohne Angebot oder Auftragsschritt (sonst störte sie bei jeder Abgabe).
+ * @param {{ npc: string, offer?: string, advances?: string, completes?: string }} talk
+ * @param {{ level: number, subclass: string|null }} record
+ */
+export function offerRespec(talk, record) {
+  return talk.npc === 'panzerla' && !!record.subclass && record.level >= SUBCLASS_RULES.chooseLevel
+    && !talk.offer && !talk.advances && !talk.completes;
 }

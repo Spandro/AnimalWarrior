@@ -18,7 +18,7 @@ import { createStick } from './ui/stick.js';
 import { createAdventureHud } from './ui/adventureHud.js';
 import { showDialogue } from './ui/dialogue.js';
 import { openPauseMenu, openCampfire, openBigMap, openQuests, playStory, openRespec } from './ui/adventureMenus.js';
-import { SUBCLASS_RULES } from './data/adventure.js';
+import { offerRespec } from './ui/treeText.js';
 import { openEquipment } from './ui/equipment.js';
 import { openShop } from './ui/shop.js';
 import { openSmith } from './ui/smith.js';
@@ -165,7 +165,7 @@ export function startAdventure({ canvas, uiLayer, view, app, heroId, seed, quali
       busy = false;
       commit(true);
       if (r.shop) await openPage(r.shop === 'merchant' ? openShop : openSmith);
-      if (r.npc === 'panzerla' && run.record.subclass && run.record.level >= SUBCLASS_RULES.chooseLevel) await openPage(openRespec);
+      if (offerRespec(r, run.record)) await openPage(openRespec);
     } else if (r.kind === 'campfire') {
       busy = true; keys.clear(); pointer.reset();
       commit(true);

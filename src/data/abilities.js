@@ -213,7 +213,7 @@ function branchAbilities() {
       base: { damage: 30, cooldown: 5, radius: 3.5, slow: 0, slowDuration: 0 }, perk3: [{ key: 'radius', mul: 1.2 }], perk5: [{ key: 'cooldown', mul: 0.8 }] },
     // Krieger – Türsteher
     { id: 'breiteskreuz', subclass: 'tuersteher', name: 'Breites Kreuz', description: 'Ein Schild aus 30 % des Lebens fängt Schaden ab. Neu auslösen ersetzt ihn.', shape: 'shield', target: 'self', damageKey: null,
-      base: { cooldown: 7, duration: 8, shieldPct: 0.3 }, perk3: [{ key: 'duration', add: 2 }], perk5: [{ key: 'cooldown', mul: 0.8 }] },
+      base: { cooldown: 7, duration: 8, shieldPct: 0.3 }, perk3: [{ key: 'duration', add: 2 }], perk5: [{ key: 'shieldPct', add: 0.05 }] },
     { id: 'ausweisbitte', subclass: 'tuersteher', name: 'Ausweis bitte!', description: 'Ein Hieb nach vorn, der Gegner kurz betäubt. Erst mal kontrollieren.', shape: 'arc', target: 'facing',
       aim: { key: 'radius', extra: M }, base: { damage: 10, cooldown: 3, radius: 2.6, angle: 100, swings: 1, knockback: 0, stun: 1 }, perk3: [{ key: 'angle', add: 40 }], perk5: [{ key: 'stun', add: 0.5 }] },
     { id: 'rausschmiss', subclass: 'tuersteher', name: 'Rausschmiss', description: 'Schiebt alles vor dir weit weg. Und tschüss.', shape: 'line', target: 'facing',

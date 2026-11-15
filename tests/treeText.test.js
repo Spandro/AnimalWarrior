@@ -1,5 +1,5 @@
 import { test, assertEqual } from './runner.js';
-import { heroLineText, passiveEffectText, branchStatus, treeHeader, respecLine } from '../src/ui/treeText.js';
+import { heroLineText, passiveEffectText, branchStatus, treeHeader, respecLine, offerRespec } from '../src/ui/treeText.js';
 import { PASSIVES } from '../src/data/subclasses.js';
 
 test('treeText: Heldenzeile mit Unterklasse', () => {
@@ -26,4 +26,15 @@ test('treeText: Astzeile gesperrt oder mit Stufe, Kopfzeile und Umlernen', () =>
   assertEqual(treeHeader({ ...rec, subclass: null, level: 8 }), 'Punkte: 3 · Unterklasse ab Level 10');
   assertEqual(treeHeader({ ...rec, subclass: null }), 'Punkte: 3 · Unterklasse: noch nicht gewählt');
   assertEqual(respecLine(), 'Umlernen bei Oma Panzerla: 500 Gold, alle Punkte zurück, Unterklasse neu wählen.');
+});
+
+test('treeText: Umlernen-Tafel nur bei Oma, ab Level 10 mit Unterklasse und nur nach einem Gespräch ohne Auftragsschritt', () => {
+  const rec = { level: 12, subclass: 'tuersteher' };
+  assertEqual(offerRespec({ npc: 'panzerla' }, rec), true);
+  assertEqual(offerRespec({ npc: 'kruemel' }, rec), false);
+  assertEqual(offerRespec({ npc: 'panzerla', offer: 'x' }, rec), false);
+  assertEqual(offerRespec({ npc: 'panzerla', advances: 'x' }, rec), false);
+  assertEqual(offerRespec({ npc: 'panzerla', completes: 'x' }, rec), false);
+  assertEqual(offerRespec({ npc: 'panzerla' }, { level: 12, subclass: null }), false);
+  assertEqual(offerRespec({ npc: 'panzerla' }, { level: 9, subclass: 'tuersteher' }), false);
 });

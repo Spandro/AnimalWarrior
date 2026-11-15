@@ -28,7 +28,7 @@ const stack = [];
  * Tafel mit Titel, Inhalt und „Zurück“. `build(body)` füllt den Inhalt; `refresh()` baut ihn neu.
  * @returns {Promise<void>} erfüllt beim Schließen
  */
-export function panel(uiLayer, title, build, { backLabel = 'Zurück', wide = false, closeKeys = [] } = {}) {
+export function panel(uiLayer, title, build, { backLabel = 'Zurück', wide = false, closeKeys = [], focusBack = false } = {}) {
   return new Promise((resolve) => {
     const body = el('div', { class: 'adv-panel-body' });
     const back = el('button', { class: 'btn', type: 'button' }, backLabel);
@@ -65,7 +65,7 @@ export function panel(uiLayer, title, build, { backLabel = 'Zurück', wide = fal
     stack.push(api);
     window.addEventListener('keydown', onKey, true);
     build(body, api);
-    focusFirst();
+    if (focusBack) back.focus({ preventScroll: true }); else focusFirst();
   });
 }
 
@@ -206,7 +206,7 @@ export function openRespec(ctx) {
       },
     }, `Umlernen (${price} Gold)`));
     if (gold < price) body.append(el('p', { class: 'adv-muted', text: 'Dafür reicht dein Gold noch nicht.' }));
-  }, { backLabel: 'Nein danke' });
+  }, { backLabel: 'Nein danke', focusBack: true });
 }
 
 /** Aufträge: laufende mit Schritt und Fortschritt (antippen = verfolgen), erledigte darunter. */

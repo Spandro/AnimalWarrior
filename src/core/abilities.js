@@ -662,7 +662,8 @@ function updateFollowers(ctx, dt) {
       strike(w, e, f.damage, f.abilityId);
       continue;
     }
-    const e = nearestEnemy(ctx, f.x, f.z, f.range) ?? null;
+    // Leine: Ziele nur in Reichweite des Helden, sonst zurück zu ihm.
+    const e = nearestEnemy(ctx, h.x, h.z, f.range) ?? null;
     const goal = e ?? h;
     const dx = goal.x - f.x, dz = goal.z - f.z, d = Math.hypot(dx, dz);
     const stop = e ? e.radius + f.reach * 0.8 : near;
