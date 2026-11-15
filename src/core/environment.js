@@ -26,6 +26,21 @@ export function obstacleSprite(obstacle) {
   return OBSTACLE_LOOK.trees[Math.floor(h * OBSTACLE_LOOK.trees.length) % OBSTACLE_LOOK.trees.length];
 }
 
+/**
+ * Kulisse eines Randbaums oder -felsens auf einer Karte mit eigenen Kulissen (`MAP_SCENERY`): Ein Anteil `share` wird
+ * zu einem Bild aus `tree` bzw. `rock`, fest nach der Position gewählt; der Rest bleibt Baum oder Fels (`null`).
+ * @param {{ x: number, z: number, kind: 'tree'|'rock' }} decor
+ * @param {{ share: number, tree: string[], rock: string[] }} scenery
+ * @returns {{ id: string, mirror: boolean } | null} Schlüssel in `SWAMP_SPRITES`, gespiegelt
+ */
+export function borderScenery(decor, scenery) {
+  const x = Math.round(decor.x * 100), z = Math.round(decor.z * 100);
+  if (hash2(0x5ce7e, x, z) >= scenery.share) return null;
+  const list = scenery[decor.kind];
+  const h = hash2(0x5ce7f, x, z);
+  return { id: list[Math.floor(h * list.length) % list.length], mirror: hash2(0x5ce80, x, z) < 0.5 };
+}
+
 /** Eigener Zufallsstrom der Deko, damit er den Hindernissen nicht in die Quere kommt. */
 function decoSeed(seed, cx, cz) {
   let h = Math.imul(seed | 0, 0x1b873593) ^ Math.imul(cx | 0, 0xcc9e2d51) ^ Math.imul(cz | 0, 0x85ebca6b);

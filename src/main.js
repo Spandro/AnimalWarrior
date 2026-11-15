@@ -8,7 +8,9 @@ import { isWebGLAvailable, createRenderer } from './render/renderer.js';
 import { initialQuality } from './render/quality.js';
 import { loadSpriteSheets, addSheet, deferredSheets } from './render/sprites.js';
 import { loadEnvironment, loadTrailTiles } from './render/environment.js';
-import { ADVENTURE_SHEETS } from './data/sprites.js';
+import { ADVENTURE_SHEETS, CHAPTER_SHEETS } from './data/sprites.js';
+import { MAPS } from './data/maps/index.js';
+import { loadChapterImages } from './render/chapterImages.js';
 import { startGame } from './game.js';
 import { startAdventure } from './adventureGame.js';
 import { newAdventure } from './save/adventure.js';
@@ -262,7 +264,13 @@ function startApp() {
       // Bilder des Abenteuers erst jetzt: Gegner des Kapitels, Leute, Häuser und Gegenstände, Weg und Bach.
       const sheets = app.sprites.then((sprites) => Promise.all(ADVENTURE_SHEETS.map((id) => addSheet(sprites, id))).then(() => sprites));
       app.trailTiles ??= loadTrailTiles();
-      Promise.all([sheets, app.environment, app.trailTiles]).then(([sprites, env, tiles]) => {
+      // Steht der Held in einem späteren Kapitel, kommen dessen Bilder vor dem Start dazu (sonst lädt das Spiel sie,
+      // sobald er es betritt oder das Kapitel davor abschließt).
+      const record = app.save.heroes.find((h) => h.id === heroId)?.adventure;
+      const startChapter = MAPS[record?.mapId]?.chapter;
+      const chapter = Promise.all([sheets, app.trailTiles]).then(([sprites, tiles]) =>
+        (CHAPTER_SHEETS[startChapter] ? loadChapterImages(sprites, tiles, startChapter) : null));
+      Promise.all([sheets, app.environment, app.trailTiles, chapter]).then(([sprites, env, tiles]) => {
         if (app.pendingRun !== token) return;
         app.pendingRun = null;
         app.run = startAdventure({

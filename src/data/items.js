@@ -103,26 +103,30 @@ export const ITEMS = {
 /** Die 24 Gegenstände der Taverne (Würfelbecher, Rad, Höher oder tiefer und ihre Truhe). */
 export const TAVERN_ITEMS = Object.fromEntries(Object.entries(ITEMS).filter(([, item]) => item.source === 'taverne'));
 
+/** Bildbogen der Symbole je Herkunft; eine Herkunft ohne Eintrag hat noch keinen (Ersatzsymbol). */
+const ITEM_SHEET_OF = { taverne: 'beute', kapitel1: 'beute1', kapitel2: 'beute2' };
+
 /**
- * Bildbogen des Symbols: Taverne `beute` (6 × 4), Kapitel 1 `beute1` (6 × 5); Kapitel 2 hat noch keinen (null).
+ * Bildbogen des Symbols: Taverne `beute` (6 × 4), Kapitel 1 `beute1` (6 × 5), Kapitel 2 `beute2` (4 × 2); sonst null.
  * @param {ItemDef} item
- * @returns {'beute'|'beute1'|null}
+ * @returns {'beute'|'beute1'|'beute2'|null}
  */
 export function itemSheet(item) {
-  if (item.source === 'taverne') return 'beute';
-  return item.source === 'kapitel1' ? 'beute1' : null;
+  return ITEM_SHEET_OF[item.source] ?? null;
 }
 
 /**
  * Bildbögen der Gegenstände (relativ zu index.html): Größe in Pixeln, Kanten der Spalten und Zeilen (Pixel, von links
- * bzw. oben; Zelle k liegt in Spalte k % 6, Zeile ⌊k / 6⌋) und Abstand zu den Zellkanten. `beute1.webp` hat hellgraue
- * Rasterlinien bei x = 255/256, 511/512, … und y = 212, 415/416, 617, 812, die Zeilen sind daher ungleich hoch; der
- * Abstand von 2 px hält die Linien aus dem Symbol (die Gegenstände reichen fast bis an die Linien).
- * @type {Record<'beute'|'beute1', { url: string, width: number, height: number, cols: number[], rows: number[], inset: number }>}
+ * bzw. oben; Zelle k liegt in Spalte k % Spaltenzahl, Zeile ⌊k / Spaltenzahl⌋) und Abstand zu den Zellkanten.
+ * `beute1.webp` hat hellgraue Rasterlinien bei x = 255/256, 511/512, … und y = 212, 415/416, 617, 812, die Zeilen sind
+ * daher ungleich hoch; `beute2.webp` (geliefert 1536 × 1024 statt 1536 × 512) Linien bei x = 383/384, 767/768,
+ * 1151/1152 und y = 511/512, also hochkant Zellen von 384 × 512. Der Abstand von 2 px hält die Linien aus dem Symbol.
+ * @type {Record<'beute'|'beute1'|'beute2', { url: string, width: number, height: number, cols: number[], rows: number[], inset: number }>}
  */
 export const ITEM_SHEETS = {
   beute: { url: 'assets/taverne/beute.webp', width: 1536, height: 1024, cols: [0, 256, 512, 768, 1024, 1280, 1536], rows: [0, 256, 512, 768, 1024], inset: 0 },
   beute1: { url: 'assets/abenteuer/beute1.webp', width: 1536, height: 1024, cols: [0, 256, 512, 768, 1024, 1280, 1536], rows: [0, 213, 416, 618, 813, 1024], inset: 2 },
+  beute2: { url: 'assets/abenteuer/beute2.webp', width: 1536, height: 1024, cols: [0, 384, 768, 1152, 1536], rows: [0, 512, 1024], inset: 2 },
 };
 
 /**

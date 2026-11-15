@@ -1,7 +1,7 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { ENEMIES } from '../data/enemies.js';
 import { ABILITIES } from '../data/abilities.js';
-import { ENEMY_SPRITES, CROW_FLIGHT_HEIGHT, BILLBOARD, CURL_ROLL, DUO_FX, ADVENTURE_ENEMY_SPRITES, ADVENTURE_SPRITE_STANDIN, PICKUP_STANDIN, ENEMY_FLASH } from '../data/sprites.js';
+import { ENEMY_SPRITES, CROW_FLIGHT_HEIGHT, BILLBOARD, CURL_ROLL, DUO_FX, ADVENTURE_ENEMY_SPRITES, ADVENTURE_SPRITE_STANDIN, ADVENTURE_SPRITE_FALLBACK, PICKUP_STANDIN, ENEMY_FLASH } from '../data/sprites.js';
 import { isCurled } from '../core/world.js';
 import { SHADOW } from '../data/shadow.js';
 import { ENV_SPRITES } from '../data/environment.js';
@@ -300,6 +300,22 @@ function createPool(scene, geometry, material, capacity, { grow = true, castShad
 // ---------------------------------------------------------------- Ansicht
 
 /**
+ * Bild eines Abenteuer-Gegners: das eigene, wenn sein Bogen geladen ist; sonst der Stellvertreter von vor dem Einbau
+ * (`ADVENTURE_SPRITE_FALLBACK`, Kapitel 2), wenn dessen Bogen da ist; sonst ein Gegner des Wellen-Modus
+ * (`ADVENTURE_SPRITE_STANDIN`) in der eigenen Bildhöhe.
+ * @param {import('./sprites.js').SpriteSheets} sprites geladene Bögen (`ok`)
+ * @param {string} type
+ * @returns {import('../data/sprites.js').SpriteDef}
+ */
+export function adventureSpriteDef(sprites, type) {
+  const own = ADVENTURE_ENEMY_SPRITES[type];
+  if (sprites.textures[own.sheet]) return own;
+  const fallback = ADVENTURE_SPRITE_FALLBACK[type];
+  if (fallback && sprites.textures[fallback.sheet]) return fallback;
+  return { ...ENEMY_SPRITES[ADVENTURE_SPRITE_STANDIN[type]], heightM: own.heightM };
+}
+
+/**
  * Mit geladenen Bildbögen (`sprites.ok`) sind die Gegner gemalte Bildtafeln, sonst die 3D-Formen oben.
  * @param {THREE.Scene} scene
  * @param {{ sprites?: import('./sprites.js').SpriteSheets, camera?: THREE.Camera,
@@ -349,10 +365,10 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
       spriteSize[type] = { width: spriteWidth(def), height: def.heightM };
       spriteDefs[type] = def;
     }
-    // Abenteuer-Gegner: eigenes Bild, sobald `kapitel1` geladen ist, sonst ein gemalter Stellvertreter in ihrer Größe.
-    for (const [type, own] of Object.entries(ADVENTURE_ENEMY_SPRITES)) {
+    // Abenteuer-Gegner: eigenes Bild, sobald sein Bogen geladen ist, sonst ein gemalter Stellvertreter.
+    for (const type of Object.keys(ADVENTURE_ENEMY_SPRITES)) {
       if (!ENEMIES[type]) continue;
-      const def = sprites.textures[own.sheet] ? own : { ...ENEMY_SPRITES[ADVENTURE_SPRITE_STANDIN[type]], heightM: own.heightM };
+      const def = adventureSpriteDef(sprites, type);
       enemyPools[type] = createPool(root, geo(spriteGeometry(def, sprites.sizes[def.sheet])), sheetMat(def.sheet), capacity(type), { grow: false });
       spriteSize[type] = { width: spriteWidth(def), height: def.heightM };
       spriteDefs[type] = def;

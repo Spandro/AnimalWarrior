@@ -79,29 +79,33 @@ export async function loadEnvironment() {
 }
 
 /**
- * @typedef {{ weg: THREE.Texture | null, wasser: THREE.Texture | null }} TrailTiles
- * Kacheln für Weg und Bach; `null`, wo das Bild fehlt (dann bleibt es dort bei der Farbfläche).
+ * @typedef {{ weg: THREE.Texture | null, wasser: THREE.Texture | null, schlamm?: THREE.Texture | null, steg?: THREE.Texture | null }} TrailTiles
+ * Kacheln für Weg und Bach, nach dem Laden von Kapitel 2 auch Schlamm und Stege; `null` (oder fehlend), wo das Bild
+ * fehlt oder noch lädt (dann bleibt es dort bei der Farbfläche bzw. den gezeichneten Brettern).
  */
 
 /**
- * Lädt die Kacheln für Weg und Bach und macht sie nahtlos ({@link blendSeams}, wie den Boden). Löst nie mit einem Fehler
- * auf: Fehlt ein Bild, ist sein Eintrag `null`.
- * @param {{ load?: (url: string) => Promise<HTMLImageElement> }} [options] in Tests ersetzbar
+ * Lädt Kacheln der Karten und macht sie nahtlos ({@link blendSeams}, wie den Boden). Löst nie mit einem Fehler auf:
+ * Fehlt ein Bild, ist sein Eintrag `null`.
+ * @param {{ load?: (url: string) => Promise<HTMLImageElement>, keys?: Array<'weg'|'wasser'|'schlamm'|'steg'> }} [options]
+ *   `load` in Tests ersetzbar; `keys`: welche Kacheln (ohne Angabe Weg und Bach)
  * @returns {Promise<TrailTiles>}
  */
-export async function loadTrailTiles({ load = loadImage } = {}) {
-  const tile = async (url) => {
+export async function loadTrailTiles({ load = loadImage, keys = ['weg', 'wasser'] } = {}) {
+  const tile = async (key) => {
+    const url = TRAIL_TILES[key];
     try {
       const data = imageDataOf(await load(url));
       blendSeams(data, TRAIL_TILES.seamBlendPx);
       const tex = dataTexture(data);
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      if (key === 'steg') tex.rotation = TRAIL_TILES.stegTurn; // Bretter quer zum Steg
       return tex;
     } catch (e) {
       console.warn(`Kachel ${url} nicht verfügbar, zeige dort eine Farbfläche.`, e);
       return null;
     }
   };
-  const [weg, wasser] = await Promise.all([tile(TRAIL_TILES.weg), tile(TRAIL_TILES.wasser)]);
-  return { weg, wasser };
+  const loaded = await Promise.all(keys.map(tile));
+  return Object.fromEntries(keys.map((k, i) => [k, loaded[i]]));
 }

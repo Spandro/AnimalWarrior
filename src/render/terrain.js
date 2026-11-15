@@ -227,20 +227,28 @@ export function createTerrainView(scene, seed, { env, camera, obstacles = (x, z,
     return { def, width: spriteWidth(def) * k, height: def.heightM * k, foot: def.footOffset * k };
   }
 
+  /** Material je fremdem Bogen (Kulissen einer Karte, `obstacle.sprite`), angelegt beim ersten Gebrauch. */
+  const extraMats = new Map();
+  const extraMat = (texture) => {
+    if (!extraMats.has(texture)) extraMats.set(texture, spriteMaterial(texture));
+    return extraMats.get(texture);
+  };
+
   /**
    * Eine aufrechte Bildtafel am Boden: Rechteck in der festen Billboard-Ebene, Unterkante auf y = 0,
-   * Standpunkt über der Bodenposition (wie bei Helden und Gegnern).
+   * Standpunkt über der Bodenposition (wie bei Helden und Gegnern). Ohne `source` aus `objekte.webp`.
+   * @param {{ def: import('../data/sprites.js').PanelDef, size: { width: number, height: number }, material: THREE.Material }} [source]
    */
-  function paintedPanel(id, x, z, width, height, foot, mirror = false) {
-    const def = ENV_SPRITES[id];
+  function paintedPanel(id, x, z, width, height, foot, mirror = false, source = undefined) {
+    const def = source?.def ?? ENV_SPRITES[id];
     const geo = new THREE.PlaneGeometry(width, height).translate(0, height / 2, 0);
-    const { u0, v0, u1, v1 } = spriteUv(def, env.sizes.objekte);
+    const { u0, v0, u1, v1 } = spriteUv(def, source?.size ?? env.sizes.objekte);
     const uv = geo.attributes.uv;
     for (let i = 0; i < uv.count; i++) {
       const left = uv.getX(i) < 0.5;
       uv.setXY(i, (left !== mirror) ? u0 : u1, uv.getY(i) < 0.5 ? v0 : v1);
     }
-    const mesh = new THREE.Mesh(geo, spriteMat);
+    const mesh = new THREE.Mesh(geo, source?.material ?? spriteMat);
     mesh.quaternion.copy(orient.quaternion);
     mesh.position.set(x + orient.foot.x * foot, 0, z + orient.foot.z * foot);
     return mesh;
@@ -254,14 +262,25 @@ export function createTerrainView(scene, seed, { env, camera, obstacles = (x, z,
     return s;
   }
 
-  /** Baum oder Fels als Bild samt Bodenschatten. */
+  /**
+   * Baum oder Fels als Bild samt Bodenschatten. Mit `o.sprite` (Kulissen einer Karte, etwa des Sumpfs) das Bild aus
+   * diesem Bogen in seiner eigenen Größe, gespiegelt nach `o.sprite.mirror`.
+   */
   function paintedObstacle(o) {
-    const id = obstacleSprite(o);
-    const { width, height, foot } = paintedSize(id, o.radius, o.kind);
+    let width, height, panel;
+    if (o.sprite) {
+      const { def, texture, size, mirror } = o.sprite;
+      width = spriteWidth(def); height = def.heightM;
+      panel = paintedPanel(null, o.x, o.z, width, height, def.footOffset, mirror, { def, size, material: extraMat(texture) });
+    } else {
+      const id = obstacleSprite(o);
+      const s = paintedSize(id, o.radius, o.kind);
+      width = s.width; height = s.height;
+      panel = paintedPanel(id, o.x, o.z, width, height, s.foot);
+    }
     const group = new THREE.Group();
-    const panel = paintedPanel(id, o.x, o.z, width, height, foot);
     group.add(paintedShadow(o.x, o.z, width), panel);
-    return { group, panel, record: { x: o.x, z: o.z, width, height, panel, fade: 0, mat: null } };
+    return { group, panel, record: { x: o.x, z: o.z, width, height, panel, base: panel.material, fade: 0, mat: null } };
   }
 
   /** Alle Deko einer Zelle in einem einzigen Netz, damit die Bildrate nicht an Zeichenaufrufen hängt. */
@@ -431,7 +450,7 @@ export function createTerrainView(scene, seed, { env, camera, obstacles = (x, z,
     if (t.fade <= 0) {
       if (t.mat) {
         // Wieder deckend: das durchscheinende Material freigeben, damit es sich im Durchgang nicht ansammelt.
-        t.panel.material = spriteMat;
+        t.panel.material = t.base;
         t.mat.dispose();
         fadeMats.splice(fadeMats.indexOf(t.mat), 1);
         t.mat = null;
@@ -441,7 +460,7 @@ export function createTerrainView(scene, seed, { env, camera, obstacles = (x, z,
     if (!t.mat) {
       // Durchscheinend wird echt gemischt: die Alpha-Schwelle des deckenden Materials würde beim
       // Abblenden jedes Pixel verwerfen (Deckkraft 0,35 liegt unter der Schwelle 0,4).
-      t.mat = spriteMat.clone();
+      t.mat = t.base.clone();
       t.mat.transparent = true;
       t.mat.alphaToCoverage = false;
       t.mat.alphaTest = 0.05;
@@ -483,6 +502,7 @@ export function createTerrainView(scene, seed, { env, camera, obstacles = (x, z,
     grassTex.dispose();
     groundMat.dispose();
     spriteMat?.dispose();
+    for (const m of extraMats.values()) m.dispose();
     blobMat?.dispose();
     blobGeo?.dispose();
     for (const m of fadeMats) m.dispose();

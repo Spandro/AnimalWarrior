@@ -129,7 +129,7 @@ export const CAMPFIRE_OFFSET = 1.6;
  */
 export const MAP_LOOK = {
   borderRadius: { tree: 0.75, rock: 1.0 },
-  propClear: { haus_oma: 6, laden: 5, schmiede: 6, wohnhaus: 5.5, wohnhaus2: 5.5, brunnen: 2.5, wegweiser: 2, zaun: 2.5, flugblatt: 1.5 },
+  propClear: { haus_oma: 6, laden: 5, schmiede: 6, wohnhaus: 5.5, wohnhaus2: 5.5, brunnen: 2.5, wegweiser: 2, zaun: 2.5, flugblatt: 1.5, kroenungsschild: 2 },
   thingClear: 3,
   pathWidthShare: 0.7,
   path: 0x8a7150,
