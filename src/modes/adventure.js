@@ -260,7 +260,7 @@ function stepDying(run, dt) {
 
 /**
  * Regeln der Moorblasen auf dieser Karte: nur auf Schlamm, nie nah an einem Lagerfeuer, nie in einer Bossarena außer
- * einer mit `bubbleArena`; Gegner-Schaden nach der Stufe der Karte.
+ * einer mit `bubbleArena` (auch nicht mit dem Rand der Blase); Gegner-Schaden nach der Stufe der Karte.
  */
 function bubbleRules(run) {
   const map = run.map;
@@ -268,7 +268,7 @@ function bubbleRules(run) {
   return {
     isMud: (x, z) => cellAt(run.grid, x, z) === CELL.mud,
     forbidden: (x, z) => map.campfires.some((c) => Math.hypot(c.x - x, c.z - z) < BUBBLES.campfireClear)
-      || map.bosses.some((b) => !b.bubbleArena && Math.hypot(b.arena.x - x, b.arena.z - z) < b.arena.r),
+      || map.bosses.some((b) => !b.bubbleArena && Math.hypot(b.arena.x - x, b.arena.z - z) < b.arena.r + BUBBLES.radius),
     enemyDamage: run.bubbleDamage,
   };
 }

@@ -134,8 +134,7 @@ function chapterXp(mapId) {
     if (p.elite) xp += ENEMIES[p.elite].xp * (ELITE.xpMul - 1) * enemyMultipliers(p.level).xpMul;
   }
   for (const b of MAPS[mapId].bosses) xp += ENEMIES[b.type].xp * enemyMultipliers(b.level).xpMul;
-  const inChapter2 = (q) => q.steps.some((st) => st.map === 'kapitel2');
-  for (const q of Object.values(QUESTS)) if (inChapter2(q) === (mapId === 'kapitel2')) xp += q.reward.xp;
+  for (const q of Object.values(QUESTS)) if ((q.chapter ?? 1) === MAPS[mapId].chapter) xp += q.reward.xp;
   return xp;
 }
 

@@ -654,12 +654,14 @@ export function spawnShadow(world, x, z, { hp, damage, expiresAt }) {
  * @param {Enemy} enemy
  * @param {{ amount: number, crit: boolean }} hit
  * @param {string} abilityId
+ * @param {{ environment?: boolean }} [opts] `environment`: Schaden aus dem Gelände (Moorblase) – kein Treffer des Helden,
+ *   also keine Markierung, kein Lebensraub und kein Klauen.
  */
-export function damageEnemy(world, enemy, hit, abilityId) {
+export function damageEnemy(world, enemy, hit, abilityId, { environment = false } = {}) {
   const index = world.enemies.indexOf(enemy);
   if (index < 0 || enemy.untargetable) return;
   let amount = enemy.behavior === 'curl' ? curlOnHit(world, enemy, hit.amount) : hit.amount;
-  if (enemy.markedUntil > world.time) amount = Math.round(amount * (1 + enemy.markPct));
+  if (!environment && enemy.markedUntil > world.time) amount = Math.round(amount * (1 + enemy.markPct));
   const armor = ENEMIES[enemy.type]?.armor;
   if (armor) amount = Math.max(1, amount - armor);
   world.events.push({ type: 'hit', x: enemy.x, z: enemy.z, amount, crit: hit.crit, id: enemy.id });
@@ -674,12 +676,12 @@ export function damageEnemy(world, enemy, hit, abilityId) {
   const landed = Math.min(amount, Math.max(0, enemy.hp));
   enemy.hp -= amount;
   dbA[abilityId] = (dbA[abilityId] || 0) + amount;
-  if (world.lifesteal > 0) {
+  if (!environment && world.lifesteal > 0) {
     const hero = world.hero;
     hero.hp = Math.min(hero.stats.maxHp, hero.hp + landed * world.lifesteal);
   }
   const steal = world.hero.steal;
-  const stealing = !!steal && world.time < steal.until;
+  const stealing = !environment && !!steal && world.time < steal.until;
   if (stealing && steal.given < steal.cap && world.rng.chance(steal.chance)) {
     const value = Math.min(world.rng.int(steal.min, steal.max), steal.cap - steal.given);
     steal.given += value;
@@ -784,13 +786,14 @@ function poisonHero(world, enemy) {
 }
 
 /**
- * Blutegel: bremst den Helden (`hero.slowUntil`/`hero.slowFactor`, ein neuer Treffer frischt auf) und heilt sich
- * höchstens bis zum vollen Leben.
+ * Blutegel: bremst den Helden (`hero.slowUntil`/`hero.slowFactor`, ein neuer Treffer frischt auf; Ereignis
+ * `heroSlowed` für die Anzeige) und heilt sich höchstens bis zum vollen Leben.
  */
 function leechHero(world, enemy, l) {
   const hero = world.hero;
   hero.slowUntil = world.time + l.seconds;
   hero.slowFactor = l.slow;
+  world.events.push({ type: 'heroSlowed', seconds: l.seconds, factor: l.slow });
   enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * l.healPct);
 }
 

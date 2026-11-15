@@ -133,3 +133,12 @@ test('swamp: Hecht Haudrauf kündigt 4 Moorblasen an und trifft nur im Kreis', (
   assertTrue(run(true) > 0, 'im Kreis getroffen');
   assertEqual(run(false), 0);
 });
+
+test('swamp: Egel-Treffer meldet die Bremse (für die Anzeige am Helden)', () => {
+  const w = world();
+  spawnEnemy(w, 'blutegel', 0.9, 0);
+  stepWorld(w, 1 / 60, still);
+  const e = w.events.find((x) => x.type === 'heroSlowed');
+  assertTrue(!!e, 'Ereignis');
+  assertEqual([e.seconds, e.factor], [1.5, 0.4]);
+});

@@ -22,8 +22,8 @@ import { QUESTS } from './quests.js';
  */
 
 /** Nebenaufträge von Kapitel 1 (für „Hilfsbereit“). */
-/** Nebenaufträge von Kapitel 1 (ohne Schritt auf einer späteren Karte). */
-const SIDE_QUESTS = Object.values(QUESTS).filter((q) => q.kind === 'side' && !q.steps.some((s) => s.map && s.map !== 'kapitel1')).map((q) => q.id);
+/** Nebenaufträge von Kapitel 1. */
+const SIDE_QUESTS = Object.values(QUESTS).filter((q) => q.kind === 'side' && (q.chapter ?? 1) === 1).map((q) => q.id);
 
 const killed = (type, n) => (ctx) => (ctx.stats.kills[type] || 0) >= n;
 

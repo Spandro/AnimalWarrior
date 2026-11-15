@@ -48,6 +48,6 @@ function pop(world, p, enemyDamage) {
   for (const e of [...world.enemies]) {
     if (!isTargetable(e) || e.shadow || Math.hypot(e.x - p.x, e.z - p.z) > r) continue;
     const amount = e.boss ? Math.min(enemyDamage, e.maxHp * BUBBLES.bossMaxPct) : enemyDamage;
-    damageEnemy(world, e, { amount, crit: false }, 'moorblase');
+    damageEnemy(world, e, { amount, crit: false }, 'moorblase', { environment: true });
   }
 }

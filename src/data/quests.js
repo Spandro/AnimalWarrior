@@ -6,8 +6,9 @@
  *   `collect`: `from: 'spot'` = Fundorte dieser Art („Untersuchen“), sonst Gegnerarten, deren Besiegen mit Chance
  *   `QUEST_DROP` ein Stück gibt.
  * @typedef {{ id: string, kind: 'main'|'side', title: string, giver: string, requires: string[], steps: StepDef[],
- *   reward: { xp: number, gold: number, item?: string, potions?: number }, unlocks?: 'merchant'|'smith', endsChapter?: number }} QuestDef
- *   `endsChapter`: mit diesem Auftrag ist das Kapitel geschafft.
+ *   reward: { xp: number, gold: number, item?: string, potions?: number }, unlocks?: 'merchant'|'smith', endsChapter?: number,
+ *   chapter?: number }} QuestDef
+ *   `endsChapter`: mit diesem Auftrag ist das Kapitel geschafft. `chapter`: zu welchem Kapitel er gehört (fehlt = 1).
  */
 
 /** Anzeigenamen der Auftragsstücke (Meldung „Gefunden: …“). */
@@ -91,7 +92,7 @@ export const QUESTS = {
 
   // ---------------------------------------------------------------- Kapitel 2 „Der Sumpf“
   ruf_aus_dem_sumpf: {
-    id: 'ruf_aus_dem_sumpf', kind: 'main', title: 'Ruf aus dem Sumpf', giver: 'panzerla', requires: ['zwickzwack'],
+    id: 'ruf_aus_dem_sumpf', chapter: 2, kind: 'main', title: 'Ruf aus dem Sumpf', giver: 'panzerla', requires: ['zwickzwack'],
     steps: [
       { type: 'reach', target: 'schilfrand', map: 'kapitel2', text: 'Geh in den Sumpf westlich von Bachwinkel' },
       { type: 'talk', target: 'quappe', text: 'Sprich mit Frau Quappe am Unkenteich' },
@@ -99,7 +100,7 @@ export const QUESTS = {
     reward: { xp: 80, gold: 80, potions: 1 },
   },
   froesche_verbuendet: {
-    id: 'froesche_verbuendet', kind: 'main', title: 'Die Frösche haben sich verbündet', giver: 'quappe', requires: ['ruf_aus_dem_sumpf'],
+    id: 'froesche_verbuendet', chapter: 2, kind: 'main', title: 'Die Frösche haben sich verbündet', giver: 'quappe', requires: ['ruf_aus_dem_sumpf'],
     steps: [
       { type: 'kill', target: 'ochsenfrosch', count: 6, map: 'kapitel2', text: 'Vertreibe Ochsenfrösche im Schilf' },
       { type: 'collect', target: 'einladung', from: ['ochsenfrosch', 'frosch'], count: 4, map: 'kapitel2', text: 'Nimm Fröschen Einladungen zur Krönung ab' },
@@ -108,7 +109,7 @@ export const QUESTS = {
     reward: { xp: 120, gold: 100 },
   },
   hofmarschall: {
-    id: 'hofmarschall', kind: 'main', title: 'Der Hofmarschall', giver: 'quappe', requires: ['froesche_verbuendet'],
+    id: 'hofmarschall', chapter: 2, kind: 'main', title: 'Der Hofmarschall', giver: 'quappe', requires: ['froesche_verbuendet'],
     steps: [
       { type: 'reach', target: 'froschhof', map: 'kapitel2', text: 'Geh zum Froschhof' },
       { type: 'boss', target: 'quak', map: 'kapitel2', text: 'Besiege Hofmarschall Quak' },
@@ -117,7 +118,7 @@ export const QUESTS = {
     reward: { xp: 160, gold: 140, potions: 1 },
   },
   nebel_im_moor: {
-    id: 'nebel_im_moor', kind: 'main', title: 'Nebel im Moor', giver: 'quappe', requires: ['hofmarschall'],
+    id: 'nebel_im_moor', chapter: 2, kind: 'main', title: 'Nebel im Moor', giver: 'quappe', requires: ['hofmarschall'],
     steps: [
       { type: 'reach', target: 'nebelmoor', map: 'kapitel2', text: 'Geh ins Nebelmoor' },
       { type: 'collect', target: 'irrlicht', from: 'spot', count: 3, map: 'kapitel2', text: 'Fang drei Irrlichter' },
@@ -126,7 +127,7 @@ export const QUESTS = {
     reward: { xp: 200, gold: 160 },
   },
   hecht_haudrauf: {
-    id: 'hecht_haudrauf', kind: 'main', title: 'Hecht Haudrauf', giver: 'quappe', requires: ['nebel_im_moor'],
+    id: 'hecht_haudrauf', chapter: 2, kind: 'main', title: 'Hecht Haudrauf', giver: 'quappe', requires: ['nebel_im_moor'],
     steps: [
       { type: 'reach', target: 'hechtloch', map: 'kapitel2', text: 'Geh zum Hechtloch' },
       { type: 'boss', target: 'haudrauf', map: 'kapitel2', text: 'Besiege Hecht Haudrauf' },
@@ -135,7 +136,7 @@ export const QUESTS = {
     reward: { xp: 300, gold: 250 }, endsChapter: 2,
   },
   egelplage: {
-    id: 'egelplage', kind: 'side', title: 'Egelplage', giver: 'quappe', requires: ['ruf_aus_dem_sumpf'],
+    id: 'egelplage', chapter: 2, kind: 'side', title: 'Egelplage', giver: 'quappe', requires: ['ruf_aus_dem_sumpf'],
     steps: [
       { type: 'kill', target: 'blutegel', count: 8, map: 'kapitel2', text: 'Vertreibe Blutegel' },
       { type: 'talk', target: 'quappe', text: 'Sag Frau Quappe Bescheid' },
@@ -143,7 +144,7 @@ export const QUESTS = {
     reward: { xp: 80, gold: 80, item: 'libellenfluegel' },
   },
   seerosen: {
-    id: 'seerosen', kind: 'side', title: 'Seerosen für Frau Quappe', giver: 'quappe', requires: ['ruf_aus_dem_sumpf'],
+    id: 'seerosen', chapter: 2, kind: 'side', title: 'Seerosen für Frau Quappe', giver: 'quappe', requires: ['ruf_aus_dem_sumpf'],
     steps: [
       { type: 'collect', target: 'seerose', from: 'spot', count: 4, map: 'kapitel2', text: 'Pflück vier Seerosen' },
       { type: 'talk', target: 'quappe', text: 'Bring Frau Quappe die Seerosen' },
@@ -151,7 +152,7 @@ export const QUESTS = {
     reward: { xp: 80, gold: 80, item: 'froschschleuder' },
   },
   libellenflug: {
-    id: 'libellenflug', kind: 'side', title: 'Libellenflug', giver: 'quappe', requires: ['hofmarschall'],
+    id: 'libellenflug', chapter: 2, kind: 'side', title: 'Libellenflug', giver: 'quappe', requires: ['hofmarschall'],
     steps: [
       { type: 'kill', target: 'libelle', count: 10, map: 'kapitel2', text: 'Verscheuche Libellen' },
       { type: 'talk', target: 'quappe', text: 'Erzähl Frau Quappe davon' },

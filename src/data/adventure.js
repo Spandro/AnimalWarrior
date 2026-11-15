@@ -141,6 +141,8 @@ export const MAP_LOOK = {
   exit: { color: 0xffe08a, opacity: 0.45 },
   /** Moorblasen: Farbe des blubbernden Kreises und der Spritzer. */
   bubble: { ring: 0xf0f070, fill: 0xd8e040, splash: 0x5a4a2a },
+  /** Vom Blutegel gebremst: dunkelroter Ring um den Helden, solange es wirkt, und kurz ein Wort über ihm. */
+  leech: { color: 0x9a2a3a, opacity: 0.7, text: 'Gebremst' },
   /** Bretter der Brücke, wenn Weg und Bach gemalt sind: Bretter je Kachel, Kachel in m, Fugenfarbe, Helligkeitsstreuung. */
   planks: { count: 8, tileM: 2.4, gap: 0x3a2614, spread: 0.18 },
   props: {

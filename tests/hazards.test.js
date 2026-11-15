@@ -184,10 +184,11 @@ test('hazards: nie im Umkreis eines Lagerfeuers', withTestMaps(() => {
   for (const w of warns) assertTrue(Math.hypot(w.x - 5, w.z) >= BUBBLES.campfireClear, `${w.x},${w.z}`);
 }));
 
-test('hazards: nie in einer fremden Bossarena, wohl aber in der mit bubbleArena', withTestMaps(() => {
+test('hazards: nie in einer fremden Bossarena (auch nicht mit dem Rand), wohl aber in der mit bubbleArena', withTestMaps(() => {
   const plain = runWarns(setupRun('testsumpf'), 44, 0, 150);
   assertTrue(plain.length > 10);
-  for (const w of plain) assertTrue(Math.hypot(w.x - 60, w.z) >= 12, `${w.x},${w.z}`);
+  // Auch der Rand der Blase (1,8 m) bleibt aus der fremden Arena heraus.
+  for (const w of plain) assertTrue(Math.hypot(w.x - 60, w.z) >= 12 + BUBBLES.radius, `${w.x},${w.z}`);
   const pike = runWarns(setupRun('testsumpf2'), 44, 0, 150);
   assertTrue(pike.some((w) => Math.hypot(w.x - 60, w.z) < 12));
 }));
@@ -225,3 +226,29 @@ test('hazards: Rasten, Tod und Kartenwechsel leeren angekündigte Blasen', withT
   travel(run, 'dorf_platz');
   assertTrue(!run.bubbles);
 }));
+
+test('hazards: Blasen-Schaden zählt nicht als Treffer des Helden – kein Lebensraub, kein Klauen, Markierung sprengt die 5 % nicht', () => {
+  const world = bubbleWorld();
+  const state = createBubbles();
+  state.nextAt = 1e9;
+  world.lifesteal = 0.5;
+  world.hero.steal = { until: 1e9, chance: 1, min: 5, max: 5, cap: 100, given: 0 };
+  world.hero.stats.hpRegen = 0;
+  world.hero.hp = world.hero.stats.maxHp / 2;
+  const hp = world.hero.hp;
+  const e = spawnEnemy(world, 'dachs', 5, 0);
+  const boss = spawnEnemy(world, 'hauptmann_graete', 5.5, 0, { hpMul: 3 });
+  e.passive = true; boss.passive = true;
+  boss.markedUntil = 1e9; boss.markPct = 0.5;
+  state.pending.push({ x: 5, z: 0, popAt: 0.2 });
+  let stole = false;
+  for (let i = 0; i < 30; i++) {
+    stepWorld(world, 1 / 30, still);
+    stepBubbles(world, state, { ...everywhere, enemyDamage: 1e6 }, 1 / 30);
+    if (world.events.some((x) => x.type === 'stealGold')) stole = true;
+  }
+  assertTrue(!world.enemies.includes(e), 'Dachs besiegt');
+  assertTrue(world.hero.hp <= hp, `kein Lebensraub: ${world.hero.hp} > ${hp}`);
+  assertTrue(!stole, 'kein Klauen');
+  assertClose(boss.hp, boss.maxHp * (1 - BUBBLES.bossMaxPct), 1e-6);
+});

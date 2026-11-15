@@ -187,3 +187,11 @@ test('quests: jedes Auftragsstück hat einen Anzeigenamen für die Meldung „Ge
   const things = new Set(Object.values(QUESTS).flatMap((q) => q.steps.filter((s) => s.type === 'collect').map((s) => s.target)));
   for (const t of things) assertTrue(typeof QUEST_THING_NAMES?.[t] === 'string' && QUEST_THING_NAMES[t].length > 0, t);
 });
+
+test('quests: jeder Auftrag nennt sein Kapitel (fehlt = 1), passend zu den Karten seiner Schritte', () => {
+  for (const q of Object.values(QUESTS)) {
+    const ch = q.chapter ?? 1;
+    for (const st of q.steps) if (st.map) assertEqual(MAPS[st.map].chapter, ch, `${q.id}: ${st.map}`);
+  }
+  for (const id of [...MAIN2, ...SIDE2]) assertEqual(QUESTS[id].chapter, 2, id);
+});

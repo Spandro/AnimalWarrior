@@ -591,6 +591,16 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
     burst(glow, 10, e.x, 0.3, e.z, { speed: e.radius * 2, up: 3, life: 0.4, size: 0.08, color: MAP_LOOK.bubble.ring, gravity: 6 });
   }
 
+  /** Vom Blutegel gebremst: dunkelroter Ring folgt dem Helden, solange die Bremse wirkt. */
+  function heroSlowed(e, hero) {
+    const look = MAP_LOOK.leech;
+    decals.add(shapes.ring, { color: look.color, life: e.seconds, x: hero.x, z: hero.z, y: 0.09, follow: heroAnchor, clock: 'world', start: world.time }, (k, d) => {
+      d.mesh.scale.setScalar(0.9 + 0.08 * Math.sin(k * 30));
+      d.material.opacity = look.opacity * (1 - k * 0.5);
+    });
+    numbers.show(look.text, hero.x, 1.6, hero.z, 'normal');
+  }
+
   function levelup(hero) {
     decals.add(shapes.pillar, { color: 0xffd77a, additive: true, life: 1.3, x: hero.x, z: hero.z, y: 0, follow: heroAnchor }, (k, d) => {
       d.mesh.scale.set(0.65 + 0.2 * k, 5, 0.65 + 0.2 * k);
@@ -648,6 +658,7 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
         case 'bossTelegraph': bossTelegraph(e); break;
         case 'bubbleWarn': bubbleWarn(e); break;
         case 'bubblePop': bubblePop(e); break;
+        case 'heroSlowed': heroSlowed(e, hero); break;
         case 'levelup': levelup(hero); break;
         case 'revive': revive(hero); break;
         case 'mapChest': mapChest(e, w); break;

@@ -244,13 +244,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/serve.ps1 -Port 8080
 - Taverne: eine Runde mit unbekannter Beute oder ungültiger Auszahlung (NaN, negativ) ändert nichts mehr; `svg()` gibt es nur noch einmal (`src/ui/dom.js`); Tastenprüfung abgesichert; der Fokus springt nicht hinter eine offene Rückfrage; nach einer abgelehnten Runde sagt der Wirt, dass Gold fehlt; `backOnEscape` nicht mehr exportiert.
 - Paket 1 und älter: die Bodentextur der App bleibt unverändert (der Boden nutzt eine Kopie); durchscheinende Baum-Materialien werden freigegeben, sobald der Baum wieder deckend ist; Export nach einem beschädigten Stand gibt die gesicherte Kopie aus, solange noch nichts Neues gespielt wurde; Erfolgs-Einblendungen liegen auf dem Ergebnisbildschirm unten; die Großfamilie blendet beim Tod mit aus. Die Anzeige der Bildrate fing schon vorher keine Zeiger ab (`pointer-events: none`).
 
-**Kapitel 2 (Gesamtprüfung 2026-11-15), zurückgestellt:**
+**Kapitel 2, Kleinigkeiten aus der Gesamtprüfung** (erledigt am 2026-11-15 auf Wunsch des Auftraggebers, jeweils mit Test):
 
-- Moorblasen laufen über den Kampfweg des Helden: Lebensraub heilt den Helden, wenn eine Blase Gegner trifft; „Klauen“ kann Gold geben; ein markierter Boss nimmt mehr als 5 %.
-- Die Blasen prüfen Arenen nur am Mittelpunkt; eine Blase knapp außerhalb könnte 1,8 m hineinreichen (mit den heutigen Daten unmöglich, nächster Schlamm 49 m von Quaks Arena). Für Kapitel 4 beachten.
-- „Hilfsbereit“ erkennt Nebenaufträge von Kapitel 1 daran, dass sie keinen Schritt auf einer späteren Karte haben; ein künftiger reiner Gesprächsauftrag würde fälschlich mitzählen.
-- Der erst nach Kapitel 1 sichtbare Wegweiser im Dorf hält schon vorher Randbäume fern (nur Aussehen).
-- Kein eigenes Zeichen am Helden, solange ein Blutegel ihn bremst.
+- Moorblasen gelten nicht mehr als Treffer des Helden: kein Lebensraub, kein Klauen, eine Markierung hebt die 5-%-Grenze bei Bossen nicht auf (`damageEnemy(…, { environment: true })`).
+- Blasen halten auch mit ihrem Rand (1,8 m) Abstand zu gesperrten Bossarenen.
+- Aufträge nennen ihr Kapitel (`chapter`, fehlt = 1); „Hilfsbereit“ zählt die Nebenaufträge von Kapitel 1 danach.
+- Solange ein Blutegel bremst, liegt ein dunkelroter Ring um den Helden, dazu kurz „Gebremst“ (Ereignis `heroSlowed`, Aussehen `MAP_LOOK.leech`).
+- Bewusst gelassen: Der erst nach Kapitel 1 sichtbare Wegweiser im Dorf hält schon vorher Randbäume fern. Sonst stünden danach Bäume vor ihm.
 
 **Bewusst gelassen** (mit Grund):
 
