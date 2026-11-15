@@ -751,6 +751,36 @@ test('survivor: Betäubung beim Ducken bricht den Sprung ab', () => {
   assertEqual(hits, 0);
 });
 
+test('survivor: Betäubung mitten im Sprung bricht ihn ab (keine Sofortlandung danach)', () => {
+  const w = behaviorWorld();
+  const { lynx } = lynxUntilTelegraph(w);
+  simulate(w, POUNCE.crouch + 0.1, 0.05);
+  assertEqual(lynx.ai.phase, 'leap');
+  lynx.stunnedUntil = w.time + 1;
+  let hits = 0;
+  simulate(w, 1.5, 0.05, () => { hits += ofType(w.events, 'heroHit').length; });
+  assertEqual(hits, 0);
+  assertTrue(lynx.ai.phase !== 'leap', 'springt weiter');
+});
+
+test('survivor: Verwirrung beim Ducken bricht den Sprung ab', () => {
+  const w = behaviorWorld();
+  const { lynx } = lynxUntilTelegraph(w);
+  lynx.confusedUntil = w.time + 0.3;
+  let leapt = false;
+  simulate(w, 1.2, 0.05, () => { if (lynx.ai.phase === 'leap') leapt = true; });
+  assertTrue(!leapt, 'sprang trotz Verwirrung');
+});
+
+test('survivor: ausgewichene Gift-Ticks zählen nicht für Glückspilz und tragen poison im Ereignis', () => {
+  const w = behaviorWorld();
+  w.hero.stats.dodge = 1;
+  w.hero.poison = { until: w.time + 2, dps: 3, nextTick: w.time + 0.01 };
+  const dodges = [];
+  simulate(w, 1.5, 0.05, () => dodges.push(...ofType(w.events, 'dodge')));
+  assertTrue(dodges.length > 0 && dodges.every((d) => d.poison === true));
+});
+
 // --- Boss-Baukasten ---
 
 /** Boss ohne Berührungsschaden; läuft, bis er einen Angriff ankündigt. */

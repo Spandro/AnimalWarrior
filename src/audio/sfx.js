@@ -4,15 +4,6 @@
 import { SFX, SFX_LIMITS, volumeToGain } from '../data/sfx.js';
 
 /**
- * Darf ein Klang dieses Typs jetzt erklingen? Unbekannte Typen nie; gedrosselte Typen höchstens
- * `limits[type]` mal je Sekunde (Mindestabstand 1000 / Grenze zum letzten Abspielen).
- * @param {string} type Ereignistyp
- * @param {number} nowMs jetzt (ms)
- * @param {number | null | undefined} lastPlayedMs wann dieser Typ zuletzt erklang (ms), sonst null
- * @param {Record<string, number>} [limits] Höchstzahl je Sekunde je Typ
- * @returns {boolean}
- */
-/**
  * Klang zu einem Spielereignis (Kennung in SFX) oder null für keinen.
  * @param {{ type: string, poison?: boolean }} e
  * @returns {string|null}
@@ -21,6 +12,15 @@ export function eventSound(e) {
   return e.type === 'heroHit' && e.poison ? null : e.type;
 }
 
+/**
+ * Darf ein Klang dieses Typs jetzt erklingen? Unbekannte Typen nie; gedrosselte Typen höchstens
+ * `limits[type]` mal je Sekunde (Mindestabstand 1000 / Grenze zum letzten Abspielen).
+ * @param {string} type Ereignistyp
+ * @param {number} nowMs jetzt (ms)
+ * @param {number | null | undefined} lastPlayedMs wann dieser Typ zuletzt erklang (ms), sonst null
+ * @param {Record<string, number>} [limits] Höchstzahl je Sekunde je Typ
+ * @returns {boolean}
+ */
 export function shouldPlay(type, nowMs, lastPlayedMs, limits = SFX_LIMITS) {
   if (!Object.hasOwn(SFX, type)) return false;
   const perSecond = Object.hasOwn(limits, type) ? limits[type] : 0;

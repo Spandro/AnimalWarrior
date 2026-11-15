@@ -10,7 +10,7 @@ import {
   duoFrameAt,
 } from './sprites.js';
 import { CLASSES } from '../data/classes.js';
-import { DUO_FX, DUO_FRAMES, BILLBOARD, AIM_TURN_DURATION, HERO_FLASH, HERO_POISON_TINT, DYING_TILT } from '../data/sprites.js';
+import { DUO_FX, DUO_FRAMES, BILLBOARD, AIM_TURN_DURATION, HERO_FLASH, HERO_POISON_TINT, HERO_POISON_EMISSIVE, DYING_TILT } from '../data/sprites.js';
 import { ABILITIES } from '../data/abilities.js';
 
 /** Dauer der Hiebanimation in Weltsekunden. */
@@ -359,7 +359,7 @@ function createFigureBody(scene, animalId, classId) {
       if (tint !== lookFlash) {
         lookFlash = tint;
         for (const m of ownMaterials) {
-          m.emissive.setHex(tint === 'flash' ? 0xff2020 : tint === 'poison' ? 0x1f5a14 : baseEmissive.get(m));
+          m.emissive.setHex(tint === 'flash' ? 0xff2020 : tint === 'poison' ? HERO_POISON_EMISSIVE : baseEmissive.get(m));
         }
       }
       if (opacity !== lookOpacity) {

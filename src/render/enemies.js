@@ -206,7 +206,6 @@ const wingParts = (s) => [
   ['sphere', 0x15151a, [s * 0.66, -0.01, -0.06], [0.16, 0.025, 0.13]],
 ];
 
-/** Fassungsvermögen je Gegnertyp: 300 reguläre insgesamt plus ausgenommene Elite; Bosse haben eigene kleine Vorräte. */
 /** 3D-Ersatz für Tiere ohne eigene Form: Kennung → Form aus ENEMY_PARTS. */
 const FALLBACK_SHAPE = {
   fuchs: 'wolf', luchs: 'wolf', dachs: 'wildschwein', keiler: 'wildschwein', igel: 'ratte', kreuzotter: 'ratte',
@@ -225,6 +224,7 @@ function rollMotion(time, height) {
   return { tilt: a, offsetY: h * (1 - Math.cos(a)), lunge: -h * Math.sin(a), scaleX: CURL_ROLL.scale, scaleY: CURL_ROLL.scale };
 }
 
+/** Fassungsvermögen je Gegnertyp: 300 reguläre insgesamt plus ausgenommene Elite; Bosse haben eigene kleine Vorräte. */
 const ENEMY_CAPACITY = 320;
 const BOSS_CAPACITY = 4;
 const CROW_HEIGHT = 1.3;
@@ -606,7 +606,7 @@ export function createEnemyView(scene, { sprites, camera, env } = {}) {
       if (world.time < e.slowUntil) color.multiply(TINT.slow);
 
       let motion = spriteMotion(sprite.motion, { speed: stunned ? 0 : g?.speed ?? 0, time: t + ph });
-      if (isCurled(world, e)) motion = rollMotion(t + ph, size.height * k);
+      if (isCurled(world, e) && !stunned) motion = rollMotion(t + ph, size.height * k);
       const lift = sprite.motion === 'fly' ? CROW_FLIGHT_HEIGHT * k : 0;
       pool.push(composeSprite(m, orient, p.x, lift, p.z, size.width * k, size.height * k, g?.face ?? 1, motion, sprite.footOffset * k), color);
       const air = lift + motion.offsetY;

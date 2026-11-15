@@ -100,11 +100,13 @@ const BEHAVIORS = {
   pounce(world, enemy, dt) {
     const ai = enemy.ai, t = world.time;
     if (ai.phase === 'crouch') {
-      if (enemy.stunnedUntil > ai.crouchStart) { ai.phase = 'chase'; ai.readyAt = t + POUNCE.cooldown; return; }
+      if (enemy.stunnedUntil > ai.crouchStart || enemy.confusedUntil > ai.crouchStart) { ai.phase = 'chase'; ai.readyAt = t + POUNCE.cooldown; return; }
       if (t < ai.until) return;
       ai.phase = 'leap'; ai.leapStart = ai.until; ai.fromX = enemy.x; ai.fromZ = enemy.z;
     }
     if (ai.phase === 'leap') {
+      // Betäubt oder verwirrt mitten im Sprung: abbrechen statt nach dem Ende sofort zu landen.
+      if (enemy.stunnedUntil > ai.leapStart || enemy.confusedUntil > ai.leapStart) { ai.phase = 'chase'; ai.readyAt = t + POUNCE.cooldown; return; }
       const k = Math.min(1, (t - ai.leapStart) / POUNCE.leapTime);
       enemy.x = ai.fromX + (ai.tx - ai.fromX) * k;
       enemy.z = ai.fromZ + (ai.tz - ai.fromZ) * k;
@@ -714,7 +716,7 @@ export function damageHero(world, rawAmount, { poison = false } = {}) {
   const res = resolveHit(world.rng,
     { baseDamage: rawAmount, damage: 1, critChance: 0, critDamage: 1 },
     { armor: hero.stats.armor, dodge: hero.stats.dodge });
-  if (res.dodged) { world.events.push({ type: 'dodge' }); return false; }
+  if (res.dodged) { world.events.push(poison ? { type: 'dodge', poison: true } : { type: 'dodge' }); return false; }
   let amount = res.amount;
   if (hero.shield) {
     const absorbed = Math.min(hero.shield.hp, amount);

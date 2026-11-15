@@ -383,6 +383,8 @@ export const HERO_FLASH = { ms: 120, color: [1, 0.22, 0.22] };
 
 /** Vergifteter Held (Kreuzotter): Farbfaktor (RGB) seines Bildes, solange das Gift wirkt; das Aufblitzen hat Vorrang. */
 export const HERO_POISON_TINT = [0.62, 1, 0.55];
+/** Leuchtfarbe der vergifteten 3D-Ersatzfigur (wenn die gemalten Bilder fehlen). */
+export const HERO_POISON_EMISSIVE = 0x1f5a14;
 
 /** Kamerawackeln bei einem Treffer: Ausschlag in Welteinheiten und Dauer in Sekunden. */
 export const SHAKE = { amount: 0.08, seconds: 0.15 };

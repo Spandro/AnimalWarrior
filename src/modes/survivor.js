@@ -95,7 +95,7 @@ export function recordFacts(run, events) {
     if (e.type === 'kill') {
       killed = true;
       f.killsByType[e.enemyType] = (f.killsByType[e.enemyType] || 0) + 1;
-    } else if (e.type === 'dodge') f.dodges++;
+    } else if (e.type === 'dodge' && !e.poison) f.dodges++;
     else if (e.type === 'shadowFlee') f.shadowsRouted++;
     else if (e.type === 'revive') f.revived++;
   }

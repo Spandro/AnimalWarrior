@@ -632,7 +632,7 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
           if (e.amount >= 1) numbers.show('+' + Math.round(e.amount), hero.x, 1.8, hero.z, 'heal');
           break;
         case 'dodge':
-          numbers.show('Ausgewichen', hero.x, 1.9, hero.z, 'info');
+          if (!e.poison) numbers.show('Ausgewichen', hero.x, 1.9, hero.z, 'info');
           break;
         case 'pickup':
           if (e.kind === 'gold') burst(glow, 4, hero.x, 0.8, hero.z, { speed: 1.5, up: 2, life: 0.35, size: 0.06, color: 0xffd040, gravity: 4 });
