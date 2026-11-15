@@ -2,7 +2,7 @@
 import { el, formatTime, formatNumber } from './dom.js';
 import { heroLineText } from './treeText.js';
 import { RUN_DURATION } from '../data/waves.js';
-import { MAX_HEROES } from '../save/schema.js';
+import { MAX_HEROES, BACKUP_KEY } from '../save/schema.js';
 import { exportText } from '../save/store.js';
 import { SAVE_HINT } from '../data/texts.js';
 import { GAME_VERSION } from '../data/version.js';
@@ -30,7 +30,9 @@ const MAX_IMPORT_BYTES = 1024 * 1024;
 
 /** Lädt den Spielstand im Speicher als JSON-Datei herunter (Blob-Link, danach wieder freigegeben). */
 export function exportSave(app) {
-  const text = exportText(app.save, app.loadStatus);
+  let backup = null;
+  try { backup = localStorage.getItem(BACKUP_KEY); } catch { backup = null; }
+  const text = exportText(app.save, app.loadStatus, backup);
   if (text === null) return;
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
   const link = el('a', { href: url, download: EXPORT_FILENAME, hidden: true });

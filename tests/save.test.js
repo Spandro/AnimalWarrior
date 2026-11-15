@@ -544,3 +544,12 @@ test('store: schlägt ein Schreiben fehl, baut das nächste Speichern auf dem un
   const r = store.update((s) => { s.gold += 5; });
   assertEqual([r.saved, r.data.gold, JSON.parse(map.get(STORAGE_KEY)).gold], [true, 65, 65]);
 });
+
+test('save: exportText nach beschädigtem Stand gibt die gesicherte Kopie aus, solange noch nichts Neues gespielt wurde', () => {
+  const broken = '{"version":5,"heroes":"kaputt"}';
+  assertEqual(exportText(defaultSave(), 'corrupt', broken), broken);
+  const played = defaultSave();
+  played.gold = 20;
+  assertEqual(JSON.parse(exportText(played, 'corrupt', broken)).gold, 20);
+  assertEqual(JSON.parse(exportText(defaultSave(), 'corrupt', null)).gold, 0);
+});

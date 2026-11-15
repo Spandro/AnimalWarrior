@@ -165,10 +165,16 @@ export function createStore(storage) {
  * Version stammt (dann ist `save` nur der Standard und darf nicht als Spielstand ausgegeben werden).
  * @param {Save} save
  * @param {LoadStatus} [status]
+ * @param {string|null} [corruptBackup] gesicherter Text eines beschädigten Stands
  * @returns {string | null}
  */
-export function exportText(save, status = 'ok') {
-  return status === 'newer' ? null : JSON.stringify(save, null, 2);
+export function exportText(save, status = 'ok', corruptBackup = null) {
+  if (status === 'newer') return null;
+  // Nach einem beschädigten Stand: solange noch nichts Neues gespielt wurde, die gesicherte Kopie ausgeben
+  // (sonst bekäme man nur den leeren Standardstand).
+  const fresh = save.heroes.length === 0 && save.gold === 0;
+  if (status === 'corrupt' && corruptBackup && fresh) return corruptBackup;
+  return JSON.stringify(save, null, 2);
 }
 
 /**
