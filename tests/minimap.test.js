@@ -14,3 +14,10 @@ test('minimap: Ziel weit weg ergibt einen Randpunkt in seiner Richtung', () => {
   assertTrue(Math.max(Math.abs(c.x), Math.abs(c.y)) <= 30 + 1e-9);
   assertClose(c.y, 30);
 });
+
+test('minimap: jede Zellart des Kartenrasters hat eine Farbe (auch Schlamm)', async () => {
+  const { CELL } = await import('../src/core/mapGrid.js');
+  const { MINIMAP } = await import('../src/data/adventure.js');
+  for (const name of Object.keys(CELL)) assertTrue(/^#[0-9a-f]{6}$/.test(MINIMAP.colors?.[name] ?? ''), name);
+  assertTrue(MINIMAP.colors.mud !== MINIMAP.colors.walk && MINIMAP.colors.mud !== MINIMAP.colors.water);
+});

@@ -1,6 +1,7 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { BOSS_MOVES, HERO_RADIUS } from '../data/enemies.js';
 import { DUO_FX } from '../data/sprites.js';
+import { MAP_LOOK } from '../data/adventure.js';
 import { describeCard } from '../ui/cardText.js';
 
 /**
@@ -566,6 +567,30 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
     });
   }
 
+  /** Moorblase: blubbernder Kreis, der sich bis zum Platzen füllt, dazu aufsteigende Bläschen. */
+  function bubbleWarn(e) {
+    const o = { life: e.delay, x: e.x, z: e.z, clock: 'world', start: world.time };
+    decals.add(shapes.ring, { ...o, y: 0.07, color: MAP_LOOK.bubble.ring }, (k, d) => {
+      d.mesh.scale.setScalar(e.radius * (1 + 0.04 * Math.sin(k * 40)));
+      d.material.opacity = 0.95;
+    });
+    decals.add(shapes.disc, { ...o, y: 0.06, color: MAP_LOOK.bubble.fill }, (k, d) => {
+      d.mesh.scale.setScalar(Math.max(0.01, e.radius * k));
+      d.material.opacity = 0.35 + 0.35 * k;
+    });
+    for (let j = 0, n = count(8); j < n; j++) {
+      const a = Math.random() * Math.PI * 2, r = rand(0, e.radius * 0.8);
+      glow.spawn(e.x + Math.cos(a) * r, 0.1, e.z + Math.sin(a) * r, 0, rand(0.4, 1), 0,
+        { life: rand(0.4, e.delay), size: rand(0.06, 0.12), color: MAP_LOOK.bubble.ring, gravity: 0 });
+    }
+  }
+
+  /** Moorblase platzt: Spritzer aus Schlamm. */
+  function bubblePop(e) {
+    burst(dust, 14, e.x, 0.2, e.z, { speed: e.radius * 2.5, up: 4, life: 0.6, size: 0.18, endSize: 0.3, color: MAP_LOOK.bubble.splash, gravity: 9 });
+    burst(glow, 10, e.x, 0.3, e.z, { speed: e.radius * 2, up: 3, life: 0.4, size: 0.08, color: MAP_LOOK.bubble.ring, gravity: 6 });
+  }
+
   function levelup(hero) {
     decals.add(shapes.pillar, { color: 0xffd77a, additive: true, life: 1.3, x: hero.x, z: hero.z, y: 0, follow: heroAnchor }, (k, d) => {
       d.mesh.scale.set(0.65 + 0.2 * k, 5, 0.65 + 0.2 * k);
@@ -621,6 +646,8 @@ export function createEffects(scene, uiLayer, { quality = 'high', camera } = {})
         case 'stealGold': numbers.show(`+${e.value} Gold`, e.x, 1.4, e.z, 'loot'); break;
         case 'kill': kill(e); break;
         case 'bossTelegraph': bossTelegraph(e); break;
+        case 'bubbleWarn': bubbleWarn(e); break;
+        case 'bubblePop': bubblePop(e); break;
         case 'levelup': levelup(hero); break;
         case 'revive': revive(hero); break;
         case 'mapChest': mapChest(e, w); break;

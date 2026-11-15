@@ -8,7 +8,7 @@ import { billboardOrientation, spriteUv, spriteWidth, spriteMaterial, shadowMate
 import { borderDecor, cellAt, CELL } from '../core/mapGrid.js';
 import { decoInCell } from '../core/environment.js';
 import { npcState } from '../core/quests.js';
-import { isGateClosed } from '../modes/adventure.js';
+import { isGateClosed, exitOpen } from '../modes/adventure.js';
 import { TERRAIN_CELL } from '../data/terrain.js';
 import { MAP_LOOK } from '../data/adventure.js';
 import { TRAIL_TILES } from '../data/environment.js';
@@ -128,7 +128,7 @@ export function createMapView(scene, map, grid, { env, sprites, tiles, camera, s
   }));
   const cleared = (d) => map.props.some((p) => Math.hypot(d.x - p.x, d.z - p.z) < (MAP_LOOK.propClear[p.kind] ?? 0))
     || [map.npcs, map.campfires, map.chests, map.spots].some((list) => list.some((t) => Math.hypot(d.x - t.x, d.z - t.z) < MAP_LOOK.thingClear))
-    || nearStrip(d, map.water) || nearStrip(d, map.bridges);
+    || nearStrip(d, map.water) || nearStrip(d, map.bridges) || nearStrip(d, map.boardwalks ?? []);
   for (const d of borderDecor(grid, seed)) if (!cleared(d)) addObstacle({ x: d.x, z: d.z, radius: MAP_LOOK.borderRadius[d.kind], kind: d.kind });
   for (const o of map.obstacles) addObstacle(o);
   const obstacles = (x, z, r) => {
@@ -164,8 +164,22 @@ export function createMapView(scene, map, grid, { env, sprites, tiles, camera, s
     ? std(0xffffff, { ...layer, map: tiles.wasser, roughness: 0.35, metalness: 0.05, transparent: true, opacity: TRAIL_TILES.waterOpacity })
     : std(MAP_LOOK.water, { ...layer, roughness: 0.25, metalness: 0.1, transparent: true, opacity: 0.88 });
   for (const w of map.water) flat(stripGeometry(w.points, w.width, 0.025, TRAIL_TILES.tileM.wasser), waterMat, 2);
-  const bridgeMat = tiles?.weg && map.bridges.length ? std(0xffffff, { ...layer, map: own(plankTexture()) }) : std(MAP_LOOK.bridge, layer);
-  for (const b of map.bridges) flat(stripGeometry(b.points, b.width, 0.09, MAP_LOOK.planks.tileM), bridgeMat, 3);
+  // Schlamm (Kapitel 2): braun-grüne Fläche über Weg und Wasser; Stege wie Brücken.
+  // Deckend: eine durchscheinende Fläche würde nach den Warnkreisen gezeichnet und sie blass überdecken.
+  const mudMat = std(MAP_LOOK.mud.color, layer);
+  for (const m of map.mud ?? []) flat(stripGeometry(m.points, m.width, MAP_LOOK.mud.y, TRAIL_TILES.tileM.weg), mudMat, 2);
+  const planked = [...map.bridges, ...(map.boardwalks ?? [])];
+  const bridgeMat = tiles?.weg && planked.length ? std(0xffffff, { ...layer, map: own(plankTexture()) }) : std(MAP_LOOK.bridge, layer);
+  for (const b of planked) flat(stripGeometry(b.points, b.width, 0.09, MAP_LOOK.planks.tileM), bridgeMat, 3);
+
+  // Ausgänge: heller Ring am Boden, nur solange der Ausgang offen ist.
+  const exitMat = std(MAP_LOOK.exit.color, { ...layer, transparent: true, opacity: MAP_LOOK.exit.opacity, emissive: MAP_LOOK.exit.color, emissiveIntensity: 0.4, depthWrite: false });
+  const exitRings = map.exits.map((x) => {
+    const ring = new THREE.Mesh(own(new THREE.RingGeometry(x.r * 0.75, x.r, 32).rotateX(-Math.PI / 2)), exitMat);
+    ring.position.set(x.x, 0.1, x.z);
+    root.add(ring);
+    return { exit: x, ring };
+  });
 
   // Gemalte Tafeln wie die Bäume: fest zur Kamera geneigt, Standpunkt über der Bodenposition, weicher Bodenschatten.
   const village = !!sprites?.textures?.dorf, people = !!sprites?.textures?.bewohner;
@@ -234,11 +248,14 @@ export function createMapView(scene, map, grid, { env, sprites, tiles, camera, s
     }
     return g;
   }
+  /** Kleinkram, der erst mit einem abgeschlossenen Kapitel erscheint (Wegweiser zum neuen Ausgang). */
+  const gatedProps = [];
   for (const p of map.props) {
-    if (village && VILLAGE_SPRITES[p.kind]) { root.add(painted(VILLAGE_SPRITES[p.kind], p.x, p.z, p.faceX === -1)); continue; }
-    const g = prop(p.kind);
-    g.position.set(p.x, 0, p.z);
+    let g;
+    if (village && VILLAGE_SPRITES[p.kind]) g = painted(VILLAGE_SPRITES[p.kind], p.x, p.z, p.faceX === -1);
+    else { g = prop(p.kind); g.position.set(p.x, 0, p.z); }
     root.add(g);
+    if (p.requires) gatedProps.push({ prop: p, mesh: g });
   }
 
   // Leute: Körper und Kopf in ihrer Farbe, darüber „!“ oder „?“.
@@ -399,6 +416,8 @@ export function createMapView(scene, map, grid, { env, sprites, tiles, camera, s
       for (const [id, c] of Object.entries(paintedChests)) { const opened = rec.chests.includes(id); c.open.visible = opened; c.shut.visible = !opened; }
       for (const [id, m] of Object.entries(spots)) m.visible = !rec.found.includes(id);
       for (const gate of run.map.gates) gates[gate.id].visible = isGateClosed(run, gate.id);
+      for (const { exit, ring } of exitRings) ring.visible = exitOpen(run, exit);
+      for (const { prop: p, mesh } of gatedProps) mesh.visible = rec.chapterDone.includes(p.requires.chapterDone);
     },
     dispose() {
       terrain.dispose();

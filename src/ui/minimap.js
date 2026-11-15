@@ -8,7 +8,7 @@ import { npcState, questTarget, trackedQuest } from '../core/quests.js';
 import { MAPS } from '../data/maps/index.js';
 import { MINIMAP } from '../data/adventure.js';
 
-const COLORS = { [CELL.blocked]: '#2e3b25', [CELL.walk]: '#b8a77a', [CELL.water]: '#4d86a6', [CELL.bridge]: '#8a6a45' };
+const COLORS = Object.fromEntries(Object.entries(CELL).map(([name, value]) => [value, MINIMAP.colors[name]]));
 
 /** Bild der ganzen Karte, ein Pixel je Rasterzelle. */
 function baseImage(grid) {

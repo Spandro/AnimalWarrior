@@ -45,7 +45,7 @@ export const DORF = {
     { kind: 'zaun', x: 34, z: -7 },
     { kind: 'zaun', x: 34, z: 7 },
     { kind: 'flugblatt', x: 40, z: -6.5 },
-    { kind: 'wegweiser', x: -20, z: -6 },
+    { kind: 'wegweiser', x: -20, z: -6, requires: { chapterDone: 1 } },
   ],
   start: { campfire: 'dorf_platz' },
 };

@@ -19,7 +19,7 @@ import { KAPITEL2 } from './kapitel2.js';
  *   bosses: { id: string, type: string, level: number, x: number, z: number, arena: { x: number, z: number, r: number }, gate: string,
  *     bubbleArena?: boolean }[],
  *   exits: { id: string, x: number, z: number, r: number, to: { map: string, campfire: string }, requires?: { chapterDone: number } }[],
- *   props: { kind: string, x: number, z: number, faceX?: number }[], start: { campfire: string },
+ *   props: { kind: string, x: number, z: number, faceX?: number, requires?: { chapterDone: number } }[], start: { campfire: string },
  *   hazards?: { bubbles?: { level: number } } }} MapDef
  *   Der erste Eintrag in `paths` ist der Hauptweg. Tore: `arena` schließt sich im Bosskampf, `barrier` ist zu, bis
  *   `opensOn` erfüllt ist. Ein Ausgang mit `requires` ist erst offen (sichtbar und benutzbar), wenn das Kapitel abgeschlossen ist. Ein Gebiet ist das kleinste, dessen Kreis den Helden enthält. `hazards.bubbles`: Moorblasen auf

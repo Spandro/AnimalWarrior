@@ -124,7 +124,7 @@ export const CAMPFIRE_OFFSET = 1.6;
  * Aussehen der Karten: Radius der Randbäume und -felsen (m), Abstand (m) um Häuser und Kleinkram (`propClear`) sowie um
  * Leute, Lagerfeuer, Kisten und Fundorte (`thingClear`), in dem keine Randbäume und -felsen stehen (sonst verdecken sie
  * diese), Anteil der Wegbreite, der als Erdweg gezeichnet wird; wenn die
- * Bilder des Abenteuers fehlen: Farben von Weg, Wasser und Brücke, Häuser (Breite, Höhe, Tiefe in m, Wand- und
+ * Bilder des Abenteuers fehlen: Farben von Weg, Wasser, Brücke und Schlamm, Ring an Ausgängen, Moorblasen, Häuser (Breite, Höhe, Tiefe in m, Wand- und
  * Dachfarbe) und eine Farbe je Person.
  */
 export const MAP_LOOK = {
@@ -135,6 +135,12 @@ export const MAP_LOOK = {
   path: 0x8a7150,
   water: 0x4d86a6,
   bridge: 0x7a5530,
+  /** Schlamm (Kapitel 2, bis Bilder kommen): Farbe braun-grün, Höhe über dem Boden (m). */
+  mud: { color: 0x5b5a30, y: 0.035 },
+  /** Ring an offenen Ausgängen: Farbe, Deckkraft. */
+  exit: { color: 0xffe08a, opacity: 0.45 },
+  /** Moorblasen: Farbe des blubbernden Kreises und der Spritzer. */
+  bubble: { ring: 0xf0f070, fill: 0xd8e040, splash: 0x5a4a2a },
   /** Bretter der Brücke, wenn Weg und Bach gemalt sind: Bretter je Kachel, Kachel in m, Fugenfarbe, Helligkeitsstreuung. */
   planks: { count: 8, tileM: 2.4, gap: 0x3a2614, spread: 0.18 },
   props: {
@@ -150,8 +156,14 @@ export const MAP_LOOK = {
   },
 };
 
-/** Minikarte: Kantenlänge in Pixeln, gezeigter Umkreis in Metern, Größe der Nebelblöcke (wie die Erkundung). */
-export const MINIMAP = { size: 112, radius: 45, block: EXPLORE_BLOCK };
+/**
+ * Minikarte: Kantenlänge in Pixeln, gezeigter Umkreis in Metern, Größe der Nebelblöcke (wie die Erkundung), Farbe je
+ * Zellart des Kartenrasters (Namen wie `CELL` in src/core/mapGrid.js).
+ */
+export const MINIMAP = {
+  size: 112, radius: 45, block: EXPLORE_BLOCK,
+  colors: { blocked: '#2e3b25', walk: '#b8a77a', water: '#4d86a6', bridge: '#8a6a45', mud: '#6e6a3c' },
+};
 
 /** Namen der Lagerfeuer für das Reisen. */
 export const CAMPFIRE_NAMES = {
